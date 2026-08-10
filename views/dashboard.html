@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HDWP - Modern WhatsApp Downloader Bot Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #080710;
+      --panel-bg: rgba(255, 255, 255, 0.03);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --accent-green: #10b981;
+      --accent-blue: #3b82f6;
+      --accent-orange: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --glow-blue: rgba(59, 130, 246, 0.25);
+      --glow-green: rgba(16, 185, 129, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at top right, #1e1b4b 0%, #0f172a 50%, var(--bg-color) 100%);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 30px 15px;
+      overflow-x: hidden;
+    }
+
+    /* Ambient background glows */
+    .glow-1 {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, var(--glow-blue) 0%, transparent 70%);
+      top: -100px;
+      left: -100px;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .glow-2 {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, var(--glow-green) 0%, transparent 70%);
+      bottom: -150px;
+      right: -150px;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .container {
+      background: var(--panel-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--panel-border);
+      border-radius: 32px;
+      padding: 40px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 30px 70px -10px rgba(0, 0, 0, 0.8),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      position: relative;
+    }
+
+    header {
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    h1 {
+      font-weight: 800;
+      margin: 0 0 15px 0;
+      font-size: 2.3rem;
+      letter-spacing: -0.04em;
+      background: linear-gradient(135deg, #34d399 0%, #3b82f6 50%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 2px 10px rgba(59, 130, 246, 0.15));
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 9999px;
+      padding: 10px 24px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      letter-spacing: 0.01em;
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--accent-orange);
+      box-shadow: 0 0 12px var(--accent-orange);
+      animation: pulse 2s infinite;
+    }
+
+    .dynamic-box {
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 20px 0;
+      width: 100%;
+    }
+
+    /* Tabs mechanism */
+    .tabs-header {
+      display: flex;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 5px;
+      margin-bottom: 20px;
+      width: 100%;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      box-shadow: none;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2);
+    }
+
+    .tab-content {
+      display: none;
+      width: 100%;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Form Fields and Inputs */
+    form {
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: 100%;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding-left: 4px;
+    }
+
+    input, select {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 14px 18px;
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      width: 100%;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      background: rgba(15, 23, 42, 0.8);
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.25),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    /* Glass Buttons */
+    button {
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      border: none;
+      color: #fff;
+      padding: 15px;
+      border-radius: 14px;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(29, 78, 216, 0.2);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 15px 25px rgba(29, 78, 216, 0.35);
+      filter: brightness(1.1);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: none;
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+      box-shadow: 0 10px 20px rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-danger:hover {
+      box-shadow: 0 15px 25px rgba(239, 68, 68, 0.35);
+    }
+
+    /* Sections */
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-align: left;
+      margin: 35px 0 15px 0;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 8px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .info-card {
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 16px;
+      padding: 15px;
+      text-align: left;
+    }
+
+    .info-card-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .info-card-value {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-top: 5px;
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    /* Task/Queue Cards */
+    .task-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 18px;
+      border-radius: 20px;
+      margin-top: 12px;
+      font-size: 0.9rem;
+      text-align: left;
+      animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .task-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+    }
+
+    .task-card.active::before {
+      background: var(--accent-green);
+    }
+
+    .task-card.waiting::before {
+      background: var(--accent-blue);
+    }
+
+    .task-card.web::before {
+      background: var(--accent-orange);
+    }
+
+    .task-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .task-title {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text-main);
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .task-status {
+      font-weight: 500;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Episode Selector Wizard styling */
+    .episode-list {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(0,0,0,0.2);
+      margin-top: 10px;
+    }
+
+    .episode-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.9rem;
+    }
+
+    .episode-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    /* Quick Action Controls */
+    .quick-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .quick-controls button {
+      padding: 12px;
+      font-size: 0.9rem;
+    }
+
+    /* Watch Link Footer Button */
+    .watch-footer-link {
+      display: block;
+      margin-top: 25px;
+      padding: 16px;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 18px;
+      color: #60a5fa;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1rem;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+
+    .watch-footer-link:hover {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(139, 92, 246, 0.18) 100%);
+      transform: scale(1.01);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(15px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+
+  <div class="container">
+    <header>
+      <h1>HDWP Bot</h1>
+      <div class="status-badge">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Bağlanıyor...</span>
+      </div>
+    </header>
+
+    <main>
+      <div class="dynamic-box" id="dynamic-box">
+        <p>Yükleniyor...</p>
+      </div>
+
+      <div class="section-title">Sistem Bilgisi</div>
+      <div class="info-grid">
+        <div class="info-card">
+          <div class="info-card-label">Ping URL Adresi</div>
+          <div class="info-card-value" id="ping-url" style="font-family: monospace; font-size: 0.85rem; color: var(--accent-blue);">-</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-label">Çalışma Süresi</div>
+          <div class="info-card-value" id="uptime-value">-</div>
+        </div>
+      </div>
+
+      <div id="tasks-container"></div>
+
+      <div class="section-title">Hızlı Kontroller</div>
+      <div class="quick-controls">
+        <button class="btn-secondary" onclick="pauseQueue()">⏸️ Duraklat</button>
+        <button class="btn-secondary" onclick="resumeQueue()">▶️ Devam Et</button>
+      </div>
+      <button class="btn-danger" style="width: 100%; margin-top: 12px; padding: 12px;" onclick="clearQueue()">🧹 Kuyruğu Sıfırla / Temizle</button>
+
+      <a href="/watch" class="watch-footer-link">🎬 İndirilen Videoları İzle (HTML5 Oynatıcı)</a>
+    </main>
+  </div>
+
+  <script>
+    let currentStatus = '';
+    let fetchedEpisodesList = [];
+
+    // Switch tab helper
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      const targetBtn = document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`);
+      if (targetBtn) targetBtn.classList.add('active');
+      
+      const targetContent = document.getElementById(tabId);
+      if (targetContent) targetContent.classList.add('active');
+    }
+
+    async function fetchEpisodes() {
+      const urlInput = document.getElementById('series-url');
+      const url = urlInput ? urlInput.value.trim() : '';
+      if (!url) { alert('Lütfen dizi / sezon linki girin!'); return; }
+
+      const fetchBtn = document.getElementById('fetch-btn');
+      fetchBtn.innerText = '🔍 Taranıyor...';
+      fetchBtn.disabled = true;
+
+      try {
+        const res = await fetch(`/api/fetch-episodes?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        
+        if (data.success && data.episodes) {
+          fetchedEpisodesList = data.episodes;
+          const listContainer = document.getElementById('fetched-episodes-list');
+          listContainer.innerHTML = '';
+          
+          data.episodes.forEach((ep, idx) => {
+            listContainer.innerHTML += `
+              <div class="episode-item">
+                <input type="checkbox" id="ep-${idx}" value="${ep.url}" checked>
+                <label for="ep-${idx}">${ep.name}</label>
+              </div>
+            `;
+          });
+          
+          document.getElementById('series-wizard-step2').style.display = 'block';
+          document.getElementById('series-name-header').innerText = `🎬 ${data.seriesName || 'Bulunan Dizi'}`;
+        } else {
+          alert('Hata: ' + (data.error || 'Bölümler alınamadı.'));
+        }
+      } catch (e) {
+        alert('İşlem başarısız: ' + e.message);
+      } finally {
+        fetchBtn.innerText = 'Bölümleri Getir 🔍';
+        fetchBtn.disabled = false;
+      }
+    }
+
+    function toggleSelectAllEpisodes(checkbox) {
+      document.querySelectorAll('#fetched-episodes-list input[type="checkbox"]').forEach(cb => {
+        cb.checked = checkbox.checked;
+      });
+    }
+
+    async function downloadSelectedEpisodes() {
+      const phoneInput = document.getElementById('series-phone');
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      if (!phone) { alert('Gönderilecek telefon numarası gerekli!'); return; }
+
+      const selected = [];
+      document.querySelectorAll('#fetched-episodes-list input[type="checkbox"]').forEach((cb, idx) => {
+        if (cb.checked) {
+          selected.push(fetchedEpisodesList[idx]);
+        }
+      });
+
+      if (selected.length === 0) {
+        alert('Lütfen en az bir bölüm seçin!');
+        return;
+      }
+
+      const submitBtn = document.getElementById('series-submit-btn');
+      submitBtn.innerText = 'Sıraya Alınıyor...';
+      submitBtn.disabled = true;
+
+      try {
+        let cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (!cleanPhone.endsWith('@s.whatsapp.net')) {
+          cleanPhone = `${cleanPhone}@s.whatsapp.net`;
+        }
+
+        const response = await fetch('/api/indir-multiple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ episodes: selected, jid: cleanPhone })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+          alert(`Başarılı! ${result.addedCount} adet bölüm sıraya eklendi.`);
+          document.getElementById('series-wizard-step2').style.display = 'none';
+          document.getElementById('series-url').value = '';
+        } else {
+          alert('Hata: ' + (result.error || 'Kuyruğa eklenemedi.'));
+        }
+      } catch (err) {
+        alert('Bağlantı hatası oluştu: ' + err.message);
+      } finally {
+        submitBtn.innerText = 'Seçilen Bölümleri İndir 📥';
+        submitBtn.disabled = false;
+      }
+    }
+
+    async function updateStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const box = document.getElementById('dynamic-box');
+        const pingUrlEl = document.getElementById('ping-url');
+
+        if (data.pingUrl) {
+          pingUrlEl.innerText = data.pingUrl;
+        } else {
+          pingUrlEl.innerText = 'Ayarlanmamış';
+        }
+
+        // Uptime sync or formatting if needed
+        document.getElementById('uptime-value').innerText = new Date().toLocaleTimeString('tr-TR');
+
+        if (data.status !== currentStatus) {
+          currentStatus = data.status;
+
+          if (data.status === 'connected') {
+            statusDot.style.backgroundColor = '#10b981';
+            statusDot.style.boxShadow = '0 0 14px #10b981';
+            statusText.innerText = 'Aktif & Çevrimiçi';
+            
+            box.innerHTML = `
+              <div class="tabs-header">
+                <button class="tab-btn active" onclick="switchTab('single-download')">🔗 Tekil Link</button>
+                <button class="tab-btn" onclick="switchTab('series-download')">🎬 Dizi Sihirbazı</button>
+              </div>
+
+              <!-- Tab 1: Single Download -->
+              <div id="single-download" class="tab-content active">
+                <div class="section-title" style="margin-top:0; width: 100%;">Web Üzerinden Video Gönder</div>
+                <form action="/download" method="POST">
+                  <div class="form-group">
+                    <label for="url">Medya Linki (Desteklenen Siteler)</label>
+                    <input type="url" id="url" name="url" placeholder="https://..." required>
+                  </div>
+                  <div class="form-group">
+                    <label for="phone">Gönderilecek Telefon Numarası (Örn: 905xxxxxxxxx)</label>
+                    <input type="text" id="phone" name="phone" placeholder="905XXXXXXXXX" required>
+                  </div>
+                  <button type="submit">İndir & WhatsApp'tan Gönder</button>
+                </form>
+              </div>
+
+              <!-- Tab 2: Series Download Wizard -->
+              <div id="series-download" class="tab-content">
+                <div class="section-title" style="margin-top:0; width: 100%;">Dizi Sezonu / Bölüm Seçici</div>
+                <div class="form-group" style="margin-bottom: 12px;">
+                  <label for="series-url">Dizi / Sezon Linki (HDfilmcehennemi, Animecix, HDKore)</label>
+                  <input type="url" id="series-url" placeholder="https://www.hdfilmcehennemi.nl/dizi/... veya https://animecix.tv/series/...">
+                </div>
+                <button id="fetch-btn" style="width: 100%;" onclick="fetchEpisodes()">Bölümleri Getir 🔍</button>
+
+                <div id="series-wizard-step2" style="display:none; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 15px;">
+                  <div class="section-title" id="series-name-header" style="margin-top:0;">Bulunan Bölümler</div>
+                  
+                  <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="series-phone">Gönderilecek Telefon Numarası</label>
+                    <input type="text" id="series-phone" placeholder="905XXXXXXXXX" value="905052761405">
+                  </div>
+
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;">Bölüm Seçin</span>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem;">
+                      <input type="checkbox" id="select-all-episodes" checked onclick="toggleSelectAllEpisodes(this)" style="width:16px; height:16px; margin:0;">
+                      <label for="select-all-episodes" style="margin:0;">Tümünü Seç</label>
+                    </div>
+                  </div>
+
+                  <div class="episode-list" id="fetched-episodes-list"></div>
+                  
+                  <button id="series-submit-btn" style="width: 100%; margin-top: 15px;" onclick="downloadSelectedEpisodes()">Seçilen Bölümleri İndir 📥</button>
+                </div>
+              </div>
+            `;
+          } else if (data.status === 'pairing' && data.pairingCode) {
+            statusDot.style.backgroundColor = '#3b82f6';
+            statusDot.style.boxShadow = '0 0 14px #3b82f6';
+            statusText.innerText = 'Pairing Code Hazır';
+            
+            box.innerHTML = `
+              <p style="margin-top:0; margin-bottom:16px; font-size:0.95rem; color:var(--text-muted); text-align: center;">WhatsApp → Bağlı Cihazlar → Telefon Numarası ile Bağla kısmına bu kodu girin:</p>
+              <div style="background: rgba(59,130,246,0.06); border: 2px dashed rgba(59,130,246,0.3); border-radius: 20px; padding: 24px; text-align: center; margin-bottom: 16px; cursor: pointer; width: 100%;" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>alert('Kod kopyalandı!'))">
+                <div style="font-size: 2.6rem; font-weight: 900; letter-spacing: 0.15em; color: #3b82f6; font-family: monospace;">${data.pairingCode}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">Koda tıklayarak kopyalayabilirsiniz</div>
+              </div>
+              <button class="btn-secondary" onclick="document.getElementById('pairing-form').style.display='block'; this.style.display='none';" style="width:100%;">Farklı Numara ile Dene</button>
+              <div id="pairing-form" style="display:none; margin-top:16px; width: 100%;">
+                <input type="text" id="new-pairing-phone" placeholder="905XXXXXXXXX" style="width:100%; margin-bottom: 8px;">
+                <button onclick="requestPairing()" style="width:100%;">Yeni Kod İste</button>
+              </div>
+            `;
+          } else {
+            statusDot.style.backgroundColor = '#f59e0b';
+            statusDot.style.boxShadow = '0 0 14px #f59e0b';
+            statusText.innerText = 'Giriş Bekleniyor';
+            
+            const qrSection = data.qrCodeUrl ? `
+              <div style="text-align:center; margin-bottom:20px;">
+                <p style="margin:0 0 10px; font-size:0.85rem; color:var(--text-muted);">1️⃣ QR Kod ile giriş:</p>
+                <div style="display:inline-block; background:white; padding:12px; border-radius:18px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+                  <img src="${data.qrCodeUrl}" alt="QR Code" style="display:block; max-width:180px; height:auto;">
+                </div>
+              </div>
+            ` : `<p style="color:var(--text-muted); text-align:center; margin-bottom:20px;">QR Kod yükleniyor...</p>`;
+            
+            box.innerHTML = qrSection + `
+              <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 20px; width: 100%;">
+                <p style="margin:0 0 12px; font-size:0.85rem; color:var(--text-muted);">2️⃣ Telefon numarası ile giriş (Pairing Code):</p>
+                <div style="display:flex; gap:10px;">
+                  <input type="text" id="pairing-phone" placeholder="905XXXXXXXXX" value="905052761405" style="flex:1;">
+                  <button onclick="requestPairing()" style="padding: 10px 20px;">Kod İste</button>
+                </div>
+                <p style="margin:10px 0 0; font-size:0.75rem; color:var(--text-muted); text-align: center;">Kodu WhatsApp → Bağlı Cihazlar → Telefon Numarası ile Bağla kısmına girin.</p>
+              </div>
+            `;
+          }
+        }
+
+        const tasksContainer = document.getElementById('tasks-container');
+        let queueHtml = '';
+
+        if (data.activeTask) {
+          queueHtml += `
+            <div class="section-title">▶️ Aktif İndirme</div>
+            <div class="task-card active">
+              <div class="task-meta">
+                <span>GÖREV NUMARASI: #${data.activeTask.id}</span>
+                <span style="color: var(--accent-green);">İNDİRİLİYOR</span>
+              </div>
+              <div class="task-title">${data.activeTask.title}</div>
+              <div class="task-status">
+                <span class="status-dot" style="background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); margin: 0;"></span>
+                <span>${data.activeTask.status}</span>
+              </div>
+            </div>
+          `;
+        } else {
+          queueHtml += `
+            <div class="section-title">▶️ Aktif İndirme</div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; text-align: left; margin: 0; padding-left: 4px;">Şu anda indirme yapılmıyor.</p>
+          `;
+        }
+
+        if (data.sendingTasks && data.sendingTasks.length > 0) {
+          const sendingList = data.sendingTasks.map((t, idx) => `
+            <div class="task-card sending" style="border-left: 4px solid var(--accent-orange, #ff9800);">
+              <div class="task-meta">
+                <span>GÖREV NUMARASI: #${t.id} (${t.size || 'Bilinmiyor'})</span>
+                <span style="color: var(--accent-orange, #ff9800); font-weight: bold;">YÜKLENİYOR</span>
+              </div>
+              <div class="task-title">${t.title}</div>
+              <div class="task-status">
+                <span class="status-dot" style="background-color: var(--accent-orange, #ff9800); box-shadow: 0 0 8px var(--accent-orange, #ff9800); margin: 0;"></span>
+                <span>${t.status}</span>
+              </div>
+            </div>
+          `).join('');
+          queueHtml += '<div class="section-title">📤 WhatsApp\'a Gönderilenler (' + data.sendingTasks.length + ')</div>' + sendingList;
+        }
+
+        if (data.downloadQueue && data.downloadQueue.length > 0) {
+          const queueList = data.downloadQueue.map((t, idx) => `
+            <div class="task-card waiting">
+              <div class="task-meta">
+                <span>SIRA: #${idx + 1} (No: #${t.id})</span>
+                <span style="color: var(--accent-blue);">KUYRUKTA</span>
+              </div>
+              <div class="task-title">${t.title}</div>
+              <div class="task-status">${t.status}</div>
+            </div>
+          `).join('');
+          queueHtml += '<div class="section-title">⏳ Bekleyen Kuyruk (' + data.downloadQueue.length + ')</div>' + queueList;
+        } else {
+          queueHtml += `
+            <div class="section-title">⏳ Bekleyen Kuyruk</div>
+            <p style="color: var(--text-muted); font-size: 0.9rem; text-align: left; margin: 0; padding-left: 4px;">Kuyrukta bekleyen işlem yok.</p>
+          `;
+        }
+
+        if (data.activeTasks && data.activeTasks.length > 0) {
+          const tasksHtml = data.activeTasks.map(t => `
+            <div class="task-card web">
+              <div class="task-meta">
+                <span>WEB İSTEĞİ (Saat: ${t.time})</span>
+                <span style="color: var(--accent-orange);">HAZIRLANIYOR</span>
+              </div>
+              <div class="task-title">Hedef JID: ${t.phone}</div>
+              <div class="task-status">${t.status}</div>
+            </div>
+          `).join('');
+          queueHtml += '<div class="section-title">🚀 Web İstekleri</div>' + tasksHtml;
+        }
+
+        tasksContainer.innerHTML = queueHtml;
+
+      } catch (e) {
+        console.error('Error fetching status:', e);
+      }
+    }
+
+    async function requestPairing() {
+      const phoneInput = document.getElementById('pairing-phone') || document.getElementById('new-pairing-phone');
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      if (!phone) { alert('Lütfen telefon numarası girin!'); return; }
+
+      try {
+        const response = await fetch('/api/request-pairing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const result = await response.json();
+        if (!result.success) {
+          alert('Hata: ' + (result.error || 'Bilinmeyen hata'));
+        }
+      } catch(err) {
+        alert('Bağlantı hatası oluştu.');
+      }
+    }
+
+    async function pauseQueue() {
+      const res = await fetch('/api/kuyruk-duraklat', { method: 'POST' });
+      const data = await res.json();
+      alert(data.message);
+      updateStatus();
+    }
+
+    async function resumeQueue() {
+      const res = await fetch('/api/kuyruk-devam', { method: 'POST' });
+      const data = await res.json();
+      alert(data.message);
+      updateStatus();
+    }
+
+    async function clearQueue() {
+      if (confirm('Kuyruktaki tüm indirmeleri temizlemek istediğinize emin misiniz?')) {
+        const res = await fetch('/api/kuyruk-temizle', { method: 'POST' });
+        const data = await res.json();
+        alert(data.message);
+        updateStatus();
+      }
+    }
+
+    setInterval(updateStatus, 2000);
+    updateStatus();
+  </script>
+</body>
+</html>

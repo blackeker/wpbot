@@ -1,0 +1,11 @@
+node_modules/
+auth_info_baileys/
+auth_info_session/
+session_backup/
+downloads/
+logs/
+.env
+yt-dlp.exe
+*.zip
+*.mp4
+*.log
