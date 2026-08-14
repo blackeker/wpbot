@@ -25,39 +25,6 @@ async function withRetry(fn, retries = 3, delayMs = 3000) {
   throw lastError;
 }
 
-// Global media sending lock & queue to prevent rate limits and bandwidth spikes
-let isUploadingMedia = false;
-const mediaUploadQueue = [];
-
-export async function queueMediaSend(jid, messageContent) {
-  return new Promise((resolve, reject) => {
-    mediaUploadQueue.push({ jid, messageContent, resolve, reject });
-    processMediaUploadQueue();
-  });
-}
-
-async function processMediaUploadQueue() {
-  if (isUploadingMedia || mediaUploadQueue.length === 0) return;
-  isUploadingMedia = true;
-
-  const { jid, messageContent, resolve, reject } = mediaUploadQueue.shift();
-  try {
-    if (!botSocketRef.current) {
-      throw new Error("WhatsApp bot bağlantısı aktif değil.");
-    }
-    const result = await botSocketRef.current.sendMessage(jid, messageContent);
-    resolve(result);
-  } catch (err) {
-    reject(err);
-  } finally {
-    // Cooldown of 8 seconds before next media upload can start
-    setTimeout(() => {
-      isUploadingMedia = false;
-      processMediaUploadQueue();
-    }, 8000);
-  }
-}
-
 // ─── Süre Formatlayıcı ───
 function formatDuration(ms) {
   const totalSec = Math.round(ms / 1000);
@@ -221,12 +188,12 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
   const sendPromise = (async () => {
     try {
       if (!botSocketRef.current) return;
-      await progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 WhatsApp gönderim kuyruğuna eklendi...\nBoyut: ${finalSizeStr}`);
+      await progressUpdateCallback(`🎬 *${title}*\n\n🚀 WhatsApp'a gönderiliyor...\nBoyut: ${finalSizeStr}`);
       if (finalSize > MAX_WA_SIZE) {
         const partPattern = path.join(downloadsDir, `${safeTitle}_part%03d${finalExt}`);
         const splitCmd = isMp3
           ? `"${ffmpegPath}" -i "${finalPath}" -f segment -segment_time 1800 -c copy "${partPattern}"`
-          : `"${ffmpegPath}" -i "${finalPath}" -f segment -segment_time 2700 -segment_format_options movflags=+faststart -c copy -map 0 "${partPattern}"`;
+          : `"${ffmpegPath}" -i "${finalPath}" -c copy -map 0 -fs 1800M "${partPattern}"`;
         await new Promise((resolve, reject) => {
           exec(splitCmd, (err) => err ? reject(err) : resolve());
         });
@@ -239,52 +206,20 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
             console.log(`[SPLIT SEND] Waiting 10 seconds before sending YouTube part ${i + 1}...`);
             await new Promise(r => setTimeout(r, 10000));
           }
-
-          const partSize = fs.statSync(partPath).size;
-          const fileStream = fs.createReadStream(partPath);
-          let lastWaUpdate = 0;
-          const progressStream = new ProgressStream(partSize, (uploaded, percent) => {
-            if (taskObject) {
-              taskObject.status = `Parça ${i + 1}/${splitFiles.length} yükleniyor... %${percent}`;
-            }
-            const now = Date.now();
-            if (now - lastWaUpdate > 5000) {
-              lastWaUpdate = now;
-              const bar = getProgressBar(percent);
-              progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 Parça ${i + 1}/${splitFiles.length} yükleniyor: *%${percent}*\n\`[${bar}]\``).catch(() => {});
-            }
-          });
-          fileStream.pipe(progressStream);
-
-          await withRetry(() => queueMediaSend(recipientJid, {
-            document: { stream: progressStream },
+          await withRetry(() => botSocketRef.current.sendMessage(recipientJid, {
+            document: { stream: fs.createReadStream(partPath) },
             mimetype: finalMime,
             fileName: splitFiles[i]
           }));
         }
-        await progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n✅ Tüm parçalar başarıyla gönderildi!\n\n🔗 *Canlı İzleme (VDS):*\n${watchUrl}`);
+        await progressUpdateCallback(`🎬 *${title}*\n\n✅ Tüm parçalar başarıyla gönderildi!\n\n🔗 *Canlı Link (VDS):* ${watchUrl}`);
       } else {
-        const fileStream = fs.createReadStream(finalPath);
-        let lastWaUpdate = 0;
-        const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
-          if (taskObject) {
-            taskObject.status = `Yükleniyor... %${percent}`;
-          }
-          const now = Date.now();
-          if (now - lastWaUpdate > 5000) {
-            lastWaUpdate = now;
-            const bar = getProgressBar(percent);
-            progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 WhatsApp'a yükleniyor: *%${percent}*\n\`[${bar}]\`\nBoyut: ${finalSizeStr}`).catch(() => {});
-          }
-        });
-        fileStream.pipe(progressStream);
-
-        await queueMediaSend(recipientJid, {
-          document: { stream: progressStream },
+        await botSocketRef.current.sendMessage(recipientJid, {
+          document: { stream: fs.createReadStream(finalPath) },
           mimetype: finalMime,
           fileName: finalSafeTitle
         });
-        await progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n✅ Başarıyla Gönderildi! (${finalSizeStr})\n\n🔗 *Canlı İzleme (VDS):*\n${watchUrl}`);
+        await progressUpdateCallback(`🎬 *${title}*\n\n✅ Gönderildi! (${finalSizeStr})\n\n🔗 *Canlı Link (VDS):* ${watchUrl}`);
       }
     } catch (err) {
       console.error(`WhatsApp gönderme hatası (${title}):`, err.message);
@@ -371,7 +306,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
 
   if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
 
-  await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndirme başlatılıyor...\n📡 Kaynak: ${result.source}\n🔗 Canlı İzle: ${watchUrl}`);
+  await progressUpdateCallback(`${icon} *${result.title}* bulundu!\nKaynak: ${result.source}\n📥 İndirme başlatılıyor...\n\n🔗 *Canlı İndirme/İzleme Linki (VDS):*\n${watchUrl}`);
 
   // ── İndirme (retry destekli) ──
   let lastPercent = -1;
@@ -441,7 +376,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           }
         }
 
-        await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndiriliyor: *%${percent}*\n\`[${bar}]\`\n📊 ${statusLine}\n⚡ Hız: ~${lastSpeedMBs} MB/s\n⏳ Kalan Süre: ${etaStr}\n🔗 Canlı İzle: ${watchUrl}`);
+        await progressUpdateCallback(`${icon} *${result.title}*\n\n📥 İndiriliyor: %${percent} [${bar}]\n${statusLine}\nHız: ~${lastSpeedMBs} MB/s\nKalan Süre: ${etaStr}\n\n🔗 *İndirme Linki:*\n${watchUrl}`);
       }, result.referer || null, result.cookies || null, result.userAgent || null, result.headers || null);
     });
   } catch (err) {
@@ -483,30 +418,12 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
       const skipZipExts = ['.apk', '.zip', '.rar', '.7z', '.pdf', '.exe', '.iso'];
       const needsZip = !isVideo && (!skipZipExts.includes(lowerExt) || fileSize > MAX_WA_SIZE);
       if (needsZip) {
-        const isWindows = process.platform === 'win32';
-        const zipPath = isWindows ? filePath.replace(fileExt, '.zip') : filePath.replace(fileExt, '.tar.gz');
-        const zipFilename = isWindows ? `${safeTitle}.zip` : `${safeTitle}.tar.gz`;
-        const mimeTypeZip = isWindows ? 'application/zip' : 'application/gzip';
-        const label = isWindows ? 'ZIP' : 'TAR.GZ';
-        
+        await progressUpdateCallback(`📦 *${result.title}*\n\n🗜️ Dosya sıkıştırılıyor (ZIP)...`);
+        const zipPath = filePath.replace(fileExt, '.zip');
         let zipSuccess = false;
-        let progressInterval;
         try {
-          progressInterval = setInterval(() => {
-            try {
-              if (fs.existsSync(zipPath)) {
-                const currentSize = fs.statSync(zipPath).size;
-                const percent = Math.min(99, Math.round((currentSize / fileSize) * 100));
-                const bar = getProgressBar(percent);
-                progressUpdateCallback(`📦 *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n🗜️ Dosya sıkıştırılıyor (${label}): *%${percent}*\n\`[${bar}]\``).catch(() => {});
-              }
-            } catch (e) {}
-          }, 3000);
-
           await new Promise((resolve, reject) => {
-            const tarCmd = isWindows 
-              ? `tar -c -a -f "${zipPath}" -C "${downloadsDir}" "${safeTitle}${fileExt}"`
-              : `tar -czf "${zipPath}" -C "${downloadsDir}" "${safeTitle}${fileExt}"`;
+            const tarCmd = `tar -c -a -f "${zipPath}" -C "${downloadsDir}" "${safeTitle}${fileExt}"`;
             exec(tarCmd, { timeout: 120000 }, (err) => {
               if (err) reject(err);
               else resolve();
@@ -516,17 +433,15 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
             zipSuccess = true;
           }
         } catch (e) {
-          console.warn(`[COMPRESS] Sıkıştırma oluşturulamadı: ${e.message}`);
-        } finally {
-          clearInterval(progressInterval);
+          console.warn(`[ZIP] ZIP oluşturulamadı, dosya direkt gönderiliyor: ${e.message}`);
         }
 
         if (zipSuccess) {
           try { fs.unlinkSync(filePath); } catch (e) {}
           finalFilePath = zipPath;
-          finalFileExt = isWindows ? '.zip' : '.tar.gz';
-          finalMimeType = mimeTypeZip;
-          finalTitle = isWindows ? `${cleanTitle}.zip` : `${cleanTitle}.tar.gz`;
+          finalFileExt = '.zip';
+          finalMimeType = 'application/zip';
+          finalTitle = `${cleanTitle}.zip`;
         }
       }
 
@@ -545,7 +460,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           : path.join(downloadsDir, `${safeTitle}${finalFileExt}.%03d`);
 
         if (isVideo) {
-          const splitCmd = `"${ffmpegPath}" -i "${finalFilePath}" -f segment -segment_time 2700 -segment_format_options movflags=+faststart -c copy -map 0 "${partPattern}"`;
+          const splitCmd = `"${ffmpegPath}" -i "${finalFilePath}" -c copy -map 0 -fs 1800M "${partPattern}"`;
           await new Promise((resolve, reject) => {
             exec(splitCmd, (err) => err ? reject(err) : resolve());
           });
@@ -576,7 +491,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           });
           fileStream.pipe(progressStream);
 
-          await withRetry(() => queueMediaSend(recipientJid, {
+          await withRetry(() => botSocketRef.current.sendMessage(recipientJid, {
             document: { stream: progressStream },
             mimetype: finalMimeType,
             fileName: splitFiles[i]
@@ -591,7 +506,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         });
         fileStream.pipe(progressStream);
 
-        await withRetry(() => queueMediaSend(recipientJid, {
+        await withRetry(() => botSocketRef.current.sendMessage(recipientJid, {
           document: { stream: progressStream },
           mimetype: finalMimeType,
           fileName: `${safeTitle}${finalFileExt}`

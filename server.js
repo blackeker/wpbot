@@ -2,8 +2,12 @@ import express from 'express';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import axios from 'axios';
+import http from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 import { gotScraping } from 'got-scraping';
+import { exec, execSync } from 'child_process';
 
 import { 
   botState, 
@@ -14,7 +18,18 @@ import {
   readConfig,
   writeConfig,
   setupPingTimer,
-  formatBytes
+  formatBytes,
+  getDiskUsage,
+  getYtDlpCommand,
+  setLogEmitter,
+  logQueue,
+  backupSession,
+  restoreSession,
+  backupCredsFile,
+  readHistory,
+  readErrorLog,
+  historyPath,
+  errorLogPath
 } from './config.js';
 
 import { 
@@ -25,7 +40,9 @@ import {
   clearQueue,
   pauseQueue,
   resumeQueue,
-  queueState
+  queueState,
+  activeTasksList,
+  setQueueUpdateCallback
 } from './queue.js';
 
 import { executeDownloadPipeline } from './pipelines.js';
@@ -57,8 +74,9 @@ function safeCompare(a, b) {
 }
 
 function basicAuth(req, res, next) {
-  const user = process.env.DASHBOARD_USER || 'admin';
-  const pass = process.env.DASHBOARD_PASS;
+  const config = readConfig();
+  const user = config.dashboardUser || 'admin';
+  const pass = config.dashboardPass || process.env.DASHBOARD_PASS;
 
   if (!pass) {
     return next();
@@ -225,22 +243,371 @@ app.get('/api/fetch-episodes', async (req, res) => {
   if (!url) return res.status(400).json({ error: 'url parametresi gerekli.' });
 
   try {
-    let result;
-    if (url.includes('animecix') || url.includes('ecchicix')) {
-      const data = await getAnimecixSeasonEpisodes(url);
-      result = { seriesName: data.animeName, episodes: data.episodes };
-    } else if (url.includes('hdfilmcehennemi')) {
-      const data = await getHdfilmcehennemiSeasonEpisodes(url);
-      result = { seriesName: data.seriesName, episodes: data.episodes };
-    } else if (url.includes('hdkore')) {
-      const data = await getHdkoreSeasonEpisodes(url);
-      result = { seriesName: data.seriesName, episodes: data.episodes };
-    } else {
-      return res.status(400).json({ error: 'Bu site dizi/sezon indirmeyi desteklemiyor veya geçersiz URL.' });
-    }
+    const result = await getUniversalSeasonEpisodes(url);
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Media Vault: List Files
+app.get('/api/files', (req, res) => {
+  try {
+    if (!fs.existsSync(downloadsDir)) {
+      fs.mkdirSync(downloadsDir, { recursive: true });
+    }
+    const files = fs.readdirSync(downloadsDir).filter(f => f.endsWith('.mp4') || f.endsWith('.ts') || f.endsWith('.zip'));
+    const fileList = files.map(name => {
+      const filePath = path.join(downloadsDir, name);
+      const stats = fs.statSync(filePath);
+      return {
+        name,
+        sizeBytes: stats.size,
+        sizeFormatted: formatBytes(stats.size),
+        dateFormatted: stats.mtime.toLocaleString('tr-TR'),
+        downloadUrl: `/downloads/${encodeURIComponent(name)}`
+      };
+    });
+    res.json({ success: true, files: fileList });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Media Vault: Delete File
+app.post('/api/files/delete', (req, res) => {
+  const { filename } = req.body;
+  if (!filename) return res.status(400).json({ error: 'filename parametresi gerekli.' });
+  try {
+    const safeFile = path.basename(filename);
+    const filePath = path.join(downloadsDir, safeFile);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      res.json({ success: true, message: 'Dosya silindi.' });
+    } else {
+      res.status(404).json({ error: 'Dosya bulunamadı.' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Queue: Cancel Task
+app.post('/api/indir/cancel', (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'id gereklidir.' });
+  const result = cancelDownloadTask(id);
+  if (result) {
+    res.json({ success: true, message: 'Görev iptal edildi.' });
+  } else {
+    res.status(404).json({ error: 'Görev bulunamadı.' });
+  }
+});
+
+// Diagnostics & System Health
+app.get('/api/system/health', (req, res) => {
+  let ffmpegOk = false;
+  try {
+    execSync('ffmpeg -version');
+    ffmpegOk = true;
+  } catch (e) {}
+
+  let ytDlpOk = false;
+  const config = readConfig();
+  const ytDlpCmd = getYtDlpCommand();
+  try {
+    execSync(`"${ytDlpCmd}" --version`);
+    ytDlpOk = true;
+  } catch (e) {}
+
+  let filesCount = 0;
+  let totalBytes = 0;
+  try {
+    if (fs.existsSync(downloadsDir)) {
+      const files = fs.readdirSync(downloadsDir);
+      filesCount = files.length;
+      files.forEach(f => {
+        try {
+          const stats = fs.statSync(path.join(downloadsDir, f));
+          totalBytes += stats.size;
+        } catch (e) {}
+      });
+    }
+  } catch (e) {}
+
+  res.json({
+    success: true,
+    ffmpeg: { ok: ffmpegOk },
+    ytDlp: { ok: ytDlpOk, command: ytDlpCmd },
+    whatsapp: {
+      ok: botState.status === 'connected',
+      status: botState.status
+    },
+    storage: {
+      filesCount,
+      totalBytes
+    }
+  });
+});
+
+// Git Pull Update
+app.post('/api/system/git-pull', (req, res) => {
+  exec('git pull', (err, stdout, stderr) => {
+    if (err) {
+      return res.status(500).json({ error: err.message, stderr });
+    }
+    res.json({ success: true, output: stdout });
+  });
+});
+
+// PM2 Process Restart
+app.post('/api/system/restart', (req, res) => {
+  res.json({ success: true, message: 'Bot PM2 süreci yeniden başlatılıyor...' });
+  setTimeout(() => {
+    process.exit(0);
+  }, 1000);
+});
+
+// Session Backup & Restore APIs
+app.post('/api/session/backup', (req, res) => {
+  try {
+    const success = backupSession();
+    if (success) {
+      res.json({ success: true, message: 'Oturum yedeği alındı.' });
+    } else {
+      res.status(500).json({ error: 'Yedekleme başarısız oldu.' });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/session/restore', (req, res) => {
+  try {
+    const success = restoreSession();
+    if (success) {
+      res.json({ success: true, message: 'Oturum geri yüklendi. Bot yeniden başlatılıyor...' });
+      setTimeout(() => {
+        process.exit(0);
+      }, 1000);
+    } else {
+      res.status(400).json({ error: 'Geri yüklenecek yedek bulunamadı.' });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/session/reset', (req, res) => {
+  try {
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+    if (fs.existsSync(backupCredsFile)) {
+      fs.unlinkSync(backupCredsFile);
+    }
+    res.json({ success: true, message: 'Oturum sıfırlandı. Bot yeniden başlatılıyor...' });
+    setTimeout(() => {
+      process.exit(0);
+    }, 1000);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Media Vault: Zip Selected Files
+app.post('/api/files/zip', (req, res) => {
+  try {
+    const { filenames } = req.body;
+    if (!filenames || !Array.isArray(filenames) || filenames.length === 0) {
+      return res.status(400).json({ error: 'Dosya adları listesi gereklidir.' });
+    }
+    const safeFiles = filenames.map(f => path.basename(f));
+    const zipName = `hdwp_archive_${Date.now()}.zip`;
+    const zipPath = path.join(downloadsDir, zipName);
+
+    // Native tar command for multi-platform compatibility (runs natively on Win10+/Linux)
+    const fileArgs = safeFiles.map(f => `"${f}"`).join(' ');
+    const cmd = `tar -ca -f "${zipPath}" -C "${downloadsDir}" ${fileArgs}`;
+
+    exec(cmd, (err) => {
+      if (err) {
+        console.error('[ZIP] Hata:', err.message);
+        return res.status(500).json({ error: 'Sıkıştırma işlemi başarısız oldu: ' + err.message });
+      }
+      res.json({ success: true, zipUrl: `/downloads/${zipName}`, filename: zipName });
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Proxy Pool: Test Proxy Link
+app.post('/api/proxy/test', async (req, res) => {
+  const { proxyUrl } = req.body;
+  if (!proxyUrl) return res.status(400).json({ error: 'Proxy URL gereklidir.' });
+
+  const targets = [
+    { name: 'YouTube', url: 'https://www.youtube.com' },
+    { name: 'Google', url: 'https://www.google.com' },
+    { name: 'Animecix', url: 'https://animecix.net' }
+  ];
+
+  let proxyConfig = null;
+  try {
+    const parsed = new URL(proxyUrl);
+    proxyConfig = {
+      protocol: parsed.protocol.replace(':', ''),
+      host: parsed.hostname,
+      port: parseInt(parsed.port, 10)
+    };
+    if (parsed.username || parsed.password) {
+      proxyConfig.auth = {
+        username: decodeURIComponent(parsed.username),
+        password: decodeURIComponent(parsed.password)
+      };
+    }
+  } catch (err) {
+    return res.status(400).json({ error: 'Geçersiz Proxy URL formatı.' });
+  }
+
+  const results = [];
+  for (const target of targets) {
+    const start = Date.now();
+    try {
+      await axios.get(target.url, {
+        proxy: proxyConfig,
+        timeout: 5000,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      });
+      results.push({ name: target.name, url: target.url, ok: true, ping: Date.now() - start });
+    } catch (err) {
+      results.push({ name: target.name, url: target.url, ok: false, error: err.message });
+    }
+  }
+
+  res.json({ success: true, results });
+});
+
+// Cookies: Verify Netscape / JSON Cookies
+app.post('/api/cookies/verify', async (req, res) => {
+  const { cookiesText, targetUrl } = req.body;
+  if (!cookiesText || !targetUrl) {
+    return res.status(400).json({ error: 'cookiesText ve targetUrl gereklidir.' });
+  }
+
+  try {
+    let parsedCookies = [];
+    if (cookiesText.trim().startsWith('[')) {
+      parsedCookies = JSON.parse(cookiesText);
+    } else {
+      const lines = cookiesText.split('\n');
+      for (const line of lines) {
+        const parts = line.trim().split('\t');
+        if (parts.length >= 7) {
+          parsedCookies.push({
+            domain: parts[0],
+            path: parts[2],
+            secure: parts[3] === 'TRUE',
+            name: parts[5],
+            value: parts[6]
+          });
+        }
+      }
+    }
+
+    if (parsedCookies.length === 0) {
+      return res.status(400).json({ error: 'Geçerli çerez verisi bulunamadı.' });
+    }
+
+    const cookieHeaderValue = parsedCookies.map(c => `${c.name}=${c.value}`).join('; ');
+    const testRes = await axios.get(targetUrl, {
+      headers: {
+        'Cookie': cookieHeaderValue,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+      },
+      timeout: 6000
+    });
+
+    res.json({
+      success: true,
+      statusCode: testRes.status,
+      parsedCount: parsedCookies.length,
+      message: `Bağlantı başarılı (HTTP ${testRes.status})`
+    });
+  } catch (e) {
+    res.json({
+      success: false,
+      error: e.message,
+      message: `Bağlantı başarısız oldu: ${e.message}`
+    });
+  }
+});
+
+// System Settings
+app.get('/api/settings', (req, res) => {
+  res.json({ success: true, settings: readConfig() });
+});
+
+app.post('/api/settings', (req, res) => {
+  try {
+    writeConfig(req.body);
+    res.json({ success: true, message: 'Ayarlar başarıyla kaydedildi.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Custom Command Templates
+app.post('/api/commands', (req, res) => {
+  try {
+    const { customCommands } = req.body;
+    if (!customCommands || typeof customCommands !== 'object') {
+      return res.status(400).json({ error: 'Geçersiz komut verisi.' });
+    }
+    writeConfig({ customCommands });
+    res.json({ success: true, message: 'Özel komutlar başarıyla kaydedildi.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Cron Scheduler Studio
+app.post('/api/cron', (req, res) => {
+  try {
+    const { cronSchedules } = req.body;
+    if (!cronSchedules || !Array.isArray(cronSchedules)) {
+      return res.status(400).json({ error: 'Geçersiz zamanlanmış görev verisi.' });
+    }
+    writeConfig({ cronSchedules });
+    res.json({ success: true, message: 'Zamanlanmış görevler başarıyla kaydedildi.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// History & Errors Logger Analytics APIs
+app.get('/api/history', (req, res) => {
+  res.json({ success: true, history: readHistory() });
+});
+
+app.get('/api/errors', (req, res) => {
+  res.json({ success: true, errors: readErrorLog() });
+});
+
+app.post('/api/history/clear', (req, res) => {
+  try {
+    fs.writeFileSync(historyPath, JSON.stringify([], null, 2), 'utf8');
+    res.json({ success: true, message: 'İndirme geçmişi temizlendi.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/errors/clear', (req, res) => {
+  try {
+    fs.writeFileSync(errorLogPath, JSON.stringify([], null, 2), 'utf8');
+    res.json({ success: true, message: 'Hata geçmişi temizlendi.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -317,6 +684,16 @@ app.post('/api/notify-captcha', async (req, res) => {
 
 // REST API Status Endpoint for Realtime Dashboard Polling
 app.get('/api/status', (req, res) => {
+  let backupExists = false;
+  let backupTime = null;
+  try {
+    if (fs.existsSync(backupCredsFile)) {
+      backupExists = true;
+      const stats = fs.statSync(backupCredsFile);
+      backupTime = stats.mtime.toLocaleString('tr-TR');
+    }
+  } catch (e) {}
+
   res.json({
     status: botState.status,
     qrCodeUrl: botState.qrCodeUrl,
@@ -324,6 +701,8 @@ app.get('/api/status', (req, res) => {
     pingUrl: botState.pingUrl,
     activeTasks: botState.activeTasks,
     sendingTasks: botState.sendingTasks,
+    backupExists,
+    backupTime,
     downloadQueue: downloadQueue.map(t => ({ id: t.id, title: t.title, status: t.status, addedTime: t.addedTime })),
     activeTask: activeTask.current ? { id: activeTask.current.id, title: activeTask.current.title, status: activeTask.current.status } : null
   });
@@ -476,9 +855,229 @@ app.get('/watch', (req, res) => {
   }
 });
 
+export let wsBroadcast = () => {};
+
+export function notifyStatusUpdate() {
+  if (wsBroadcast) {
+    let backupExists = false;
+    let backupTime = null;
+    try {
+      if (fs.existsSync(backupCredsFile)) {
+        backupExists = true;
+        const stats = fs.statSync(backupCredsFile);
+        backupTime = stats.mtime.toLocaleString('tr-TR');
+      }
+    } catch (e) {}
+
+    wsBroadcast('BOT_STATUS', {
+      status: botState.status,
+      pairingCode: botState.pairingCode,
+      qrCodeUrl: botState.qrCodeUrl,
+      backupExists,
+      backupTime
+    });
+  }
+}
+
+export function setupWebSocketServer(httpServer) {
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const clients = new Set();
+
+  wss.on('connection', (ws) => {
+    clients.add(ws);
+    console.log(`[WS] Dashboard client connected. Active: ${clients.size}`);
+
+    // Send initial status payload
+    ws.send(JSON.stringify({
+      type: 'BOT_STATUS',
+      data: {
+        status: botState.status,
+        pairingCode: botState.pairingCode,
+        qrCodeUrl: botState.qrCodeUrl
+      }
+    }));
+
+    // Send initial queue payload
+    ws.send(JSON.stringify({
+      type: 'QUEUE_UPDATE',
+      data: {
+        activeTasks: activeTasksList.map(t => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          speed: t.speed || '0.00'
+        })),
+        queue: downloadQueue.map(t => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority
+        })),
+        sending: botState.sendingTasks
+      }
+    }));
+
+    // Send recent logs
+    ws.send(JSON.stringify({
+      type: 'INITIAL_LOGS',
+      data: logQueue
+    }));
+
+    ws.on('close', () => {
+      clients.delete(ws);
+      console.log(`[WS] Dashboard client disconnected. Active: ${clients.size}`);
+    });
+  });
+
+  // Telemetry loop (every 1.5 seconds)
+  const telemetryInterval = setInterval(() => {
+    if (clients.size === 0) return;
+    try {
+      const cpus = os.cpus();
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const usedMem = totalMem - freeMem;
+      const loadAvg = os.loadavg();
+      const disk = getDiskUsage();
+
+      const payload = JSON.stringify({
+        type: 'TELEMETRY_UPDATE',
+        data: {
+          cpu: {
+            cores: cpus.length,
+            usagePercent: Math.min(100, Math.max(0, Math.round((loadAvg[0] / Math.max(1, cpus.length)) * 100))),
+            loadAvg: loadAvg
+          },
+          memory: {
+            total: totalMem,
+            used: usedMem,
+            usagePercent: Math.round((usedMem / totalMem) * 100)
+          },
+          disk: {
+            downloadsFolderBytes: disk.totalBytes,
+            fileCount: disk.files.length
+          }
+        }
+      });
+
+      for (const client of clients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(payload);
+        }
+      }
+    } catch (err) {
+      console.error('[WS Telemetry Error]', err.message);
+    }
+  }, 1500);
+
+  // Hook config's log emitter to forward logs to WebSocket clients
+  setLogEmitter((logEntry) => {
+    const payload = JSON.stringify({
+      type: 'CONSOLE_LOG',
+      data: logEntry
+    });
+    for (const client of clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    }
+  });
+
+  wsBroadcast = (type, data) => {
+    const payload = JSON.stringify({ type, data });
+    for (const client of clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    }
+  };
+}
+
+function parseCronField(field, min) {
+  if (field === '*') return true;
+  if (field.startsWith('*/')) {
+    const step = parseInt(field.slice(2), 10);
+    return min % step === 0;
+  }
+  const val = parseInt(field, 10);
+  return val === min;
+}
+
+function matchCron(cronExpr, date = new Date()) {
+  const parts = cronExpr.trim().split(/\s+/);
+  if (parts.length < 5) return false;
+  
+  const minute = date.getMinutes();
+  const hour = date.getHours();
+  const dom = date.getDate();
+  const month = date.getMonth() + 1; // 1-indexed
+  const dow = date.getDay(); // 0-6 (Sun-Sat)
+  
+  return parseCronField(parts[0], minute) &&
+         parseCronField(parts[1], hour) &&
+         parseCronField(parts[2], dom) &&
+         parseCronField(parts[3], month) &&
+         parseCronField(parts[4], dow);
+}
+
+import { cleanOldDownloads } from './config.js';
+
+export function startCronScheduler() {
+  console.log('[CRON] Zamanlanmış otomasyon motoru başlatıldı.');
+  setInterval(() => {
+    try {
+      const config = readConfig();
+      const schedules = config.cronSchedules || [];
+      const now = new Date();
+      
+      for (const sched of schedules) {
+        if (sched.active && matchCron(sched.cron, now)) {
+          console.log(`[CRON] Zamanlanmış görev tetiklendi: ${sched.name} (${sched.action})`);
+          if (sched.action === 'cleanup') {
+            try {
+              cleanOldDownloads();
+              console.log(`[CRON] ${sched.name} başarıyla tamamlandı.`);
+            } catch (err) {
+              console.error(`[CRON] ${sched.name} yürütülürken hata oluştu:`, err.message);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[CRON Scheduler Loop Error]', e.message);
+    }
+  }, 60000); // Check every minute
+}
+
 export function startServer(PORT, startBotCallback) {
   onResetRequest = startBotCallback;
-  app.listen(PORT, '0.0.0.0', () => {
+  
+  const server = http.createServer(app);
+  setupWebSocketServer(server);
+  
+  startCronScheduler(); // Start cron studio background loop
+
+  setQueueUpdateCallback(() => {
+    if (wsBroadcast) {
+      wsBroadcast('QUEUE_UPDATE', {
+        activeTasks: activeTasksList.map(t => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          speed: t.speed || '0.00'
+        })),
+        queue: downloadQueue.map(t => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority
+        })),
+        sending: botState.sendingTasks
+      });
+    }
+  });
+
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`Web Dashboard is running at http://0.0.0.0:${PORT}`);
   });
 }

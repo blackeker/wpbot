@@ -3,839 +3,2438 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HDWP - Modern WhatsApp Downloader Bot Dashboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>HDWP Enterprise Dashboard 2.0 - WhatsApp & VDS Medya Komuta Konsolu</title>
+  
+  <!-- Google Fonts: Outfit & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Plyr Video Player & HLS.js CDN -->
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+  <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
     :root {
-      --bg-color: #080710;
-      --panel-bg: rgba(255, 255, 255, 0.03);
-      --panel-border: rgba(255, 255, 255, 0.08);
-      --accent-green: #10b981;
-      --accent-blue: #3b82f6;
-      --accent-orange: #f59e0b;
-      --accent-red: #ef4444;
-      --accent-purple: #8b5cf6;
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-      --glow-blue: rgba(59, 130, 246, 0.25);
-      --glow-green: rgba(16, 185, 129, 0.25);
+      /* Renk Paleti - Cyberpunk Dark & Deep Space */
+      --bg-base: #06050b;
+      --bg-surface: #0c0a14;
+      --bg-card: rgba(18, 15, 30, 0.65);
+      --bg-card-hover: rgba(28, 23, 48, 0.75);
+      --bg-glass-input: rgba(255, 255, 255, 0.04);
+      
+      /* Çerçeve & Ayırıcılar */
+      --border-subtle: rgba(255, 255, 255, 0.07);
+      --border-active: rgba(99, 102, 241, 0.5);
+      --border-focus: #6366f1;
+      
+      /* Vurgular (Neon Accents) */
+      --accent-primary: #6366f1;
+      --accent-primary-hover: #4f46e5;
+      --accent-emerald: #10b981;
+      --accent-cyan: #06b6d4;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      /* Tipografi Renkleri */
+      --text-main: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --text-accent: #818cf8;
+      
+      /* Efektler ve Gölgeler */
+      --glow-primary: rgba(99, 102, 241, 0.35);
+      --glow-emerald: rgba(16, 185, 129, 0.35);
+      --glow-rose: rgba(244, 63, 94, 0.35);
+      --glass-blur: blur(24px);
+      --shadow-card: 0 20px 50px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      --shadow-btn: 0 10px 25px -5px var(--glow-primary);
+      
+      /* Boyutlandırma & Yarıçap */
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 22px;
+      --radius-xl: 32px;
+      --sidebar-width: 260px;
     }
 
-    * {
+    *, *::before, *::after {
       box-sizing: border-box;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      margin: 0;
+      padding: 0;
+      transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
     }
 
     body {
-      margin: 0;
-      font-family: 'Outfit', sans-serif;
-      background: radial-gradient(circle at top right, #1e1b4b 0%, #0f172a 50%, var(--bg-color) 100%);
+      font-family: 'Outfit', -apple-system, sans-serif;
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(circle at 10% 15%, rgba(99, 102, 241, 0.15) 0%, transparent 45%),
+        radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.05) 0%, transparent 60%);
       color: var(--text-main);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
       min-height: 100vh;
-      padding: 30px 15px;
+      display: flex;
       overflow-x: hidden;
     }
 
-    /* Ambient background glows */
-    .glow-1 {
-      position: absolute;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, var(--glow-blue) 0%, transparent 70%);
-      top: -100px;
-      left: -100px;
-      z-index: -1;
-      pointer-events: none;
+    /* Özel Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-base); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+    /* LAYOUT: SIDEBAR & MAIN WRAPPER */
+    .app-sidebar {
+      width: var(--sidebar-width);
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-subtle);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      z-index: 100;
+      backdrop-filter: var(--glass-blur);
     }
 
-    .glow-2 {
-      position: absolute;
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, var(--glow-green) 0%, transparent 70%);
-      bottom: -150px;
-      right: -150px;
-      z-index: -1;
-      pointer-events: none;
+    .brand-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 10px 20px;
+      border-bottom: 1px solid var(--border-subtle);
     }
 
-    .container {
-      background: var(--panel-bg);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border: 1px solid var(--panel-border);
-      border-radius: 32px;
-      padding: 40px;
-      width: 100%;
-      max-width: 520px;
-      box-shadow: 0 30px 70px -10px rgba(0, 0, 0, 0.8),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      position: relative;
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-cyan));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 0 20px var(--glow-primary);
     }
 
-    header {
-      margin-bottom: 30px;
-      text-align: center;
-    }
-
-    h1 {
+    .brand-title {
+      font-size: 1.25rem;
       font-weight: 800;
-      margin: 0 0 15px 0;
-      font-size: 2.3rem;
-      letter-spacing: -0.04em;
-      background: linear-gradient(135deg, #34d399 0%, #3b82f6 50%, #8b5cf6 100%);
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 2px 10px rgba(59, 130, 246, 0.15));
     }
 
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 9999px;
-      padding: 10px 24px;
+    .brand-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-muted);
       font-weight: 600;
-      font-size: 0.95rem;
-      letter-spacing: 0.01em;
-      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .nav-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 20px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 11px 16px;
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.92rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.08);
+      transform: translateX(4px);
+    }
+
+    .nav-item.active {
+      color: #fff;
+      background: linear-gradient(90deg, rgba(99, 102, 241, 0.2), transparent);
+      border-left: 3px solid var(--accent-primary);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    .nav-icon { font-size: 1.2rem; }
+
+    .sidebar-footer {
+      padding-top: 16px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .server-status-pill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg-glass-input);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      font-size: 0.8rem;
     }
 
     .status-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background-color: var(--accent-orange);
-      box-shadow: 0 0 12px var(--accent-orange);
-      animation: pulse 2s infinite;
+      background: var(--accent-amber);
+      box-shadow: 0 0 10px var(--accent-amber);
+      animation: pulseGlow 2s infinite;
     }
 
-    .dynamic-box {
-      min-height: 180px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      margin: 20px 0;
-      width: 100%;
+    .status-dot.online {
+      background: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
     }
 
-    /* Tabs mechanism */
-    .tabs-header {
-      display: flex;
-      background: rgba(15, 23, 42, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 14px;
-      padding: 5px;
-      margin-bottom: 20px;
-      width: 100%;
+    .status-dot.error {
+      background: var(--accent-rose);
+      box-shadow: 0 0 10px var(--accent-rose);
     }
 
-    .tab-btn {
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    /* MAIN CONTENT */
+    .app-main {
+      margin-left: var(--sidebar-width);
       flex: 1;
-      padding: 10px;
-      border-radius: 10px;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      font-family: inherit;
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      box-shadow: none;
+      padding: 30px 40px;
+      max-width: 1600px;
+      overflow-y: auto;
     }
 
-    .tab-btn.active {
-      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-      color: #fff;
-      box-shadow: 0 4px 12px rgba(29, 78, 216, 0.2);
-    }
-
-    .tab-content {
-      display: none;
-      width: 100%;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    /* Form Fields and Inputs */
-    form {
-      text-align: left;
+    .top-navbar {
       display: flex;
-      flex-direction: column;
-      gap: 18px;
-      width: 100%;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 30px;
     }
 
-    .form-group {
+    .page-title-group h1 {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .page-title-group p {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-top: 4px;
+    }
+
+    .top-actions {
       display: flex;
-      flex-direction: column;
-      gap: 8px;
+      align-items: center;
+      gap: 12px;
     }
 
-    label {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      padding-left: 4px;
-    }
-
-    input, select {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 14px 18px;
-      color: #fff;
-      font-family: inherit;
-      font-size: 0.95rem;
-      width: 100%;
-    }
-
-    input:focus, select:focus {
-      outline: none;
-      border-color: var(--accent-blue);
-      background: rgba(15, 23, 42, 0.8);
-      box-shadow: 0 0 15px rgba(59, 130, 246, 0.25),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    }
-
-    /* Glass Buttons */
-    button {
-      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-      border: none;
-      color: #fff;
-      padding: 15px;
-      border-radius: 14px;
-      font-family: inherit;
-      font-weight: 600;
-      font-size: 1rem;
-      cursor: pointer;
-      box-shadow: 0 10px 20px rgba(29, 78, 216, 0.2);
-    }
-
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 15px 25px rgba(29, 78, 216, 0.35);
-      filter: brightness(1.1);
-    }
-
-    button:active {
-      transform: translateY(0);
-    }
-
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: none;
-      color: var(--text-main);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.08);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    }
-
-    .btn-danger {
-      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-      box-shadow: 0 10px 20px rgba(239, 68, 68, 0.2);
-    }
-
-    .btn-danger:hover {
-      box-shadow: 0 15px 25px rgba(239, 68, 68, 0.35);
-    }
-
-    /* Sections */
-    .section-title {
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-align: left;
-      margin: 35px 0 15px 0;
-      color: var(--text-muted);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      padding-bottom: 8px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .info-grid {
+    .metrics-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 15px;
-      margin-bottom: 15px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
     }
 
-    .info-card {
-      background: rgba(255, 255, 255, 0.015);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      border-radius: 16px;
-      padding: 15px;
-      text-align: left;
-    }
-
-    .info-card-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .info-card-value {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-top: 5px;
-      color: var(--text-main);
-      word-break: break-all;
-    }
-
-    /* Task/Queue Cards */
-    .task-card {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      padding: 18px;
-      border-radius: 20px;
-      margin-top: 12px;
-      font-size: 0.9rem;
-      text-align: left;
-      animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    .metric-card {
+      background: var(--bg-card);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 22px 24px;
+      box-shadow: var(--shadow-card);
       position: relative;
       overflow: hidden;
     }
 
-    .task-card::before {
+    .metric-card::before {
       content: '';
       position: absolute;
-      left: 0;
       top: 0;
-      bottom: 0;
-      width: 4px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
     }
 
-    .task-card.active::before {
-      background: var(--accent-green);
+    .metric-card:hover {
+      border-color: var(--border-active);
+      transform: translateY(-3px);
     }
 
-    .task-card.waiting::before {
-      background: var(--accent-blue);
-    }
-
-    .task-card.web::before {
-      background: var(--accent-orange);
-    }
-
-    .task-meta {
+    .metric-header {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 0.75rem;
-      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .metric-label {
+      font-size: 0.82rem;
       font-weight: 600;
-    }
-
-    .task-title {
-      font-weight: 700;
-      font-size: 1rem;
-      color: var(--text-main);
-      margin-bottom: 8px;
-      line-height: 1.4;
-    }
-
-    .task-status {
-      font-weight: 500;
       color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-icon { font-size: 1.3rem; opacity: 0.8; }
+
+    .metric-value {
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+    }
+
+    .metric-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      margin-top: 14px;
+      overflow: hidden;
+    }
+
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-cyan));
+      width: 0%;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 30px;
+    }
+
+    .glass-panel {
+      background: var(--bg-card);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 24px;
+    }
+
+    .panel-header {
       display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .panel-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-group { margin-bottom: 18px; }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .glass-input {
+      width: 100%;
+      background: var(--bg-glass-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      color: #fff;
+      font-size: 0.92rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .glass-input:focus {
+      border-color: var(--border-focus);
+      background: rgba(255, 255, 255, 0.07);
+      box-shadow: 0 0 15px var(--glow-primary);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 13px 24px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: var(--shadow-btn);
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px var(--glow-primary);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      border-radius: var(--radius-md);
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: var(--accent-rose);
+      border-radius: var(--radius-md);
+      padding: 8px 14px;
+      font-weight: 600;
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: inline-flex;
       align-items: center;
       gap: 6px;
     }
 
-    /* Episode Selector Wizard styling */
-    .episode-list {
-      max-height: 250px;
-      overflow-y: auto;
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px;
-      padding: 10px;
-      background: rgba(0,0,0,0.2);
-      margin-top: 10px;
+    .btn-danger:hover {
+      background: var(--accent-rose);
+      color: #fff;
     }
 
-    .episode-item {
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 480px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .task-card {
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      position: relative;
+    }
+
+    .task-card.active {
+      border-left: 4px solid var(--accent-emerald);
+      background: rgba(16, 185, 129, 0.04);
+    }
+
+    .task-card-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      font-size: 0.9rem;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 6px;
     }
 
-    .episode-item input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-    }
-
-    /* Quick Action Controls */
-    .quick-controls {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 20px;
-    }
-
-    .quick-controls button {
-      padding: 12px;
-      font-size: 0.9rem;
-    }
-
-    /* Watch Link Footer Button */
-    .watch-footer-link {
-      display: block;
-      margin-top: 25px;
-      padding: 16px;
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-      border: 1px solid rgba(59, 130, 246, 0.2);
-      border-radius: 18px;
-      color: #60a5fa;
-      text-decoration: none;
+    .task-card-title {
+      font-size: 0.95rem;
       font-weight: 700;
-      font-size: 1rem;
-      text-align: center;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 8px;
     }
 
-    .watch-footer-link:hover {
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.18) 0%, rgba(139, 92, 246, 0.18) 100%);
-      transform: scale(1.01);
-      box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+    .task-card-progress {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
     }
 
-    @keyframes pulse {
-      0% { transform: scale(0.95); opacity: 0.7; }
-      50% { transform: scale(1.15); opacity: 1; }
-      100% { transform: scale(0.95); opacity: 0.7; }
+    .episode-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
     }
 
-    @keyframes slideIn {
-      from { transform: translateY(15px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
+    .episode-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .episode-pill:hover { background: rgba(255, 255, 255, 0.08); }
+
+    .terminal-box {
+      background: #040308;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: #a5b4fc;
+      height: 380px;
+      overflow-y: auto;
+      line-height: 1.6;
+    }
+
+    .log-line { margin-bottom: 4px; word-break: break-all; }
+    .log-info { color: #38bdf8; }
+    .log-warn { color: #fbbf24; }
+    .log-error { color: #f87171; font-weight: bold; }
+    .log-success { color: #4ade80; }
+
+    /* TOASTS */
+    .toast-card {
+      background: rgba(12, 10, 20, 0.85);
+      backdrop-filter: blur(12px);
+      border-left: 4px solid var(--accent-primary);
+      padding: 16px 20px;
+      border-radius: var(--radius-md);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      color: #fff;
+      min-width: 280px;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+    .toast-success { border-left-color: var(--accent-emerald); }
+    .toast-error { border-left-color: var(--accent-rose); }
+    .toast-warn { border-left-color: var(--accent-amber); }
+    .toast-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+    .toast-msg { font-size: 0.85rem; color: var(--text-secondary); }
+
+    /* RESPONSIVE */
+    @media (max-width: 1024px) {
+      .workspace-grid { grid-template-columns: 1fr; }
+      .app-sidebar { width: 70px; padding: 20px 8px; }
+      .brand-title, .brand-subtitle, .nav-item span, .server-status-pill span { display: none; }
+      .app-main { margin-left: 70px; padding: 20px; }
+    }
+
+    .tab-view { display: none; }
+    .tab-view.active { display: block; }
+    
+    /* Tables for Settings, Custom Commands, Cron */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    .data-table th, .data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .data-table th {
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+    }
+    .data-table tbody tr:hover {
+      background: rgba(255,255,255,0.02);
+    }
+
+    /* Live Chart Containers */
+    .chart-container {
+      position: relative;
+      height: 220px;
+      width: 100%;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
-  <div class="glow-1"></div>
-  <div class="glow-2"></div>
 
-  <div class="container">
-    <header>
-      <h1>HDWP Bot</h1>
-      <div class="status-badge">
-        <div class="status-dot" id="status-dot"></div>
-        <span id="status-text">Bağlanıyor...</span>
+  <!-- ==============================================================================
+       1. APP SIDEBAR (Sabit Sol Menü)
+       ============================================================================== -->
+  <aside class="app-sidebar">
+    <div>
+      <div class="brand-header">
+        <div class="brand-logo">🎬</div>
+        <div>
+          <div class="brand-title">HDWP BOT</div>
+          <div class="brand-subtitle">ENTERPRISE 2.0</div>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <a class="nav-item active" onclick="switchNavTab('overview')">
+          <span class="nav-icon">📊</span>
+          <span>Genel Bakış & Telemetri</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('series-wizard')">
+          <span class="nav-icon">🎬</span>
+          <span>Dizi & Sezon Sihirbazı</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('media-vault')">
+          <span class="nav-icon">🍿</span>
+          <span>Medya Kasası & Player</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('whatsapp-station')">
+          <span class="nav-icon">📱</span>
+          <span>WhatsApp İstasyonu</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('queue-manager')">
+          <span class="nav-icon">📋</span>
+          <span>Görev Kuyruğu</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('settings-station')">
+          <span class="nav-icon">⚙️</span>
+          <span>Sistem & Proxy Ayarları</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('commands-station')">
+          <span class="nav-icon">💬</span>
+          <span>Özel Bot Komutları</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('cron-station')">
+          <span class="nav-icon">⏱️</span>
+          <span>Cron Zamanlayıcı</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('system-health')">
+          <span class="nav-icon">🩺</span>
+          <span>Sistem Sağlığı & Teşhis</span>
+        </a>
+        <a class="nav-item" onclick="switchNavTab('terminal-logs')">
+          <span class="nav-icon">📜</span>
+          <span>Canlı Terminal & Loglar</span>
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="server-status-pill">
+        <span style="font-weight:600; color:var(--text-secondary);">WhatsApp</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="status-dot" id="sidebar-status-dot"></span>
+          <span id="sidebar-status-text" style="font-weight:700;">Bağlanıyor...</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ==============================================================================
+       2. MAIN CONTENT WRAPPER
+       ============================================================================== -->
+  <main class="app-main">
+    
+    <!-- TOP NAVBAR -->
+    <header class="top-navbar">
+      <div class="page-title-group">
+        <h1 id="page-heading">Komuta Konsolu & Telemetri</h1>
+        <p id="page-subheading">Sunucu kaynakları, aktif indirmeler ve WhatsApp durumu anlık izleniyor.</p>
+      </div>
+
+      <div class="top-actions">
+        <div style="background:var(--bg-glass-input); border:1px solid var(--border-subtle); padding:8px 16px; border-radius:var(--radius-md); font-size:0.85rem; display:flex; align-items:center; gap:8px;">
+          <span style="color:var(--text-muted);">VDS IP:</span>
+          <span style="font-family:monospace; color:var(--accent-cyan); font-weight:700;" id="top-vds-ip">127.0.0.1</span>
+        </div>
+        <button class="btn-primary" onclick="switchNavTab('overview')" style="width:auto; padding:10px 20px;">
+          <span>⚡ Hızlı İndirici</span>
+        </button>
       </div>
     </header>
 
-    <main>
-      <div class="dynamic-box" id="dynamic-box">
-        <p>Yükleniyor...</p>
-      </div>
-
-      <div class="section-title">Sistem Bilgisi</div>
-      <div class="info-grid">
-        <div class="info-card">
-          <div class="info-card-label">Ping URL Adresi</div>
-          <div class="info-card-value" id="ping-url" style="font-family: monospace; font-size: 0.85rem; color: var(--accent-blue);">-</div>
+    <!-- ==========================================================================
+         SEKME 1: GENEL BAKIŞ & TELEMETRİ (OVERVIEW)
+         ========================================================================== -->
+    <section id="view-overview" class="tab-view active">
+      <!-- Dinamik WhatsApp Bağlantı Uyarısı / Oturum Açma QR Kodu -->
+      <div id="overview-wa-login-banner" style="display:none; margin-bottom:24px;"></div>
+      
+      <!-- 4'lü Üst Metrik Kartları -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">CPU Yükü</span>
+            <span class="metric-icon">⚡</span>
+          </div>
+          <div class="metric-value" id="metric-cpu-val">%0</div>
+          <div class="metric-bar-bg">
+            <div class="metric-bar-fill" id="metric-cpu-bar"></div>
+          </div>
         </div>
-        <div class="info-card">
-          <div class="info-card-label">Çalışma Süresi</div>
-          <div class="info-card-value" id="uptime-value">-</div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">RAM Kullanımı</span>
+            <span class="metric-icon">🧠</span>
+          </div>
+          <div class="metric-value" id="metric-ram-val">%0</div>
+          <div class="metric-bar-bg">
+            <div class="metric-bar-fill" id="metric-ram-bar"></div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">İndirme Klasörü (LRU)</span>
+            <span class="metric-icon">💾</span>
+          </div>
+          <div class="metric-value" id="metric-disk-val">0.0 GB</div>
+          <div class="metric-bar-bg">
+            <div class="metric-bar-fill" id="metric-disk-bar" style="background:linear-gradient(90deg, var(--accent-emerald), var(--accent-amber));"></div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Kuyrukta Bekleyen</span>
+            <span class="metric-icon">📥</span>
+          </div>
+          <div class="metric-value" id="metric-queue-val">0 Görev</div>
+          <div class="metric-bar-bg">
+            <div class="metric-bar-fill" id="metric-queue-bar" style="width:0%;"></div>
+          </div>
         </div>
       </div>
 
-      <div id="tasks-container"></div>
+      <!-- 2 Sütunlu Çalışma Alanı -->
+      <div class="workspace-grid">
+        
+        <!-- SOL PANEL: HIZLI İNDİRME KONSOLU -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>🚀</span>
+              <span>Hızlı Medya İndirici</span>
+            </div>
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">1800+ SİTE DESTEKLİ</span>
+          </div>
 
-      <div class="section-title">Hızlı Kontroller</div>
-      <div class="quick-controls">
-        <button class="btn-secondary" onclick="pauseQueue()">⏸️ Duraklat</button>
-        <button class="btn-secondary" onclick="resumeQueue()">▶️ Devam Et</button>
+          <form id="quick-download-form" onsubmit="handleQuickDownload(event)">
+            <div class="form-group">
+              <label class="form-label" for="input-quick-url">Medya Bağlantısı (URL)</label>
+              <input type="url" id="input-quick-url" class="glass-input" placeholder="https://dizipal.com/... veya https://youtube.com/..." required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="input-quick-phone">Gönderilecek WhatsApp Numarası</label>
+              <input type="text" id="input-quick-phone" class="glass-input" value="905052761405" placeholder="905XXXXXXXXX" required>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:18px;">
+              <div>
+                <label class="form-label">Depolama Modu</label>
+                <select id="input-quick-mode" class="glass-input">
+                  <option value="whatsapp">İndir & WhatsApp'a Gönder</option>
+                  <option value="vault_only">Yalnızca Sunucuya İndir (İzle)</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" id="btn-quick-submit" class="btn-primary">
+              <span>İndirmeyi Başlat 📥</span>
+            </button>
+          </form>
+
+          <!-- Telemetry Graphs -->
+          <div class="panel-header" style="margin-top:28px; margin-bottom:10px;">
+            <div class="panel-title">
+              <span>📈</span>
+              <span>Canlı Kaynak Grafiği</span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="telemetryChart"></canvas>
+          </div>
+        </div>
+
+        <!-- SAĞ PANEL: CANLI GÖREV & KUYRUK MONİTÖRÜ -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>⚡</span>
+              <span>Canlı İndirme & Kuyruk Monitörü</span>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-secondary" onclick="pauseQueueToggle()" id="btn-pause-queue">⏸️ Duraklat</button>
+              <button class="btn-danger" onclick="clearQueueAction()">🗑️ Temizle</button>
+            </div>
+          </div>
+
+          <div class="panel-title" style="font-size:0.95rem; margin-bottom:12px;">
+            <span>🔥 Aktif Çalışan Görevler</span>
+          </div>
+          <div id="active-task-container" style="margin-bottom:20px;">
+            <!-- Aktif İndirme Kartları Buraya Dinamik Render Edilir -->
+            <p style="color:var(--text-muted); font-size:0.9rem; text-align:center; padding:20px 0;">Şu anda aktif indirme bulunmuyor.</p>
+          </div>
+
+          <div class="section-divider" style="border-top:1px solid var(--border-subtle); margin:16px 0;"></div>
+
+          <div class="panel-title" style="font-size:0.95rem; margin-bottom:12px;">
+            <span>📋 Kuyrukta Bekleyenler</span>
+          </div>
+
+          <div class="task-list" id="queue-task-list">
+            <!-- Kuyruk Öğeleri Buraya Listelenir -->
+            <p style="color:var(--text-muted); font-size:0.85rem; text-align:center;">Kuyrukta bekleyen görev yok.</p>
+          </div>
+        </div>
       </div>
-      <button class="btn-danger" style="width: 100%; margin-top: 12px; padding: 12px;" onclick="clearQueue()">🧹 Kuyruğu Sıfırla / Temizle</button>
+    </section>
 
-      <a href="/watch" class="watch-footer-link">🎬 İndirilen Videoları İzle (HTML5 Oynatıcı)</a>
-    </main>
+    <!-- ==========================================================================
+         SEKME 2: EVRENSEL DİZİ SİHİRBAZI (SERIES WIZARD)
+         ========================================================================== -->
+    <section id="view-series-wizard" class="tab-view">
+      <div class="glass-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🎬</span>
+            <span>Evrensel Dizi & Sezon Toplu İndirme Sihirbazı</span>
+          </div>
+          <span style="color:var(--accent-cyan); font-weight:600; font-size:0.85rem;">Dizipal, Dizibox, Anizm, Animecix vb.</span>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom:20px;">
+          <input type="url" id="series-wizard-url" class="glass-input" placeholder="Dizi veya Sezon Linki Yapıştırın (Örn: https://dizipal.com/dizi/...)" style="flex:1;">
+          <button class="btn-primary" id="series-wizard-fetch-btn" onclick="fetchSeriesEpisodes()" style="width:auto; padding:0 28px;">
+            <span>Bölümleri Getir 🔍</span>
+          </button>
+        </div>
+
+        <!-- Adım 2: Bölüm Seçim Paneli (Dinamik Açılır) -->
+        <div id="series-step2-panel" style="display:none; border-top:1px solid var(--border-subtle); padding-top:20px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <h3 id="series-detected-title" style="font-size:1.2rem; font-weight:800; color:var(--text-main);">Dizi Adı</h3>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <button class="btn-secondary" onclick="toggleSelectAllEpisodes(true)">Tümünü Seç</button>
+              <button class="btn-secondary" onclick="toggleSelectAllEpisodes(false)">Seçimi Kaldır</button>
+            </div>
+          </div>
+
+          <div class="episode-grid" id="series-episodes-container">
+            <!-- Bölüm kutucukları buraya basılır -->
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px;">
+            <div>
+              <label class="form-label">Gönderilecek WhatsApp Numarası</label>
+              <input type="text" id="series-target-phone" class="glass-input" value="905052761405">
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+              <button class="btn-primary" id="series-bulk-download-btn" onclick="downloadSelectedSeriesEpisodes()">
+                <span>Seçilen Bölümleri Toplu İndir 📥</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SEKME 3: MEDYA KASASI & GÖMÜLÜ OYNATICI (MEDIA VAULT)
+         ========================================================================== -->
+    <section id="view-media-vault" class="tab-view">
+      <div class="glass-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🍿</span>
+            <span>Medya Kasası & Disk Explorer</span>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-secondary" onclick="zipSelectedFiles()">Toplu Zip İndir 📦</button>
+            <button class="btn-secondary" onclick="loadMediaVault()">Yenile 🔄</button>
+          </div>
+        </div>
+
+        <div id="media-files-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:18px;">
+          <!-- Medya Dosya Kartları Buraya Dinamik Gelir -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SEKME 4: WHATSAPP KOMUTA İSTASYONU (WHATSAPP STATION)
+         ========================================================================== -->
+    <section id="view-whatsapp-station" class="tab-view">
+      <div class="workspace-grid">
+        
+        <!-- SOL: QR KOD & PAIRING KONTROL -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>📱</span>
+              <span>WhatsApp Cihaz Bağlantısı</span>
+            </div>
+          </div>
+
+          <div id="wa-auth-container" style="text-align:center; padding:20px 0;">
+            <!-- QR veya Pairing Code Buraya Render Edilir -->
+          </div>
+
+          <div class="section-divider" style="border-top:1px solid var(--border-subtle); margin:20px 0;"></div>
+
+          <div class="panel-title" style="font-size:0.95rem; margin-bottom:12px;">
+            <span>🔑 Telefon No İle Pairing Kodu İste</span>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <input type="text" id="pairing-phone-input" class="glass-input" value="905052761405" placeholder="905XXXXXXXXX" style="flex:1;">
+            <button class="btn-primary" onclick="requestNewPairingCode()" style="width:auto; padding:0 20px;">Kod İste 🔑</button>
+          </div>
+        </div>
+
+        <!-- SAĞ: OTURUM YÖNETİMİ & YEDEK KASASI -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>🔐</span>
+              <span>Oturum Kasası & Kurtarma</span>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <p style="color:var(--text-secondary); font-size:0.9rem;">WhatsApp bağlantınızın kopmaması için aktif oturum kimliğini güvenle yedekleyebilir veya geri yükleyebilirsiniz.</p>
+            <div id="backup-status-badge" style="font-size:0.82rem; padding:8px 12px; background:rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--border-subtle); color:var(--text-muted); font-family:Outfit, sans-serif; font-weight:600;">💾 Yedek Durumu: Yükleniyor...</div>
+            <button class="btn-secondary" onclick="backupSessionAction()">💾 Oturumu Yedekle (Backup)</button>
+            <button class="btn-secondary" onclick="restoreSessionAction()">🔄 Oturumu Geri Yükle (Restore)</button>
+            <button class="btn-danger" onclick="resetSessionAction()">⚠️ Oturumu Tamamen Sıfırla & Çıkış Yap</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SEKME: GÖREV KUYRUĞU (QUEUE MANAGER)
+         ========================================================================== -->
+    <section id="view-queue-manager" class="tab-view">
+      <div class="workspace-grid">
+        <!-- SOL PANEL: KUYRUK AYARLARI -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>⚙️</span>
+              <span>Kuyruk Yapılandırması</span>
+            </div>
+          </div>
+          
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div>
+              <label class="form-label" style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span>Eşzamanlı İndirme Limiti (Limit)</span>
+                <span id="queue-limit-display-val" style="color:var(--accent-cyan); font-weight:700;">1</span>
+              </label>
+              <input type="range" id="input-queue-limit" min="1" max="5" value="1" class="glass-input" style="padding:0;" oninput="updateQueueLimitFromSlider(this.value)">
+              <p style="font-size:0.75rem; color:var(--text-muted); margin-top:6px; line-height:1.4;">Aynı anda en fazla kaç adet medyanın paralel olarak indirileceğini belirler. Sunucu yükünü dengede tutmak için 1-3 önerilir.</p>
+            </div>
+            
+            <div class="section-divider" style="border-top:1px solid var(--border-subtle); margin:8px 0;"></div>
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <button class="btn-primary" onclick="pauseQueueToggle()" id="btn-mgr-pause-queue" style="font-size:0.85rem;">⏸️ Duraklat</button>
+              <button class="btn-danger" onclick="clearQueueAction()" style="font-size:0.85rem;">🗑️ Kuyruğu Temizle</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- SAĞ PANEL: DETAYLI KUYRUK LISTESI -->
+        <div class="glass-panel" style="flex:2;">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>📋</span>
+              <span>Kuyruktaki Tüm Görevler</span>
+            </div>
+          </div>
+          
+          <div style="overflow-x:auto;">
+            <table class="glass-table" style="width:100%; border-collapse:collapse; text-align:left;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border-subtle); color:var(--text-muted); font-size:0.85rem;">
+                  <th style="padding:12px; font-weight:600;">No</th>
+                  <th style="padding:12px; font-weight:600;">Görev Tanımı</th>
+                  <th style="padding:12px; font-weight:600;">Format</th>
+                  <th style="padding:12px; font-weight:600;">Telefon</th>
+                  <th style="padding:12px; font-weight:600;">Durum</th>
+                  <th style="padding:12px; font-weight:600; text-align:right;">İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="mgr-queue-table-body" style="font-size:0.9rem; color:var(--text-secondary);">
+                <!-- Görev satırları dinamik render edilir -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SEKME 5: SİSTEM & PROXY AYARLARI (SETTINGS STATION)
+         ========================================================================== -->
+    <section id="view-settings-station" class="tab-view">
+      <div class="workspace-grid">
+        <!-- SOL PANEL: SISTEM AYARLARI -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>⚙️</span>
+              <span>Sistem Konfigürasyonu</span>
+            </div>
+          </div>
+
+          <form id="settings-form" onsubmit="saveSettingsAction(event)">
+            <div class="form-group">
+              <label class="form-label">VDS IP Adresi</label>
+              <input type="text" id="settings-vds-ip" class="glass-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Keep-Alive Ping URL</label>
+              <input type="text" id="settings-ping-url" class="glass-input" placeholder="http://...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Proxy Sunucu URL (got-scraping / yt-dlp için)</label>
+              <input type="text" id="settings-proxy-url" class="glass-input" placeholder="http://user:pass@ip:port">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="form-group">
+                <label class="form-label">Disk Önbellek Yaşı (Saat)</label>
+                <input type="number" id="settings-retention" class="glass-input" step="0.5" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Maks Önbellek Boyutu (GB)</label>
+                <input type="number" id="settings-cache-limit" class="glass-input" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Eşzamanlı Çalışma Limiti (Concurrency: 1-3)</label>
+              <div style="display:flex; align-items:center; gap:12px;">
+                <input type="range" id="settings-concurrency" min="1" max="3" class="glass-input" style="flex:1; padding:0;">
+                <span id="concurrency-val" style="font-weight:700; color:var(--accent-cyan); font-size:1.2rem;">1</span>
+              </div>
+            </div>
+             <div class="form-group">
+              <label class="form-label">Discord Webhook URL</label>
+              <input type="text" id="settings-discord-webhook" class="glass-input" placeholder="https://discord.com/api/webhooks/...">
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Yönetici WhatsApp Numaraları (Whitelist)</label>
+              <input type="text" id="settings-admin-jids" class="glass-input" placeholder="Virgülle ayırın: 905052761405, 905332624732">
+              <p style="font-size:0.72rem; color:var(--text-muted); margin-top:4px; line-height:1.4;">Eğer doldurulursa bot sadece bu numaralardan gelen indirme ve kontrol taleplerini işler. Boş bırakılırsa tüm kullanıcılara yanıt verir.</p>
+            </div>
+
+            <div style="border-top:1px solid var(--border-subtle); margin:18px 0; padding-top:14px;">
+              <span style="font-size:0.85rem; font-weight:700; color:var(--accent-cyan); display:block; margin-bottom:10px;">🔐 Panel Giriş Bilgileri (Basic Auth)</span>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div class="form-group">
+                  <label class="form-label">Kullanıcı Adı</label>
+                  <input type="text" id="settings-dashboard-user" class="glass-input" placeholder="admin">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Giriş Şifresi</label>
+                  <input type="password" id="settings-dashboard-pass" class="glass-input" placeholder="Boş bırakırsanız şifresiz giriş aktif kalır">
+                </div>
+              </div>
+            </div>
+            
+            <button type="submit" class="btn-primary" style="margin-top:10px;">
+              <span>Ayarları Kaydet 💾</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- SAĞ PANEL: PROXY TEST & COOKIE MANAGER -->
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <span>📡</span>
+              <span>Proxy & Çerez Yardımcı Araçları</span>
+            </div>
+          </div>
+
+          <!-- Proxy Tester -->
+          <div style="margin-bottom:24px;">
+            <h4 style="font-size:0.95rem; margin-bottom:10px; color:var(--text-accent);">Proxy Canlılık Testi</h4>
+            <div style="display:flex; gap:10px;">
+              <input type="text" id="proxy-test-input" class="glass-input" placeholder="http://user:pass@ip:port" style="flex:1;">
+              <button class="btn-secondary" onclick="testProxyAction()">Test Et</button>
+            </div>
+            <div id="proxy-test-results" style="margin-top:10px; font-size:0.85rem; max-height:120px; overflow-y:auto; border-radius:8px; background:rgba(0,0,0,0.2); padding:8px;">
+              <p style="color:var(--text-muted);">Test sonucu bekleniyor...</p>
+            </div>
+          </div>
+
+          <div class="section-divider" style="border-top:1px solid var(--border-subtle); margin:20px 0;"></div>
+
+          <!-- Cookies Verifier -->
+          <div>
+            <h4 style="font-size:0.95rem; margin-bottom:10px; color:var(--text-accent);">Çerez (Cookie) Geçerlilik Testi</h4>
+            <div class="form-group">
+              <label class="form-label">Netscape (.txt) veya JSON Çerez Metni</label>
+              <textarea id="cookie-test-text" class="glass-input" rows="4" placeholder="# Netscape HTTP Cookie File... veya [ { ... } ]" style="resize:vertical; font-family:monospace; font-size:0.78rem;"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Test Edilecek URL</label>
+              <input type="url" id="cookie-test-url" class="glass-input" value="https://www.youtube.com">
+            </div>
+            <button class="btn-secondary" onclick="verifyCookiesAction()">Çerezleri Test Et & Doğrula 🔑</button>
+            <div id="cookie-test-results" style="margin-top:10px; font-size:0.85rem; border-radius:8px; background:rgba(0,0,0,0.2); padding:8px;">
+              <p style="color:var(--text-muted);">Çerez doğrulama sonucu bekleniyor...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SEKME 6: ÖZEL BOT KOMUTLARI (COMMANDS STATION)
+         ========================================================================== -->
+    <section id="view-commands-station" class="tab-view">
+      <div class="glass-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>💬</span>
+            <span>Özel Bot Komut Yanıt Şablonları</span>
+          </div>
+          <button class="btn-secondary" onclick="addNewCommandRow()">Yeni Şablon Ekle ➕</button>
+        </div>
+
+        <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:20px;">
+          WhatsApp üzerinden gelen mesajlara otomatik yanıtlar tanımlayabilirsiniz. Kullanılabilir etiketler: 
+          <code style="color:var(--accent-cyan); font-family:monospace;">{uptime}</code>, 
+          <code style="color:var(--accent-cyan); font-family:monospace;">{tarih}</code>, 
+          <code style="color:var(--accent-cyan); font-family:monospace;">{disk_kalan}</code>, 
+          <code style="color:var(--accent-cyan); font-family:monospace;">{aktif_indirme_sayisi}</code>
+        </p>
+
+        <div class="table-container">
+          <table class="data-table" id="commands-table">
+            <thead>
+              <tr>
+                <th>Komut Tetikleyici</th>
+                <th>Yanıt Mesajı Şablonu</th>
+                <th style="width:120px;">İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="commands-tbody">
+              <!-- Dinamik komut satırları -->
+            </tbody>
+          </table>
+        </div>
+
+        <button class="btn-primary" onclick="saveCommandsAction()" style="margin-top:20px; width:auto; padding:12px 30px;">
+          <span>Komut Şablonlarını Kaydet 💾</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SEKME 7: CRON STUDIO (CRON STATION)
+         ========================================================================== -->
+    <section id="view-cron-station" class="tab-view">
+      <div class="glass-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>⏱️</span>
+            <span>Zamanlanmış Otomasyon Görevleri (Cron Studio)</span>
+          </div>
+          <button class="btn-secondary" onclick="addNewCronRow()">Yeni Görev Ekle ➕</button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="cron-table">
+            <thead>
+              <tr>
+                <th>Görev Adı</th>
+                <th>Cron İfadesi (Örn: 0 4 * * *)</th>
+                <th>Eylem</th>
+                <th>Durum</th>
+                <th style="width:120px;">İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="cron-tbody">
+              <!-- Dinamik cron satırları -->
+            </tbody>
+          </table>
+        </div>
+
+        <button class="btn-primary" onclick="saveCronAction()" style="margin-top:20px; width:auto; padding:12px 30px;">
+          <span>Otomasyon Planlarını Kaydet 💾</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SEKME 8: SİSTEM SAĞLIĞI & TEŞHİS (SYSTEM HEALTH)
+         ========================================================================== -->
+    <section id="view-system-health" class="tab-view">
+      <div class="glass-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🩺</span>
+            <span>Sistem Teşhis & Sağlık Raporu</span>
+          </div>
+          <button class="btn-secondary" onclick="loadSystemHealth()">Yeniden Test Et 🔄</button>
+        </div>
+
+        <div id="health-report-container" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
+          <p style="color:var(--text-muted);">Sağlık testi yapılıyor...</p>
+        </div>
+        
+        <div class="panel-header" style="margin-top:40px; margin-bottom:10px;">
+          <div class="panel-title">
+            <span>🚀</span>
+            <span>Sistem Güncelleme & PM2 Yeniden Başlatma Sihirbazı</span>
+          </div>
+        </div>
+        
+        <div style="display:flex; gap:12px;">
+          <button class="btn-secondary" onclick="systemDiagnosticGitPull()" style="flex:1;">Git Pull & Güncelle 📥</button>
+          <button class="btn-danger" onclick="systemDiagnosticRestartPM2()" style="flex:1;">PM2 Sürecini Yeniden Başlat ♻️</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
+         SEKME 9: CANLI TERMİNAL & LOGLAR (TERMINAL LOGS)
+         ========================================================================== -->
+    <section id="view-terminal-logs" class="tab-view">
+      <div class="glass-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>📜</span>
+            <span>Canlı Konsol & Terminal Log Akışı</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn-secondary" onclick="clearTerminalLogs()">Konsolu Temizle</button>
+            <button class="btn-secondary" onclick="downloadTerminalLogs()">Logları İndir 📥</button>
+          </div>
+        </div>
+
+        <div class="terminal-box" id="live-terminal-console-full">
+          <div class="log-line log-info">[SİSTEM] Terminal log motoru WebSocket telemetri hattına bağlandı.</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Plyr Video Player Modal Dialog -->
+  <div id="video-player-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(16px); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); width:90%; max-width:1000px; padding:24px; box-shadow:0 30px 80px rgba(0,0,0,0.9);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 id="modal-video-title" style="font-size:1.15rem; font-weight:700;">Video Oynatıcı</h3>
+        <button class="btn-danger" onclick="closeVideoModal()">Kapat ✕</button>
+      </div>
+
+      <div style="border-radius:var(--radius-md); overflow:hidden; background:#000;">
+        <video id="modal-plyr-video" playsinline controls style="width:100%; max-height:550px;"></video>
+      </div>
+    </div>
   </div>
+
+  <div id="toast-container" style="position:fixed; bottom:24px; right:24px; z-index:9999; display:flex; flex-direction:column; gap:10px;"></div>
 
   <script>
     let currentStatus = '';
     let fetchedEpisodesList = [];
+    let socket = null;
+    let telemetryChart = null;
+    let cpuData = Array(30).fill(0);
+    let ramData = Array(30).fill(0);
+    let chartLabels = Array(30).fill('');
 
-    // Switch tab helper
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-      
-      const targetBtn = document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`);
-      if (targetBtn) targetBtn.classList.add('active');
-      
-      const targetContent = document.getElementById(tabId);
-      if (targetContent) targetContent.classList.add('active');
+    // Tab Switcher
+    function switchNavTab(tabName) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-view').forEach(el => el.style.display = 'none');
+
+      const activeLink = Array.from(document.querySelectorAll('.nav-item')).find(el => el.getAttribute('onclick')?.includes(tabName));
+      if (activeLink) activeLink.classList.add('active');
+
+      const targetView = document.getElementById(`view-${tabName}`);
+      if (targetView) targetView.style.display = 'block';
+
+      const headings = {
+        'overview': { title: 'Komuta Konsolu & Telemetri', sub: 'Sunucu kaynakları, aktif indirmeler ve WhatsApp durumu anlık izleniyor.' },
+        'series-wizard': { title: 'Dizi & Sezon Sihirbazı', sub: 'Tüm sezonu tek tıkla tara, seç ve sırayla indir.' },
+        'media-vault': { title: 'Medya Kasası & Disk Explorer', sub: 'Sunucudaki videoları izle, bilgisayarına indir veya sil.' },
+        'whatsapp-station': { title: 'WhatsApp Komuta İstasyonu', sub: 'QR kod, Pairing kodu, oturum yedekleme ve sıfırlama merkezi.' },
+        'settings-station': { title: 'Sistem & Proxy Yapılandırması', sub: 'LRU kota limitleri, bildirim webhookları ve proxy havuzu.' },
+        'commands-station': { title: 'Özel Komutlar', sub: 'WhatsApp botuna özel dinamik şablon komutları düzenleyin.' },
+        'cron-station': { title: 'Cron Zamanlayıcı Stüdyosu', sub: 'Zamanlanmış otomatik arka plan görevlerini yapılandırın.' },
+        'system-health': { title: 'Sistem Sağlığı & Teşhis', sub: 'FFmpeg, yt-dlp, disk ve socket sağlığını denetleyin.' },
+        'terminal-logs': { title: 'Canlı Konsol & Terminal Logları', sub: 'Gerçek zamanlı sunucu ve indirme log akışı.' }
+      };
+
+      if (headings[tabName]) {
+        document.getElementById('page-heading').innerText = headings[tabName].title;
+        document.getElementById('page-subheading').innerText = headings[tabName].sub;
+      }
+
+      if (tabName === 'media-vault') loadMediaVault();
+      if (tabName === 'system-health') loadSystemHealth();
+      if (tabName === 'settings-station' || tabName === 'queue-manager') loadSettingsAction();
+      if (tabName === 'commands-station') loadCommandsAction();
+      if (tabName === 'cron-station') loadCronAction();
     }
 
-    async function fetchEpisodes() {
-      const urlInput = document.getElementById('series-url');
-      const url = urlInput ? urlInput.value.trim() : '';
-      if (!url) { alert('Lütfen dizi / sezon linki girin!'); return; }
+    // Toast Alert
+    function showToast(title, msg, type = 'info') {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = `toast-card toast-${type}`;
+      t.innerHTML = `<div class="toast-title">${title}</div><div class="toast-msg">${msg}</div>`;
+      c.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
+    }
 
-      const fetchBtn = document.getElementById('fetch-btn');
-      fetchBtn.innerText = '🔍 Taranıyor...';
-      fetchBtn.disabled = true;
+    // ─── WebSocket Client (Modül 03) ───
+    function initWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        console.log('[WS] Connected to Web Command Socket');
+        const dot = document.getElementById('sidebar-status-dot');
+        const txt = document.getElementById('sidebar-status-text');
+        dot.className = 'status-dot online';
+        txt.innerText = 'Çevrimiçi';
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleWebSocketMessage(msg);
+        } catch (e) {
+          console.error('[WS Parse Hatası]', e);
+        }
+      };
+
+      socket.onclose = () => {
+        console.warn('[WS] Connection closed, reconnecting in 3s...');
+        const dot = document.getElementById('sidebar-status-dot');
+        const txt = document.getElementById('sidebar-status-text');
+        dot.className = 'status-dot';
+        txt.innerText = 'Bağlanıyor...';
+        setTimeout(initWebSocket, 3000);
+      };
+    }
+
+    function handleWebSocketMessage(msg) {
+      switch (msg.type) {
+        case 'TELEMETRY_UPDATE':
+          renderTelemetry(msg.data);
+          break;
+        case 'QUEUE_UPDATE':
+          renderQueueUI(msg.data);
+          break;
+        case 'BOT_STATUS':
+          renderBotStatusUI(msg.data);
+          break;
+        case 'INITIAL_LOGS':
+          msg.data.forEach(log => appendLogLine(log));
+          break;
+        case 'CONSOLE_LOG':
+          appendLogLine(msg.data);
+          break;
+        case 'NOTIFICATION':
+          showToast(msg.data.title, msg.data.message, msg.data.type);
+          break;
+      }
+    }
+
+    // Telemetry Dashboard Rendering and Chart update (Modül 02)
+    function renderTelemetry(t) {
+      if (t.cpu) {
+        document.getElementById('metric-cpu-val').innerText = `%${t.cpu.usagePercent}`;
+        document.getElementById('metric-cpu-bar').style.width = `${t.cpu.usagePercent}%`;
+        
+        cpuData.push(t.cpu.usagePercent);
+        cpuData.shift();
+      }
+      if (t.memory) {
+        document.getElementById('metric-ram-val').innerText = `%${t.memory.usagePercent}`;
+        document.getElementById('metric-ram-bar').style.width = `${t.memory.usagePercent}%`;
+        
+        ramData.push(t.memory.usagePercent);
+        ramData.shift();
+      }
+      if (t.disk) {
+        const usedGB = (t.disk.downloadsFolderBytes / (1024 * 1024 * 1024)).toFixed(1);
+        document.getElementById('metric-disk-val').innerText = `${usedGB} GB`;
+      }
+      
+      const nowStr = new Date().toLocaleTimeString('tr-TR');
+      chartLabels.push(nowStr);
+      chartLabels.shift();
+      
+      if (telemetryChart) {
+        telemetryChart.update('none'); // silent update
+      }
+    }
+
+    // Queue Telemetry UI (Modül 05)
+    function renderQueueUI(data) {
+      const activeContainer = document.getElementById('active-task-container');
+      const queueContainer = document.getElementById('queue-task-list');
+      
+      document.getElementById('metric-queue-val').innerText = `${data.queue ? data.queue.length : 0} Görev`;
+
+      if (data.activeTasks && data.activeTasks.length > 0) {
+        activeContainer.innerHTML = data.activeTasks.map(t => `
+          <div class="task-card active" style="margin-bottom: 8px;">
+            <div class="task-card-header">
+              <span>GÖREV #${t.id}</span>
+              <span style="color:var(--accent-emerald); font-weight:700;">İNDİRİLİYOR</span>
+            </div>
+            <div class="task-card-title">${t.title}</div>
+            <div class="task-card-progress">
+              <span>${t.status}</span>
+              <span style="font-family:monospace; font-weight:bold; color:var(--accent-cyan);">${t.speed ? t.speed + ' MB/s' : ''}</span>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        activeContainer.innerHTML = `<p style="color:var(--text-muted); font-size:0.9rem; text-align:center; padding:15px 0;">Şu anda aktif indirme bulunmuyor.</p>`;
+      }
+
+      if (data.queue && data.queue.length > 0) {
+        queueContainer.innerHTML = data.queue.map((q, idx) => `
+          <div class="task-card">
+            <div class="task-card-header">
+              <span>#${q.id}</span>
+              <span style="color:var(--accent-amber); font-weight:700;">${q.priority ? '🔴 ÖNCELİKLİ' : 'BEKLİYOR'}</span>
+            </div>
+            <div class="task-card-title">${q.title}</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+              <span style="font-size:0.75rem; color:var(--text-muted);">Sıra: ${idx + 1}</span>
+              <button class="btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="cancelQueueTask('${q.id}')">İptal Et</button>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        queueContainer.innerHTML = `<p style="color:var(--text-muted); font-size:0.85rem; text-align:center;">Kuyrukta bekleyen görev yok.</p>`;
+      }
+
+      // Render dedicated queue manager table (Sekme: Görev Kuyruğu)
+      const mgrTableBody = document.getElementById('mgr-queue-table-body');
+      if (mgrTableBody) {
+        let tableRowsHtml = '';
+        let rowIdx = 1;
+
+        if (data.activeTasks && data.activeTasks.length > 0) {
+          data.activeTasks.forEach(t => {
+            tableRowsHtml += `
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.03); background:rgba(16,185,129,0.04);">
+                <td style="padding:12px; font-weight:700; color:var(--accent-emerald);">#${t.id}</td>
+                <td style="padding:12px; font-weight:600;">${t.title}</td>
+                <td style="padding:12px;"><span style="background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.2); padding:3px 8px; border-radius:6px; font-size:0.75rem; color:var(--accent-cyan);">Aktif</span></td>
+                <td style="padding:12px; font-family:monospace; font-size:0.8rem; color:var(--text-muted);">${t.recipientJid ? t.recipientJid.split('@')[0] : ''}</td>
+                <td style="padding:12px;"><span style="color:var(--accent-emerald); font-weight:bold;">%${t.status || '0'} ${t.speed ? '('+t.speed+' MB/s)' : ''}</span></td>
+                <td style="padding:12px; text-align:right;">
+                  <button class="btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="cancelQueueTask('${t.id}')">İptal Et</button>
+                </td>
+              </tr>
+            `;
+            rowIdx++;
+          });
+        }
+
+        if (data.queue && data.queue.length > 0) {
+          data.queue.forEach((q, qidx) => {
+            tableRowsHtml += `
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+                <td style="padding:12px; color:var(--text-muted); font-family:monospace;">#${q.id}</td>
+                <td style="padding:12px; font-weight:600;">${q.title}</td>
+                <td style="padding:12px;"><span style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); padding:3px 8px; border-radius:6px; font-size:0.75rem; color:#818cf8;">Sırada (Sıra: ${qidx+1})</span></td>
+                <td style="padding:12px; font-family:monospace; font-size:0.8rem; color:var(--text-muted);">${q.recipientJid ? q.recipientJid.split('@')[0] : ''}</td>
+                <td style="padding:12px;">
+                  <span style="color:${q.priority ? 'var(--accent-rose)' : 'var(--text-muted)'}; font-weight:bold;">
+                    ${q.priority ? '🔴 Öncelikli' : '⏳ Bekliyor'}
+                  </span>
+                </td>
+                <td style="padding:12px; text-align:right;">
+                  <button class="btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="cancelQueueTask('${q.id}')">İptal Et</button>
+                </td>
+              </tr>
+            `;
+            rowIdx++;
+          });
+        }
+
+        if (tableRowsHtml === '') {
+          tableRowsHtml = `<tr><td colspan="6" style="padding:24px; text-align:center; color:var(--text-muted);">Kuyrukta aktif veya bekleyen görev bulunmuyor.</td></tr>`;
+        }
+        mgrTableBody.innerHTML = tableRowsHtml;
+      }
+    }
+
+    async function cancelQueueTask(taskId) {
+      if (!confirm('Bu görevi kuyruktan kaldırmak istediğinize emin misiniz?')) return;
+      try {
+        const res = await fetch(`/api/indir/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId })
+        });
+        showToast('İptal İstendi', 'İptal talebi gönderildi.', 'info');
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    // WhatsApp Status (Modül 08)
+    function renderBotStatusUI(data) {
+      currentStatus = data.status;
+      const waContainer = document.getElementById('wa-auth-container');
+      const sideDot = document.getElementById('sidebar-status-dot');
+      const sideText = document.getElementById('sidebar-status-text');
+
+      // Update backup status badge
+      const backupBadge = document.getElementById('backup-status-badge');
+      if (backupBadge) {
+        if (data.backupExists) {
+          backupBadge.innerHTML = `💾 Son Yedek: <span style="color:var(--accent-emerald); font-weight:700;">${data.backupTime}</span>`;
+        } else {
+          backupBadge.innerHTML = `💾 Son Yedek: <span style="color:var(--accent-rose); font-weight:700;">Yedek Bulunamadı</span>`;
+        }
+      }
+
+      // Dinamik Giriş/QR Kod Uyarısı (Overview Tab)
+      const loginBanner = document.getElementById('overview-wa-login-banner');
+      if (loginBanner) {
+        if (data.status === 'connected') {
+          loginBanner.style.display = 'none';
+        } else {
+          loginBanner.style.display = 'block';
+          
+          let qrOrPairingHtml = '';
+          if (data.pairingCode) {
+            qrOrPairingHtml = `
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">Pairing Kodu:</div>
+              <div style="background:rgba(99,102,241,0.15); border:1px dashed rgba(99,102,241,0.5); border-radius:10px; padding:10px 20px; font-size:1.5rem; font-weight:900; font-family:monospace; color:#818cf8; cursor:pointer;" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>showToast('Kopyalandı', 'Pairing kodu kopyalandı.', 'success'))">
+                ${data.pairingCode}
+              </div>
+            `;
+          } else if (data.qrCodeUrl) {
+            qrOrPairingHtml = `
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">QR Kodunu Taratın:</div>
+              <img src="${data.qrCodeUrl}" style="background:#fff; padding:6px; border-radius:8px; max-width:140px; height:auto; display:block; margin:0 auto; box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+            `;
+          } else {
+            qrOrPairingHtml = `
+              <div style="display:inline-block; border:3px solid rgba(255,255,255,0.1); border-top-color:var(--accent-primary); border-radius:50%; width:24px; height:24px; animation: spin 1s linear infinite;"></div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">Yükleniyor...</div>
+            `;
+          }
+
+          loginBanner.innerHTML = `
+            <div class="glass-panel" style="border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.04); padding:20px; border-radius:16px;">
+              <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:20px;">
+                <div style="flex:1; min-width:280px;">
+                  <h3 style="color:#ef4444; font-size:1.15rem; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+                    <span>⚠️</span> WhatsApp Bağlantısı Aktif Değil!
+                  </h3>
+                  <p style="color:var(--text-secondary); font-size:0.85rem; line-height:1.5; margin:0;">
+                    Botun WhatsApp üzerinden indirme isteklerini alabilmesi ve mesaj gönderebilmesi için oturum açmalısınız. 
+                    Sağdaki QR kodu telefonunuzdaki WhatsApp uygulamasından taratın veya <b>Komuta İstasyonu</b> sekmesinden pairing kodu alın.
+                  </p>
+                </div>
+                <div style="min-width:160px; text-align:center;">
+                  ${qrOrPairingHtml}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      if (data.status === 'connected') {
+        sideDot.className = 'status-dot online';
+        sideText.innerText = 'Çevrimiçi';
+        waContainer.innerHTML = `
+          <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:18px; padding:24px;">
+            <h3 style="color:#10b981; font-size:1.4rem; margin-bottom:8px;">✅ WhatsApp Cihazı Bağlı</h3>
+            <p style="color:var(--text-secondary);">WhatsApp oturumunuz aktif durumda. Bot tüm gelen indirme isteklerini otonom olarak yanıtlıyor.</p>
+          </div>
+        `;
+      } else if (data.pairingCode) {
+        sideDot.className = 'status-dot';
+        sideText.innerText = 'Pairing Kodu';
+        waContainer.innerHTML = `
+          <p style="color:var(--text-secondary); margin-bottom:12px;">WhatsApp uygulamanızı açıp <b>Bağlı Cihazlar -> Telefon numarasıyla bağla</b> seçeneğine girin ve bu kodu yazın:</p>
+          <div style="background:rgba(99,102,241,0.1); border:2px dashed rgba(99,102,241,0.4); border-radius:18px; padding:20px; font-size:2.4rem; font-weight:900; font-family:monospace; color:#818cf8; cursor:pointer;" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>showToast('Kopyalandı', 'Pairing kodu panoya kopyalandı.', 'success'))">
+            ${data.pairingCode}
+          </div>
+          <p style="font-size:0.75rem; color:var(--text-muted); margin-top:8px;">Kopyalamak için koda tıklayın.</p>
+          <div style="margin-top:16px;">
+            <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="resetSessionAction()">🔄 Oturumu Sıfırla / QR Koduna Geç</button>
+          </div>
+        `;
+      } else if (data.qrCodeUrl) {
+        sideDot.className = 'status-dot';
+        sideText.innerText = 'Giriş Bekleniyor';
+        waContainer.innerHTML = `
+          <p style="color:var(--text-secondary); margin-bottom:12px;">WhatsApp web tarayıcısı üzerinden bağlantı kurmak için aşağıdaki QR kodunu telefonunuzdan taratın:</p>
+          <img src="${data.qrCodeUrl}" style="background:#fff; padding:12px; border-radius:14px; max-width:240px; box-shadow: 0 0 20px rgba(255,255,255,0.05);">
+          <div style="margin-top:16px;">
+            <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="resetSessionAction()">🔄 QR Kodunu Yenile / Sıfırla</button>
+          </div>
+        `;
+      } else {
+        sideDot.className = 'status-dot';
+        sideText.innerText = 'Giriş Bekleniyor';
+        waContainer.innerHTML = `
+          <div style="padding:24px;">
+            <p style="color:var(--text-muted); margin-bottom:12px;">Giriş bekleniyor. QR kod veya pairing kodu yükleniyor...</p>
+            <div style="display:inline-block; border:4px solid rgba(255,255,255,0.1); border-top-color:var(--accent-primary); border-radius:50%; width:32px; height:32px; animation: spin 1s linear infinite;"></div>
+          </div>
+        `;
+      }
+    }
+
+    // Terminal Logging System (Modül 15)
+    function appendLogLine(log) {
+      const consoleCompact = document.getElementById('live-terminal-console');
+      const consoleFull = document.getElementById('live-terminal-console-full');
+      
+      const typeClass = `log-${log.type}`;
+      const badge = log.type === 'error' ? '[HATA]' : log.type === 'warn' ? '[UYARI]' : '[İNF]';
+      const logHtml = `<div class="log-line"><span style="color:var(--text-muted);">${log.time}</span> <span class="${typeClass}">${badge} ${log.text}</span></div>`;
+      
+      if (consoleCompact) {
+        consoleCompact.insertAdjacentHTML('beforeend', logHtml);
+        if (consoleCompact.childNodes.length > 300) consoleCompact.removeChild(consoleCompact.firstChild);
+        consoleCompact.scrollTop = consoleCompact.scrollHeight;
+      }
+      
+      if (consoleFull) {
+        consoleFull.insertAdjacentHTML('beforeend', logHtml);
+        if (consoleFull.childNodes.length > 1000) consoleFull.removeChild(consoleFull.firstChild);
+        consoleFull.scrollTop = consoleFull.scrollHeight;
+      }
+    }
+
+    function clearTerminalLogs() {
+      document.getElementById('live-terminal-console-full').innerHTML = '';
+      if (document.getElementById('live-terminal-console')) {
+        document.getElementById('live-terminal-console').innerHTML = '';
+      }
+    }
+
+    function downloadTerminalLogs() {
+      const consoleFull = document.getElementById('live-terminal-console-full');
+      const text = consoleFull.innerText;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `hdwp_logs_${Date.now()}.txt`;
+      a.click();
+    }
+
+    // Hızlı İndirici (Modül 01/05)
+    async function handleQuickDownload(e) {
+      e.preventDefault();
+      const url = document.getElementById('input-quick-url').value.trim();
+      const phone = document.getElementById('input-quick-phone').value.trim();
+      const mode = document.getElementById('input-quick-mode').value;
+      const btn = document.getElementById('btn-quick-submit');
+
+      if (!url || !phone) return showToast('Eksik Bilgi', 'Lütfen tüm alanları doldurun.', 'warn');
+
+      let cleanPhone = phone.replace(/[^0-9]/g, '');
+      if (!cleanPhone.endsWith('@s.whatsapp.net')) cleanPhone += '@s.whatsapp.net';
+
+      btn.disabled = true;
+      btn.innerText = 'Gönderiliyor...';
+
+      try {
+        const res = await fetch('/api/indir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, jid: cleanPhone })
+        });
+        const data = await res.json();
+        if (data.ok || data.success) {
+          showToast('Başarılı', 'İndirme kuyruğa eklendi!', 'success');
+          document.getElementById('input-quick-url').value = '';
+        } else {
+          showToast('Hata', data.error || 'İşlem başlatılamadı.', 'error');
+        }
+      } catch (err) {
+        showToast('Bağlantı Hatası', err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'İndirmeyi Başlat 📥';
+      }
+    }
+
+    // Dizi Sihirbazı (Modül 04)
+    async function fetchSeriesEpisodes() {
+      const url = document.getElementById('series-wizard-url').value.trim();
+      if (!url) return showToast('Uyarı', 'Lütfen dizi/sezon linkini girin.', 'warn');
+
+      const btn = document.getElementById('series-wizard-fetch-btn');
+      btn.disabled = true;
+      btn.innerText = 'Taranıyor...';
 
       try {
         const res = await fetch(`/api/fetch-episodes?url=${encodeURIComponent(url)}`);
         const data = await res.json();
-        
-        if (data.success && data.episodes) {
+        if (data.success) {
           fetchedEpisodesList = data.episodes;
-          const listContainer = document.getElementById('fetched-episodes-list');
-          listContainer.innerHTML = '';
+          document.getElementById('series-detected-title').innerText = data.seriesName;
           
-          data.episodes.forEach((ep, idx) => {
-            listContainer.innerHTML += `
-              <div class="episode-item">
-                <input type="checkbox" id="ep-${idx}" value="${ep.url}" checked>
-                <label for="ep-${idx}">${ep.name}</label>
-              </div>
-            `;
-          });
-          
-          document.getElementById('series-wizard-step2').style.display = 'block';
-          document.getElementById('series-name-header').innerText = `🎬 ${data.seriesName || 'Bulunan Dizi'}`;
+          const grid = document.getElementById('series-episodes-container');
+          grid.innerHTML = data.episodes.map((ep, idx) => `
+            <label class="episode-pill">
+              <input type="checkbox" class="series-ep-check" data-idx="${idx}" checked>
+              <span>${ep.name}</span>
+            </label>
+          `).join('');
+
+          document.getElementById('series-step2-panel').style.display = 'block';
+          showToast('Başarılı', `${data.episodes.length} bölüm çözümlendi.`, 'success');
         } else {
-          alert('Hata: ' + (data.error || 'Bölümler alınamadı.'));
+          showToast('Hata', data.error || 'Bölüm bilgileri çekilemedi.', 'error');
         }
       } catch (e) {
-        alert('İşlem başarısız: ' + e.message);
+        showToast('Bağlantı Hatası', e.message, 'error');
       } finally {
-        fetchBtn.innerText = 'Bölümleri Getir 🔍';
-        fetchBtn.disabled = false;
+        btn.disabled = false;
+        btn.innerText = 'Bölümleri Getir 🔍';
       }
     }
 
-    function toggleSelectAllEpisodes(checkbox) {
-      document.querySelectorAll('#fetched-episodes-list input[type="checkbox"]').forEach(cb => {
-        cb.checked = checkbox.checked;
-      });
+    function toggleSelectAllEpisodes(state) {
+      document.querySelectorAll('.series-ep-check').forEach(cb => cb.checked = state);
     }
 
-    async function downloadSelectedEpisodes() {
-      const phoneInput = document.getElementById('series-phone');
-      const phone = phoneInput ? phoneInput.value.trim() : '';
-      if (!phone) { alert('Gönderilecek telefon numarası gerekli!'); return; }
-
+    async function downloadSelectedSeriesEpisodes() {
       const selected = [];
-      document.querySelectorAll('#fetched-episodes-list input[type="checkbox"]').forEach((cb, idx) => {
-        if (cb.checked) {
-          selected.push(fetchedEpisodesList[idx]);
-        }
+      document.querySelectorAll('.series-ep-check:checked').forEach(cb => {
+        const idx = parseInt(cb.getAttribute('data-idx'), 10);
+        if (fetchedEpisodesList[idx]) selected.push(fetchedEpisodesList[idx]);
       });
 
-      if (selected.length === 0) {
-        alert('Lütfen en az bir bölüm seçin!');
-        return;
-      }
+      if (selected.length === 0) return showToast('Uyarı', 'Lütfen en az 1 bölüm seçin.', 'warn');
 
-      const submitBtn = document.getElementById('series-submit-btn');
-      submitBtn.innerText = 'Sıraya Alınıyor...';
-      submitBtn.disabled = true;
+      const phone = document.getElementById('series-target-phone').value.trim();
+      let cleanPhone = phone.replace(/[^0-9]/g, '');
+      if (!cleanPhone.endsWith('@s.whatsapp.net')) cleanPhone += '@s.whatsapp.net';
+
+      const btn = document.getElementById('series-bulk-download-btn');
+      btn.disabled = true;
+      btn.innerText = 'Ekleniyor...';
 
       try {
-        let cleanPhone = phone.replace(/[^0-9]/g, '');
-        if (!cleanPhone.endsWith('@s.whatsapp.net')) {
-          cleanPhone = `${cleanPhone}@s.whatsapp.net`;
-        }
-
-        const response = await fetch('/api/indir-multiple', {
+        const res = await fetch('/api/indir-multiple', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ episodes: selected, jid: cleanPhone })
         });
-        
-        const result = await response.json();
-        if (result.success) {
-          alert(`Başarılı! ${result.addedCount} adet bölüm sıraya eklendi.`);
-          document.getElementById('series-wizard-step2').style.display = 'none';
-          document.getElementById('series-url').value = '';
-        } else {
-          alert('Hata: ' + (result.error || 'Kuyruğa eklenemedi.'));
-        }
-      } catch (err) {
-        alert('Bağlantı hatası oluştu: ' + err.message);
-      } finally {
-        submitBtn.innerText = 'Seçilen Bölümleri İndir 📥';
-        submitBtn.disabled = false;
-      }
-    }
-
-    async function updateStatus() {
-      try {
-        const res = await fetch('/api/status');
         const data = await res.json();
-
-        const statusDot = document.getElementById('status-dot');
-        const statusText = document.getElementById('status-text');
-        const box = document.getElementById('dynamic-box');
-        const pingUrlEl = document.getElementById('ping-url');
-
-        if (data.pingUrl) {
-          pingUrlEl.innerText = data.pingUrl;
+        if (data.success) {
+          showToast('Kuyruğa Alındı', `${data.addedCount} görev kuyruğa eklendi.`, 'success');
+          document.getElementById('series-step2-panel').style.display = 'none';
+          document.getElementById('series-wizard-url').value = '';
+          switchNavTab('overview');
         } else {
-          pingUrlEl.innerText = 'Ayarlanmamış';
+          showToast('Hata', data.error, 'error');
         }
-
-        // Uptime sync or formatting if needed
-        document.getElementById('uptime-value').innerText = new Date().toLocaleTimeString('tr-TR');
-
-        if (data.status !== currentStatus) {
-          currentStatus = data.status;
-
-          if (data.status === 'connected') {
-            statusDot.style.backgroundColor = '#10b981';
-            statusDot.style.boxShadow = '0 0 14px #10b981';
-            statusText.innerText = 'Aktif & Çevrimiçi';
-            
-            box.innerHTML = `
-              <div class="tabs-header">
-                <button class="tab-btn active" onclick="switchTab('single-download')">🔗 Tekil Link</button>
-                <button class="tab-btn" onclick="switchTab('series-download')">🎬 Dizi Sihirbazı</button>
-              </div>
-
-              <!-- Tab 1: Single Download -->
-              <div id="single-download" class="tab-content active">
-                <div class="section-title" style="margin-top:0; width: 100%;">Web Üzerinden Video Gönder</div>
-                <form action="/download" method="POST">
-                  <div class="form-group">
-                    <label for="url">Medya Linki (Desteklenen Siteler)</label>
-                    <input type="url" id="url" name="url" placeholder="https://..." required>
-                  </div>
-                  <div class="form-group">
-                    <label for="phone">Gönderilecek Telefon Numarası (Örn: 905xxxxxxxxx)</label>
-                    <input type="text" id="phone" name="phone" placeholder="905XXXXXXXXX" required>
-                  </div>
-                  <button type="submit">İndir & WhatsApp'tan Gönder</button>
-                </form>
-              </div>
-
-              <!-- Tab 2: Series Download Wizard -->
-              <div id="series-download" class="tab-content">
-                <div class="section-title" style="margin-top:0; width: 100%;">Dizi Sezonu / Bölüm Seçici</div>
-                <div class="form-group" style="margin-bottom: 12px;">
-                  <label for="series-url">Dizi / Sezon Linki (HDfilmcehennemi, Animecix, HDKore)</label>
-                  <input type="url" id="series-url" placeholder="https://www.hdfilmcehennemi.nl/dizi/... veya https://animecix.tv/series/...">
-                </div>
-                <button id="fetch-btn" style="width: 100%;" onclick="fetchEpisodes()">Bölümleri Getir 🔍</button>
-
-                <div id="series-wizard-step2" style="display:none; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 15px;">
-                  <div class="section-title" id="series-name-header" style="margin-top:0;">Bulunan Bölümler</div>
-                  
-                  <div class="form-group" style="margin-bottom: 12px;">
-                    <label for="series-phone">Gönderilecek Telefon Numarası</label>
-                    <input type="text" id="series-phone" placeholder="905XXXXXXXXX" value="905052761405">
-                  </div>
-
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;">Bölüm Seçin</span>
-                    <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem;">
-                      <input type="checkbox" id="select-all-episodes" checked onclick="toggleSelectAllEpisodes(this)" style="width:16px; height:16px; margin:0;">
-                      <label for="select-all-episodes" style="margin:0;">Tümünü Seç</label>
-                    </div>
-                  </div>
-
-                  <div class="episode-list" id="fetched-episodes-list"></div>
-                  
-                  <button id="series-submit-btn" style="width: 100%; margin-top: 15px;" onclick="downloadSelectedEpisodes()">Seçilen Bölümleri İndir 📥</button>
-                </div>
-              </div>
-            `;
-          } else if (data.status === 'pairing' && data.pairingCode) {
-            statusDot.style.backgroundColor = '#3b82f6';
-            statusDot.style.boxShadow = '0 0 14px #3b82f6';
-            statusText.innerText = 'Pairing Code Hazır';
-            
-            box.innerHTML = `
-              <p style="margin-top:0; margin-bottom:16px; font-size:0.95rem; color:var(--text-muted); text-align: center;">WhatsApp → Bağlı Cihazlar → Telefon Numarası ile Bağla kısmına bu kodu girin:</p>
-              <div style="background: rgba(59,130,246,0.06); border: 2px dashed rgba(59,130,246,0.3); border-radius: 20px; padding: 24px; text-align: center; margin-bottom: 16px; cursor: pointer; width: 100%;" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>alert('Kod kopyalandı!'))">
-                <div style="font-size: 2.6rem; font-weight: 900; letter-spacing: 0.15em; color: #3b82f6; font-family: monospace;">${data.pairingCode}</div>
-                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">Koda tıklayarak kopyalayabilirsiniz</div>
-              </div>
-              <button class="btn-secondary" onclick="document.getElementById('pairing-form').style.display='block'; this.style.display='none';" style="width:100%;">Farklı Numara ile Dene</button>
-              <div id="pairing-form" style="display:none; margin-top:16px; width: 100%;">
-                <input type="text" id="new-pairing-phone" placeholder="905XXXXXXXXX" style="width:100%; margin-bottom: 8px;">
-                <button onclick="requestPairing()" style="width:100%;">Yeni Kod İste</button>
-              </div>
-            `;
-          } else {
-            statusDot.style.backgroundColor = '#f59e0b';
-            statusDot.style.boxShadow = '0 0 14px #f59e0b';
-            statusText.innerText = 'Giriş Bekleniyor';
-            
-            const qrSection = data.qrCodeUrl ? `
-              <div style="text-align:center; margin-bottom:20px;">
-                <p style="margin:0 0 10px; font-size:0.85rem; color:var(--text-muted);">1️⃣ QR Kod ile giriş:</p>
-                <div style="display:inline-block; background:white; padding:12px; border-radius:18px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
-                  <img src="${data.qrCodeUrl}" alt="QR Code" style="display:block; max-width:180px; height:auto;">
-                </div>
-              </div>
-            ` : `<p style="color:var(--text-muted); text-align:center; margin-bottom:20px;">QR Kod yükleniyor...</p>`;
-            
-            box.innerHTML = qrSection + `
-              <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 20px; width: 100%;">
-                <p style="margin:0 0 12px; font-size:0.85rem; color:var(--text-muted);">2️⃣ Telefon numarası ile giriş (Pairing Code):</p>
-                <div style="display:flex; gap:10px;">
-                  <input type="text" id="pairing-phone" placeholder="905XXXXXXXXX" value="905052761405" style="flex:1;">
-                  <button onclick="requestPairing()" style="padding: 10px 20px;">Kod İste</button>
-                </div>
-                <p style="margin:10px 0 0; font-size:0.75rem; color:var(--text-muted); text-align: center;">Kodu WhatsApp → Bağlı Cihazlar → Telefon Numarası ile Bağla kısmına girin.</p>
-              </div>
-            `;
-          }
-        }
-
-        const tasksContainer = document.getElementById('tasks-container');
-        let queueHtml = '';
-
-        if (data.activeTask) {
-          queueHtml += `
-            <div class="section-title">▶️ Aktif İndirme</div>
-            <div class="task-card active">
-              <div class="task-meta">
-                <span>GÖREV NUMARASI: #${data.activeTask.id}</span>
-                <span style="color: var(--accent-green);">İNDİRİLİYOR</span>
-              </div>
-              <div class="task-title">${data.activeTask.title}</div>
-              <div class="task-status">
-                <span class="status-dot" style="background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); margin: 0;"></span>
-                <span>${data.activeTask.status}</span>
-              </div>
-            </div>
-          `;
-        } else {
-          queueHtml += `
-            <div class="section-title">▶️ Aktif İndirme</div>
-            <p style="color: var(--text-muted); font-size: 0.9rem; text-align: left; margin: 0; padding-left: 4px;">Şu anda indirme yapılmıyor.</p>
-          `;
-        }
-
-        if (data.sendingTasks && data.sendingTasks.length > 0) {
-          const sendingList = data.sendingTasks.map((t, idx) => `
-            <div class="task-card sending" style="border-left: 4px solid var(--accent-orange, #ff9800);">
-              <div class="task-meta">
-                <span>GÖREV NUMARASI: #${t.id} (${t.size || 'Bilinmiyor'})</span>
-                <span style="color: var(--accent-orange, #ff9800); font-weight: bold;">YÜKLENİYOR</span>
-              </div>
-              <div class="task-title">${t.title}</div>
-              <div class="task-status">
-                <span class="status-dot" style="background-color: var(--accent-orange, #ff9800); box-shadow: 0 0 8px var(--accent-orange, #ff9800); margin: 0;"></span>
-                <span>${t.status}</span>
-              </div>
-            </div>
-          `).join('');
-          queueHtml += '<div class="section-title">📤 WhatsApp\'a Gönderilenler (' + data.sendingTasks.length + ')</div>' + sendingList;
-        }
-
-        if (data.downloadQueue && data.downloadQueue.length > 0) {
-          const queueList = data.downloadQueue.map((t, idx) => `
-            <div class="task-card waiting">
-              <div class="task-meta">
-                <span>SIRA: #${idx + 1} (No: #${t.id})</span>
-                <span style="color: var(--accent-blue);">KUYRUKTA</span>
-              </div>
-              <div class="task-title">${t.title}</div>
-              <div class="task-status">${t.status}</div>
-            </div>
-          `).join('');
-          queueHtml += '<div class="section-title">⏳ Bekleyen Kuyruk (' + data.downloadQueue.length + ')</div>' + queueList;
-        } else {
-          queueHtml += `
-            <div class="section-title">⏳ Bekleyen Kuyruk</div>
-            <p style="color: var(--text-muted); font-size: 0.9rem; text-align: left; margin: 0; padding-left: 4px;">Kuyrukta bekleyen işlem yok.</p>
-          `;
-        }
-
-        if (data.activeTasks && data.activeTasks.length > 0) {
-          const tasksHtml = data.activeTasks.map(t => `
-            <div class="task-card web">
-              <div class="task-meta">
-                <span>WEB İSTEĞİ (Saat: ${t.time})</span>
-                <span style="color: var(--accent-orange);">HAZIRLANIYOR</span>
-              </div>
-              <div class="task-title">Hedef JID: ${t.phone}</div>
-              <div class="task-status">${t.status}</div>
-            </div>
-          `).join('');
-          queueHtml += '<div class="section-title">🚀 Web İstekleri</div>' + tasksHtml;
-        }
-
-        tasksContainer.innerHTML = queueHtml;
-
       } catch (e) {
-        console.error('Error fetching status:', e);
+        showToast('Hata', e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Seçilen Bölümleri Toplu İndir 📥';
       }
     }
 
-    async function requestPairing() {
-      const phoneInput = document.getElementById('pairing-phone') || document.getElementById('new-pairing-phone');
-      const phone = phoneInput ? phoneInput.value.trim() : '';
-      if (!phone) { alert('Lütfen telefon numarası girin!'); return; }
+    // Medya Kasası (Modül 06/07)
+    async function loadMediaVault() {
+      const grid = document.getElementById('media-files-grid');
+      try {
+        const res = await fetch('/api/files');
+        const data = await res.json();
+        if (data.success && data.files && data.files.length > 0) {
+          grid.innerHTML = data.files.map(f => `
+            <div class="media-card" style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:16px; position:relative;">
+              <input type="checkbox" class="vault-file-select" data-name="${f.name}" style="position:absolute; top:12px; right:12px; transform:scale(1.2);">
+              <div style="font-size:1.5rem; margin-bottom:8px;">🎬</div>
+              <div style="font-weight:700; font-size:0.95rem; margin-bottom:6px; word-break:break-all;">${f.name}</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">${f.sizeFormatted} • ${f.dateFormatted}</div>
+              <div style="display:flex; gap:8px; margin-top:14px;">
+                <button class="btn-primary" style="padding:8px 12px; font-size:0.82rem;" onclick="openVideoModal('${f.name}', '${f.downloadUrl}')">İzle 🍿</button>
+                <a href="${f.downloadUrl}" download class="btn-secondary" style="padding:8px 12px; font-size:0.82rem; text-decoration:none;">İndir ⬇️</a>
+                <button class="btn-danger" style="padding:8px 10px;" onclick="deleteMediaFile('${f.name}')">🗑️</button>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          grid.innerHTML = `<p style="color:var(--text-muted); font-size:0.9rem; padding:10px;">Sunucuda kayıtlı medya dosyası bulunmuyor.</p>`;
+        }
+      } catch (e) {
+        grid.innerHTML = `<p style="color:var(--accent-rose); padding:10px;">Dosya gezgini yüklenemedi: ${e.message}</p>`;
+      }
+    }
+
+    async function deleteMediaFile(filename) {
+      if (!confirm(`${filename} dosyasını diskten tamamen silmek istiyor musunuz?`)) return;
+      try {
+        const res = await fetch('/api/files/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Silindi', 'Dosya başarıyla temizlendi.', 'success');
+          loadMediaVault();
+        } else {
+          showToast('Hata', data.error, 'error');
+        }
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    async function zipSelectedFiles() {
+      const selected = Array.from(document.querySelectorAll('.vault-file-select:checked')).map(cb => cb.getAttribute('data-name'));
+      if (selected.length === 0) return showToast('Seçim Yok', 'Lütfen zip oluşturmak için dosya seçin.', 'warn');
+
+      showToast('Zip Hazırlanıyor', `${selected.length} dosya sıkıştırılıyor. Lütfen bekleyin...`, 'info');
+      
+      try {
+        const res = await fetch('/api/files/zip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filenames: selected })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Zip Tamamlandı', 'Arşiv paketi oluşturuldu.', 'success');
+          loadMediaVault();
+          window.location.href = data.zipUrl;
+        } else {
+          showToast('Hata', data.error, 'error');
+        }
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    // Video Player Modal (Plyr.js)
+    function openVideoModal(fileName, videoUrl) {
+      const modal = document.getElementById('video-player-modal');
+      const title = document.getElementById('modal-video-title');
+      const videoEl = document.getElementById('modal-plyr-video');
+
+      title.innerText = fileName;
+      videoEl.src = videoUrl;
+      modal.style.display = 'flex';
+
+      if (window.currentPlyr) {
+        window.currentPlyr.destroy();
+      }
+      window.currentPlyr = new Plyr(videoEl, {
+        controls: ['play-large', 'play', 'progress', 'current-time', 'duration', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen']
+      });
+      videoEl.play();
+    }
+
+    function closeVideoModal() {
+      const modal = document.getElementById('video-player-modal');
+      const videoEl = document.getElementById('modal-plyr-video');
+      if (videoEl) videoEl.pause();
+      modal.style.display = 'none';
+    }
+
+    // WhatsApp Device pairing & actions
+    async function requestNewPairingCode() {
+      const phone = document.getElementById('pairing-phone-input').value.trim();
+      if (!phone) return showToast('Hata', 'Telefon numarası girilmelidir.', 'warn');
 
       try {
-        const response = await fetch('/api/request-pairing', {
+        const res = await fetch('/api/request-pairing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone })
         });
-        const result = await response.json();
-        if (!result.success) {
-          alert('Hata: ' + (result.error || 'Bilinmeyen hata'));
-        }
-      } catch(err) {
-        alert('Bağlantı hatası oluştu.');
-      }
-    }
-
-    async function pauseQueue() {
-      const res = await fetch('/api/kuyruk-duraklat', { method: 'POST' });
-      const data = await res.json();
-      alert(data.message);
-      updateStatus();
-    }
-
-    async function resumeQueue() {
-      const res = await fetch('/api/kuyruk-devam', { method: 'POST' });
-      const data = await res.json();
-      alert(data.message);
-      updateStatus();
-    }
-
-    async function clearQueue() {
-      if (confirm('Kuyruktaki tüm indirmeleri temizlemek istediğinize emin misiniz?')) {
-        const res = await fetch('/api/kuyruk-temizle', { method: 'POST' });
         const data = await res.json();
-        alert(data.message);
-        updateStatus();
+        if (data.success) {
+          showToast('Talep Gönderildi', data.message, 'success');
+        } else {
+          showToast('Hata', data.error, 'error');
+        }
+      } catch (e) {
+        showToast('Bağlantı Hatası', e.message, 'error');
       }
     }
 
-    setInterval(updateStatus, 2000);
-    updateStatus();
+    async function backupSessionAction() {
+      try {
+        const res = await fetch('/api/session/backup', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) showToast('Yedeklendi', 'Oturum creds.json yedeği oluşturuldu.', 'success');
+        else showToast('Hata', data.error, 'error');
+      } catch (e) { showToast('Hata', e.message, 'error'); }
+    }
+
+    async function restoreSessionAction() {
+      if (!confirm('Yedekten oturumu geri yüklemek botu yeniden başlatacaktır. Emin misiniz?')) return;
+      try {
+        const res = await fetch('/api/session/restore', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) showToast('Geri Yüklendi', 'Oturum yedeği kuruldu, bot bağlanıyor.', 'success');
+        else showToast('Hata', data.error, 'error');
+      } catch (e) { showToast('Hata', e.message, 'error'); }
+    }
+
+    async function resetSessionAction() {
+      if (!confirm('Oturumu sıfırlamak WhatsApp bağlantısını tamamen koparacak ve oturum klasörünü silecektir. Emin misiniz?')) return;
+      try {
+        const res = await fetch('/api/session/reset', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) showToast('Sıfırlandı', 'Oturum sıfırlandı. Yeni giriş QR kodu bekleniyor.', 'success');
+        else showToast('Hata', data.error, 'error');
+      } catch (e) { showToast('Hata', e.message, 'error'); }
+    }
+
+    // Queue Control Buttons
+    async function clearQueueAction() {
+      if (!confirm('Kuyruktaki tüm bekleyen indirmeler iptal edilsin mi?')) return;
+      try {
+        await fetch('/api/kuyruk-temizle', { method: 'POST' });
+        showToast('Temizlendi', 'Kuyruk başarıyla temizlendi.', 'info');
+      } catch (e) { showToast('Hata', e.message, 'error'); }
+    }
+
+    async function pauseQueueToggle() {
+      const btn = document.getElementById('btn-pause-queue');
+      try {
+        if (btn.innerText.includes('Duraklat')) {
+          await fetch('/api/kuyruk-duraklat', { method: 'POST' });
+          btn.innerText = '▶️ Devam Et';
+        } else {
+          await fetch('/api/kuyruk-devam', { method: 'POST' });
+          btn.innerText = '⏸️ Duraklat';
+        }
+      } catch (e) { showToast('Hata', e.message, 'error'); }
+    }
+
+    // Settings Station (Modül 10/11)
+    async function loadSettingsAction() {
+      try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        if (data.success && data.settings) {
+          const s = data.settings;
+          document.getElementById('settings-vds-ip').value = s.vdsIp || '';
+          document.getElementById('settings-ping-url').value = s.pingUrl || '';
+          document.getElementById('settings-proxy-url').value = s.proxyUrl || '';
+          document.getElementById('settings-retention').value = s.downloadRetentionHours || 4;
+          document.getElementById('settings-cache-limit').value = s.maxDownloadsCacheGB || 15;
+          document.getElementById('settings-concurrency').value = s.concurrencyLimit || 1;
+          document.getElementById('concurrency-val').innerText = s.concurrencyLimit || 1;
+          
+          if (document.getElementById('input-queue-limit')) {
+            document.getElementById('input-queue-limit').value = s.concurrencyLimit || 1;
+          }
+          if (document.getElementById('queue-limit-display-val')) {
+            document.getElementById('queue-limit-display-val').innerText = s.concurrencyLimit || 1;
+          }
+          
+          document.getElementById('settings-discord-webhook').value = s.discordWebhookUrl || '';
+          document.getElementById('settings-admin-jids').value = s.adminJids || '';
+          document.getElementById('settings-dashboard-user').value = s.dashboardUser || 'admin';
+          document.getElementById('settings-dashboard-pass').value = s.dashboardPass || '';
+          document.getElementById('top-vds-ip').innerText = s.vdsIp || '127.0.0.1';
+        }
+      } catch (e) {
+        showToast('Hata', 'Ayarlar yüklenemedi: ' + e.message, 'error');
+      }
+    }
+
+    // Concurrency slider label
+    document.getElementById('settings-concurrency').addEventListener('input', (e) => {
+      document.getElementById('concurrency-val').innerText = e.target.value;
+      if (document.getElementById('input-queue-limit')) {
+        document.getElementById('input-queue-limit').value = e.target.value;
+      }
+      if (document.getElementById('queue-limit-display-val')) {
+        document.getElementById('queue-limit-display-val').innerText = e.target.value;
+      }
+    });
+
+    async function updateQueueLimitFromSlider(val) {
+      document.getElementById('queue-limit-display-val').innerText = val;
+      document.getElementById('settings-concurrency').value = val;
+      document.getElementById('concurrency-val').innerText = val;
+      try {
+        const configRes = await fetch('/api/settings');
+        const configData = await configRes.json();
+        if (configData.success) {
+          const currentSettings = configData.settings;
+          currentSettings.concurrencyLimit = parseInt(val, 10);
+          await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentSettings)
+          });
+          showToast('Sınır Güncellendi', `Eşzamanlı indirme limiti ${val} olarak ayarlandı.`, 'success');
+        }
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    async function saveSettingsAction(e) {
+      e.preventDefault();
+      const settings = {
+        vdsIp: document.getElementById('settings-vds-ip').value.trim(),
+        pingUrl: document.getElementById('settings-ping-url').value.trim(),
+        proxyUrl: document.getElementById('settings-proxy-url').value.trim(),
+        downloadRetentionHours: parseFloat(document.getElementById('settings-retention').value),
+        maxDownloadsCacheGB: parseFloat(document.getElementById('settings-cache-limit').value),
+        concurrencyLimit: parseInt(document.getElementById('settings-concurrency').value, 10),
+        discordWebhookUrl: document.getElementById('settings-discord-webhook').value.trim(),
+        adminJids: document.getElementById('settings-admin-jids').value.trim(),
+        dashboardUser: document.getElementById('settings-dashboard-user').value.trim(),
+        dashboardPass: document.getElementById('settings-dashboard-pass').value
+      };
+
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settings)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Kaydedildi', 'Sistem ayarları başarıyla güncellendi.', 'success');
+          loadSettingsAction();
+        } else {
+          showToast('Hata', data.error, 'error');
+        }
+      } catch (err) {
+        showToast('Hata', err.message, 'error');
+      }
+    }
+
+    // Proxy tester
+    async function testProxyAction() {
+      const url = document.getElementById('proxy-test-input').value.trim();
+      const consoleArea = document.getElementById('proxy-test-results');
+      if (!url) return showToast('Hata', 'Lütfen test etmek için proxy URL girin.', 'warn');
+
+      consoleArea.innerHTML = '<p style="color:var(--accent-cyan);">Proxy ping testi başlatıldı, sorgular gönderiliyor...</p>';
+
+      try {
+        const res = await fetch('/api/proxy/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ proxyUrl: url })
+        });
+        const data = await res.json();
+        if (data.success && data.results) {
+          consoleArea.innerHTML = data.results.map(r => `
+            <div style="margin-bottom:4px; color:${r.ok ? 'var(--accent-emerald)' : 'var(--accent-rose)'};">
+              [${r.name}] -> ${r.ok ? 'BAĞLANDI (' + r.ping + 'ms)' : 'HATA: ' + r.error}
+            </div>
+          `).join('');
+        } else {
+          consoleArea.innerHTML = `<p style="color:var(--accent-rose);">Test başarısız oldu: ${data.error}</p>`;
+        }
+      } catch (err) {
+        consoleArea.innerHTML = `<p style="color:var(--accent-rose);">Bağlantı Hatası: ${err.message}</p>`;
+      }
+    }
+
+    // Cookies Verifier
+    async function verifyCookiesAction() {
+      const text = document.getElementById('cookie-test-text').value.trim();
+      const target = document.getElementById('cookie-test-url').value.trim();
+      const consoleArea = document.getElementById('cookie-test-results');
+
+      if (!text || !target) return showToast('Hata', 'Lütfen çerez verisi ve hedef URL girin.', 'warn');
+      consoleArea.innerHTML = '<p style="color:var(--accent-cyan);">Çerez başlığı çözümleniyor ve doğrulama isteği atılıyor...</p>';
+
+      try {
+        const res = await fetch('/api/cookies/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cookiesText: text, targetUrl: target })
+        });
+        const data = await res.json();
+        if (data.success) {
+          consoleArea.innerHTML = `
+            <p style="color:var(--accent-emerald);">
+              ✅ Çerezler Geçerli! (HTTP ${data.statusCode})<br>
+              Çözümlenen çerez sayısı: <b>${data.parsedCount}</b>
+            </p>
+          `;
+        } else {
+          consoleArea.innerHTML = `<p style="color:var(--accent-rose);">❌ Geçersiz Çerez: ${data.message}</p>`;
+        }
+      } catch (err) {
+        consoleArea.innerHTML = `<p style="color:var(--accent-rose);">Hata: ${err.message}</p>`;
+      }
+    }
+
+    // Custom Commands Editor (Modül 17)
+    async function loadCommandsAction() {
+      const tbody = document.getElementById('commands-tbody');
+      tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-muted);">Komutlar yükleniyor...</td></tr>';
+
+      try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        if (data.success && data.settings) {
+          const cmds = data.settings.customCommands || {};
+          tbody.innerHTML = '';
+          
+          const keys = Object.keys(cmds);
+          if (keys.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Henüz özel komut tanımlanmamış.</td></tr>';
+            return;
+          }
+          
+          for (const key of keys) {
+            appendCommandRowToTable(key, cmds[key]);
+          }
+        }
+      } catch (e) {
+        showToast('Hata', 'Komutlar yüklenemedi: ' + e.message, 'error');
+      }
+    }
+
+    function appendCommandRowToTable(trigger = '', response = '') {
+      const tbody = document.getElementById('commands-tbody');
+      const tr = document.createElement('tr');
+      tr.className = 'command-row';
+      tr.innerHTML = `
+        <td><input type="text" class="glass-input cmd-trigger" value="${trigger}" placeholder="Örn: !yardim" style="font-family:monospace; font-weight:bold;"></td>
+        <td><textarea class="glass-input cmd-response" rows="2" placeholder="Yanıt şablonu yazın...">${response}</textarea></td>
+        <td><button class="btn-danger" style="padding:6px 10px;" onclick="this.closest('tr').remove()">Sil 🗑️</button></td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    function addNewCommandRow() {
+      appendCommandRowToTable();
+    }
+
+    async function saveCommandsAction() {
+      const commands = {};
+      const rows = document.querySelectorAll('.command-row');
+      
+      let valid = true;
+      rows.forEach(row => {
+        const trigger = row.querySelector('.cmd-trigger').value.trim().toLowerCase();
+        const response = row.querySelector('.cmd-response').value.trim();
+        if (trigger && response) {
+          commands[trigger] = response;
+        } else if (trigger || response) {
+          valid = false;
+        }
+      });
+
+      if (!valid) return showToast('Eksik Veri', 'Lütfen tüm alanları doldurun veya boş satırları silin.', 'warn');
+
+      try {
+        const res = await fetch('/api/commands', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customCommands: commands })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Başarılı', 'Özel komut şablonları kaydedildi.', 'success');
+          loadCommandsAction();
+        } else {
+          showToast('Hata', data.error, 'error');
+        }
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    // Cron Studio Editor (Modül 19)
+    async function loadCronAction() {
+      const tbody = document.getElementById('cron-tbody');
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);">Zamanlanmış görevler yükleniyor...</td></tr>';
+
+      try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        if (data.success && data.settings) {
+          const schedules = data.settings.cronSchedules || [];
+          tbody.innerHTML = '';
+          
+          if (schedules.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Aktif zamanlanmış görev planı bulunmuyor.</td></tr>';
+            return;
+          }
+          
+          for (const sched of schedules) {
+            appendCronRowToTable(sched.id, sched.name, sched.cron, sched.action, sched.active);
+          }
+        }
+      } catch (e) {
+        showToast('Hata', 'Cron verileri yüklenemedi: ' + e.message, 'error');
+      }
+    }
+
+    function appendCronRowToTable(id = '', name = '', cron = '', action = 'cleanup', active = true) {
+      const tbody = document.getElementById('cron-tbody');
+      const tr = document.createElement('tr');
+      tr.className = 'cron-row';
+      tr.setAttribute('data-id', id || 'cron_' + Date.now());
+      tr.innerHTML = `
+        <td><input type="text" class="glass-input cron-name" value="${name}" placeholder="Örn: Gece Temizliği"></td>
+        <td><input type="text" class="glass-input cron-expr" value="${cron}" placeholder="Örn: 0 4 * * *" style="font-family:monospace;"></td>
+        <td>
+          <select class="glass-input cron-action">
+            <option value="cleanup" ${action === 'cleanup' ? 'selected' : ''}>Disk Temizliği (Clean Downloads)</option>
+          </select>
+        </td>
+        <td>
+          <select class="glass-input cron-active" style="color:${active ? 'var(--accent-emerald)' : 'var(--text-muted)'}; font-weight:bold;" onchange="this.style.color = this.value === 'true' ? 'var(--accent-emerald)' : 'var(--text-muted)'">
+            <option value="true" ${active ? 'selected' : ''}>AKTİF</option>
+            <option value="false" ${!active ? 'selected' : ''}>PASİF</option>
+          </select>
+        </td>
+        <td><button class="btn-danger" style="padding:6px 10px;" onclick="this.closest('tr').remove()">Sil 🗑️</button></td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    function addNewCronRow() {
+      appendCronRowToTable('', '', '', 'cleanup', true);
+    }
+
+    async function saveCronAction() {
+      const schedules = [];
+      const rows = document.querySelectorAll('.cron-row');
+      
+      let valid = true;
+      rows.forEach(row => {
+        const id = row.getAttribute('data-id');
+        const name = row.querySelector('.cron-name').value.trim();
+        const cron = row.querySelector('.cron-expr').value.trim();
+        const action = row.querySelector('.cron-action').value;
+        const active = row.querySelector('.cron-active').value === 'true';
+        
+        if (name && cron) {
+          schedules.push({ id, name, cron, action, active });
+        } else if (name || cron) {
+          valid = false;
+        }
+      });
+
+      if (!valid) return showToast('Hata', 'Lütfen tüm alanları doldurun veya boş satırları silin.', 'warn');
+
+      try {
+        const res = await fetch('/api/cron', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cronSchedules: schedules })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Zamanlayıcı Güncellendi', 'Zamanlanmış otomasyon görevleri başarıyla kaydedildi.', 'success');
+          loadCronAction();
+        } else {
+          showToast('Hata', data.error, 'error');
+        }
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    // Diagnostics / System Health (Modül 20)
+    async function loadSystemHealth() {
+      const c = document.getElementById('health-report-container');
+      c.innerHTML = '<p style="color:var(--text-muted); padding:10px;">Sunucu teşhis modülleri sorgulanıyor...</p>';
+
+      try {
+        const res = await fetch('/api/system/health');
+        const data = await res.json();
+        if (data.success) {
+          c.innerHTML = `
+            <div class="metric-card">
+              <div class="metric-label">FFmpeg Motoru</div>
+              <div class="metric-value" style="color:var(--accent-emerald); font-size:1.4rem;">${data.ffmpeg.ok ? '✅ Aktif' : '❌ Hata'}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Static build derlemesi devrede.</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">yt-dlp Çözücü</div>
+              <div class="metric-value" style="color:var(--accent-emerald); font-size:1.4rem;">${data.ytDlp.ok ? '✅ Hazır' : '❌ Hata'}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">İkili çalıştırılabilir yol: ${data.ytDlp.command}</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">WhatsApp WebSocket</div>
+              <div class="metric-value" style="color:${data.whatsapp.ok ? 'var(--accent-emerald)' : 'var(--accent-amber)'}; font-size:1.4rem;">${data.whatsapp.ok ? '✅ Bağlı' : '🟡 ' + data.whatsapp.status}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">WhiskeySockets Baileys v6.x soketi.</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">NVMe Disk Vault</div>
+              <div class="metric-value" style="color:var(--accent-emerald); font-size:1.4rem;">✅ Okuma-Yazma</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">${data.storage.filesCount} dosya, ${(data.storage.totalBytes / (1024*1024)).toFixed(1)} MB önbellek.</div>
+            </div>
+          `;
+        }
+      } catch (e) {
+        c.innerHTML = `<p style="color:var(--accent-rose); padding:10px;">Teşhis hatası: ${e.message}</p>`;
+      }
+    }
+
+    async function systemDiagnosticGitPull() {
+      if (!confirm('Git havuzundaki en son bot dosyaları çekilerek güncellenecektir. Emin misiniz?')) return;
+      showToast('Güncelleme Başlatıldı', 'Dosyalar indiriliyor...', 'info');
+      try {
+        const res = await fetch('/api/system/git-pull', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) showToast('Güncellendi', 'Dosyalar başarıyla çekildi. Değişiklikleri uygulamak için botu yeniden başlatın.', 'success');
+        else showToast('Hata', data.error || 'Git pull başarısız.', 'error');
+      } catch (e) { showToast('Hata', e.message, 'error'); }
+    }
+
+    async function systemDiagnosticRestartPM2() {
+      if (!confirm('PM2 süreci kapatılıp yeniden başlatılacaktır. Bağlantınız geçici olarak kesilecek. Emin misiniz?')) return;
+      showToast('Başlatılıyor', 'PM2 restart komutu gönderildi...', 'warn');
+      try {
+        await fetch('/api/system/restart', { method: 'POST' });
+      } catch (e) {}
+    }
+
+    // Chart.js Telemetry Initializer (Modül 02)
+    function initTelemetryChart() {
+      const ctx = document.getElementById('telemetryChart').getContext('2d');
+      telemetryChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: chartLabels,
+          datasets: [
+            {
+              label: 'CPU Yükü (%)',
+              data: cpuData,
+              borderColor: '#6366f1',
+              backgroundColor: 'rgba(99, 102, 241, 0.1)',
+              borderWidth: 2,
+              tension: 0.4,
+              fill: true
+            },
+            {
+              label: 'RAM Kullanımı (%)',
+              data: ramData,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              borderWidth: 2,
+              tension: 0.4,
+              fill: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { family: 'Outfit', size: 10 } }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#64748b', font: { size: 8 } }
+            },
+            y: {
+              min: 0,
+              max: 100,
+              grid: { color: 'rgba(255, 255, 255, 0.04)' },
+              ticks: { color: '#64748b', font: { size: 9 } }
+            }
+          }
+        }
+      });
+    }
+
+    // Initialize Page on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      initWebSocket();
+      initTelemetryChart();
+      loadSettingsAction(); // fetch IP and retention for top navbar
+    });
   </script>
 </body>
 </html>

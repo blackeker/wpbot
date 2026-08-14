@@ -17,23 +17,113 @@ if (!fs.existsSync(sessionPath)) {
   fs.mkdirSync(sessionPath, { recursive: true });
 }
 
-// Config file reader/writer helpers
+// Config file reader/writer helpers with full defaults
+const DEFAULT_CONFIG = {
+  whatsappPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || "905052761405",
+  port: parseInt(process.env.PORT || "7860", 10),
+  vdsIp: process.env.VDS_IP || "111.235.150.157",
+  pingUrl: process.env.PING_URL || "",
+  proxyUrl: process.env.PROXY_URL || "",
+  downloadRetentionHours: parseFloat(process.env.DOWNLOAD_MAX_AGE_HOURS || "4"),
+  maxDownloadsCacheGB: parseFloat(process.env.MAX_DOWNLOADS_CACHE_GB || "15"),
+  concurrencyLimit: parseInt(process.env.CONCURRENCY_LIMIT || "1", 10),
+  autoCleanAfterSend: true,
+  discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || "",
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "",
+  telegramChatId: process.env.TELEGRAM_CHAT_ID || "",
+  dashboardUser: process.env.DASHBOARD_USER || "admin",
+  dashboardPass: process.env.DASHBOARD_PASS || "",
+  adminJids: process.env.ADMIN_JIDS || "",
+  customCommands: {},
+  cronSchedules: [
+    { id: "cleanup", name: "Disk Temizliği", cron: "0 4 * * *", action: "cleanup", active: true }
+  ]
+};
+
 export function readConfig() {
+  let config = { ...DEFAULT_CONFIG };
   if (fs.existsSync(configPath)) {
     try {
-      return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const saved = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      config = { ...config, ...saved };
     } catch (e) {
-      return {};
+      // Return default on parse failure
     }
   }
-  return {};
+  // Initialize env values from config for libraries checking process.env
+  if (config.proxyUrl) {
+    process.env.PROXY_URL = config.proxyUrl;
+  }
+  if (config.downloadRetentionHours) {
+    process.env.DOWNLOAD_MAX_AGE_HOURS = String(config.downloadRetentionHours);
+  }
+  if (config.maxDownloadsCacheGB) {
+    process.env.MAX_DOWNLOADS_CACHE_GB = String(config.maxDownloadsCacheGB);
+  }
+  return config;
 }
 
 export function writeConfig(data) {
   const current = readConfig();
   const updated = { ...current, ...data };
   fs.writeFileSync(configPath, JSON.stringify(updated, null, 2), 'utf8');
+  
+  // Update process.env variables immediately
+  if (updated.proxyUrl) process.env.PROXY_URL = updated.proxyUrl;
+  else delete process.env.PROXY_URL;
+  
+  if (updated.downloadRetentionHours) process.env.DOWNLOAD_MAX_AGE_HOURS = String(updated.downloadRetentionHours);
+  if (updated.maxDownloadsCacheGB) process.env.MAX_DOWNLOADS_CACHE_GB = String(updated.maxDownloadsCacheGB);
 }
+
+// ─── Real-time Log Forwarder Hook System ───
+export const logQueue = [];
+const MAX_LOGS_LIMIT = 500;
+let logEmitter = null;
+
+export function setLogEmitter(emitter) {
+  logEmitter = emitter;
+}
+
+const originalLog = console.log;
+const originalError = console.error;
+const originalWarn = console.warn;
+
+function handleLogIntercept(type, args) {
+  const text = args.map(arg => {
+    if (typeof arg === 'object') {
+      try { return JSON.stringify(arg); } catch (e) { return String(arg); }
+    }
+    return String(arg);
+  }).join(' ');
+  
+  const time = new Date().toLocaleTimeString('tr-TR');
+  const logEntry = { type, time, text };
+  
+  logQueue.push(logEntry);
+  if (logQueue.length > MAX_LOGS_LIMIT) {
+    logQueue.shift();
+  }
+  
+  if (logEmitter) {
+    try { logEmitter(logEntry); } catch (e) {}
+  }
+}
+
+console.log = (...args) => {
+  originalLog(...args);
+  handleLogIntercept('info', args);
+};
+
+console.error = (...args) => {
+  originalError(...args);
+  handleLogIntercept('error', args);
+};
+
+console.warn = (...args) => {
+  originalWarn(...args);
+  handleLogIntercept('warn', args);
+};
 
 // Global Bot Socket reference to avoid circular dependencies
 export const botSocketRef = {
@@ -98,23 +188,94 @@ export function formatBytes(bytes, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-export function cleanOldDownloads() {
-  const expiryTime = 24 * 60 * 60 * 1000; // 24 hours
+export function getYtDlpCommand() {
+  if (process.platform === 'win32') {
+    if (fs.existsSync('./yt-dlp.exe')) return path.resolve('./yt-dlp.exe');
+    return 'yt-dlp';
+  } else {
+    if (fs.existsSync('./yt-dlp')) return path.resolve('./yt-dlp');
+    return 'yt-dlp';
+  }
+}
+
+export async function cleanOldDownloads() {
+  // Yapılandırılabilir saklama süresi (varsayılan: 4 saat veya .env DOWNLOAD_MAX_AGE_HOURS)
+  const maxAgeHours = parseFloat(process.env.DOWNLOAD_MAX_AGE_HOURS || '4');
+  const expiryTime = maxAgeHours * 60 * 60 * 1000;
+  // Yapılandırılabilir maksimum disk önbellek limiti (varsayılan: 15 GB veya .env MAX_DOWNLOADS_CACHE_GB)
+  const maxCacheBytes = parseFloat(process.env.MAX_DOWNLOADS_CACHE_GB || '15') * 1024 * 1024 * 1024;
   const now = Date.now();
+
+  let activeList = [];
+  try {
+    const queueModule = await import('./queue.js');
+    activeList = queueModule.activeTasksList || [];
+  } catch (e) {}
+
   try {
     if (!fs.existsSync(downloadsDir)) return;
-    const files = fs.readdirSync(downloadsDir);
-    for (const file of files) {
+    const entries = fs.readdirSync(downloadsDir);
+    const fileStats = [];
+    let totalBytes = 0;
+
+    for (const file of entries) {
       if (file === '.gitignore' || file === 'placeholder') continue;
       const filePath = path.join(downloadsDir, file);
-      const stat = fs.statSync(filePath);
-      if (now - stat.mtimeMs > expiryTime) {
-        fs.unlinkSync(filePath);
-        console.log(`[CLEANUP] Deleted old download: ${file}`);
+      try {
+        const stat = fs.statSync(filePath);
+        if (stat.isDirectory()) continue;
+
+        // Aktif indirilen veya gönderilen dosyaları koru
+        const isActive = activeList.some(task => {
+          if (!task.title) return false;
+          const safe = task.title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          const cleanF = file.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+          return cleanF.includes(safe);
+        });
+
+        // 1. Yarım kalmış veya geçici artık dosyaları temizle (.part, .ytdl, .tmp, segment_ vb.)
+        const isTemp = file.endsWith('.part') || file.endsWith('.ytdl') || file.endsWith('.tmp') || 
+                       file.startsWith('temp_') || file.startsWith('segment_') || file.startsWith('hentaizm_captcha_');
+
+        if (isTemp && (now - stat.mtimeMs > 15 * 60 * 1000)) {
+          fs.unlinkSync(filePath);
+          console.log(`[CLEANUP] Silindi (Yetim geçici dosya): ${file}`);
+          continue;
+        }
+
+        // 2. Belirlenen maksimum yaştan eski dosyaları temizle
+        if (now - stat.mtimeMs > expiryTime && !isActive) {
+          fs.unlinkSync(filePath);
+          console.log(`[CLEANUP] Silindi (Süresi dolan dosya > ${maxAgeHours} saat): ${file}`);
+          continue;
+        }
+
+        totalBytes += stat.size;
+        if (!isActive) {
+          fileStats.push({ name: file, path: filePath, size: stat.size, mtime: stat.mtimeMs });
+        }
+      } catch {}
+    }
+
+    // 3. Disk kotası kontrolü: Toplam boyut limiti aşarsa en eski dosyalardan başlayarak temizle
+    if (totalBytes > maxCacheBytes) {
+      console.log(`[CLEANUP] İndirme önbelleği (${formatBytes(totalBytes)}) sınırı (${formatBytes(maxCacheBytes)}) aştı. En eski dosyalar temizleniyor...`);
+      fileStats.sort((a, b) => a.mtime - b.mtime); // En eskiler başta
+
+      const targetSize = maxCacheBytes * 0.7; // %70 seviyesine kadar düşür
+      for (const item of fileStats) {
+        if (totalBytes <= targetSize) break;
+        try {
+          fs.unlinkSync(item.path);
+          totalBytes -= item.size;
+          console.log(`[CLEANUP] Kota tahliyesi: ${item.name} (${formatBytes(item.size)}) silindi.`);
+        } catch (e) {
+          console.error(`[CLEANUP] Dosya silinemedi (${item.name}):`, e.message);
+        }
       }
     }
   } catch (err) {
-    console.error('[CLEANUP] Error during cleanup:', err.message);
+    console.error('[CLEANUP] Temizlik sırasında hata:', err.message);
   }
 }
 

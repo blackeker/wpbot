@@ -6,11 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node bot.js",
-    "dev": "node --watch-path=bot.js --watch-path=extractor.js --watch-path=pipelines.js --watch-path=server.js --watch-path=queue.js --watch-path=downloader.js bot.js",
-    "pm2:start": "pm2 start ecosystem.config.cjs",
-    "pm2:stop": "pm2 stop wpbot",
-    "pm2:restart": "pm2 restart wpbot",
-    "pm2:logs": "pm2 logs wpbot"
+    "dev": "node --watch-path=bot.js --watch-path=extractor.js --watch-path=pipelines.js --watch-path=server.js --watch-path=queue.js --watch-path=downloader.js bot.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",
@@ -28,7 +24,6 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
-    "tough-cookie": "^4.1.3",
-    "ws": "^8.21.3"
+    "tough-cookie": "^4.1.3"
   }
 }

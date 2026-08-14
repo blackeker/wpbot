@@ -6,7 +6,6 @@ downloads/
 logs/
 .env
 yt-dlp.exe
-yt-dlp
 *.zip
 *.mp4
 *.log

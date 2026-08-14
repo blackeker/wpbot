@@ -23,9 +23,7 @@ import {
   readErrorLog,
   getDiskUsage,
   backupSession,
-  restoreSession,
-  getYtDlpCommand,
-  backupCredsFile
+  restoreSession
 } from './config.js';
 
 import { 
@@ -38,16 +36,13 @@ import {
   queueState,
   pauseQueue,
   resumeQueue,
-  getEstimatedWaitTime,
-  activeTasksList
+  getEstimatedWaitTime
 } from './queue.js';
-import { queueMediaSend } from './pipelines.js';
 
 import { 
   startServer, 
   startCaptchaPoller, 
-  activeCaptchasMap,
-  notifyStatusUpdate
+  activeCaptchasMap 
 } from './server.js';
 
 import {
@@ -145,7 +140,6 @@ async function startBot() {
       if (statusCode === 401) {
         console.log('[BOT] Oturum kapatıldı (401), oturum verileri temizleniyor...');
         try { fs.rmSync(sessionPath, { recursive: true, force: true }); } catch(e) {}
-        try { if (fs.existsSync(backupCredsFile)) fs.unlinkSync(backupCredsFile); } catch(e) {}
       }
 
       // Status 440/428/Conflict: Stream Errored (Avoid rapid reconnect loop)
@@ -164,7 +158,6 @@ async function startBot() {
       console.log('WhatsApp Bot is successfully connected and online!');
       console.log('====================================');
     }
-    notifyStatusUpdate();
   });
 
   sock.ev.on('messages.upsert', async (m) => {
@@ -172,68 +165,20 @@ async function startBot() {
     if (!msg.message || msg.key.fromMe) return;
 
     const from = msg.key.remoteJid;
-    const config = readConfig();
-
-    // Whitelist check (Only process commands/downloads from allowed numbers)
-    if (config.adminJids) {
-      const adminList = config.adminJids.split(',').map(num => num.trim().toLowerCase()).filter(Boolean);
-      if (adminList.length > 0) {
-        const sender = msg.key.participant || from;
-        const senderNumber = sender.split('@')[0];
-        const isAllowed = adminList.some(num => senderNumber.includes(num));
-        if (!isAllowed) {
-          return; // Ignore silently
-        }
-      }
-    }
-
     const text = (msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
       '').trim();
     const ltext = text.toLowerCase().trim();
 
-    const customCmds = config.customCommands || {};
-    if (customCmds[ltext]) {
-      let replyTemplate = customCmds[ltext];
-      
-      const uptimeMs = Date.now() - botState.uptime.getTime();
-      const uptimeHours = (uptimeMs / (1000 * 60 * 60)).toFixed(1);
-      const disk = getDiskUsage();
-      const freeDiskGB = ((config.maxDownloadsCacheGB * 1024 * 1024 * 1024 - disk.totalBytes) / (1024 * 1024 * 1024)).toFixed(1);
-      
-      const placeholders = {
-        '{uptime}': `${uptimeHours} saat`,
-        '{tarih}': new Date().toLocaleDateString('tr-TR'),
-        '{disk_kalan}': `${freeDiskGB} GB`,
-        '{aktif_indirme_sayisi}': `${activeTasksList.length}`
-      };
-      
-      for (const [placeholder, val] of Object.entries(placeholders)) {
-        replyTemplate = replyTemplate.replaceAll(placeholder, val);
-      }
-      
-      await sock.sendMessage(from, { text: replyTemplate });
-      return;
-    }
-
     // ─── Desteklenen domain listesi (URL algılama için) ───
     const SUPPORTED_DOMAINS = [
-      'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm', 'anizm', 'aniuzm',
+      'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm',
       'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
-      'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru',
-      'dood', 'ds2play', 'streamtape', 'streamta.pe', 'stape.fun', 'filemoon', 'moonplayer',
-      'vk.com', 'vkvideo', 'vk.ru', 'vidmoly', 'dizipal', 'dizibox', 'dizigom', 'diziroll',
-      'filmmodu', 'fullhdfilmizlesene', 'rule34video', 'hanime.tv', 'jable.tv', 'missav',
-      'erome.com', 'fapello.com', 'camwhores', 'hentaihaven', 'hentaimama', 'hentaiseason',
-      'spankbang', 'xvideos', 'xnxx', 'eporner', 'xhamster', 'beeg', 'hqporner', 'youporn',
-      'redtube', 'tnaflix', 'thumbzilla', 'tube8', 'txxx', 'youjizz', 'porntrex', 'pornone',
-      'motherless', 'daftsex', 'veporno', 'brazzers3x', 'drtuber', 'heavy-r', 'xbabe',
-      'empflix', 'sxyprn', 'sunporno', 'fuq', 'javforme', 'javhd', 'jav789', 'yerliifsa',
-      'sikis', 'pornovakti', 'turkcealtyaziliporno', 'pornoizle', 'ifsadunyasi', 'guncelporno', 'yerliporno'
+      'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru'
     ];
     const isLink = text.startsWith('http://') || text.startsWith('https://');
     const isDirectFileLink = isLink && /\.(mp4|mkv|avi|webm|apk|zip|rar|7z|pdf|exe)(\?.*)?$/i.test(text.split(' ')[0]);
-    const isSupportedLink = (isLink && (SUPPORTED_DOMAINS.some(d => text.includes(d)) || text.includes('itch.io') || text.includes('9mod.com'))) || isDirectFileLink;
+    const isSupportedLink = (isLink && SUPPORTED_DOMAINS.some(d => text.includes(d))) || isDirectFileLink;
 
     // 0. Pending Quality Selection Handler
     if (pendingSelections[from]) {
@@ -244,7 +189,9 @@ async function startBot() {
         delete pendingSelections[from];
         try {
           const task = addDownloadTask(selection.url, from, selection.title, chosen.format_id);
-          await sock.sendMessage(from, { text: `✅ *${chosen.label}* kalitesi seçildi!\n\n📥 Sıraya eklendi, bekleme sırası çok olmadığı sürece kısa süre içinde başlayacak.\n\n🔢 Görev no: *${task.id}*  |  Kuyruk: *kuyruk* yaz` });
+          await sock.sendMessage(from, { text: `✅ *${chosen.label}* kalitesi seçildi!\n
+📥 Sıraya eklendi, bekleme sırası çok olmadığı sürece kısa süre içinde başlayacak.\n
+🔢 Görev no: *${task.id}*  |  Kuyruk: *kuyruk* yaz` });
         } catch (err) {
           await sock.sendMessage(from, { text: `⚠️ Bir sorun oluştu: ${err.message}` });
         }
@@ -340,12 +287,12 @@ Herhangi bir link gönderdiğinizde otomatik indirmeyi başlatırım. Alternatif
 • *!pingurl <link>* → Sunucudan o linke erişim testi yapar.
 • *!botkontrol* → Botun çalışma durumunu test eder.
 
-🎬 *DESTEKLENEN SİTELER VE KAYNAKLAR:*
-• *Anime:* Anizm (Aniuzm), AnimeCix, EcchiCix, Hentaizm
-• *Dizi / Film:* Dizipal, Dizibox, Dizigom, Diziroll, Filmmodu, FullHDFilmizlesene, HDFilmCehennemi, HDKore, HDabla
-• *Hosting Servisleri:* Doodstream, Streamtape, Filemoon, VK.com (VKVideo), Vidmoly, Cloud Mail.ru
-• *Sosyal & Video:* YouTube, Youtu.be (Playlist & Format Seçimli)
-• *NSFW / Hentai:* Hanime.tv, Rule34Video, Jable.tv, MissAV, EroMe, Fapello, Camwhores, HentaiHaven, HentaiMama, HentaiSeason, Doeda, Turkifsahub, Turkifsalar, Turkporno, Pornhub, Xvideos, XNXX, SpankBang, Eporner, Xhamster, Beeg, YouPorn, RedTube, TnaFlix, Thumbzilla, Tube8, Txxx, YouJizz, Porntrex, Pornone, Yerli İfşalar & Tüm Yetişkin Tube Siteleri
+🎬 *DESTEKLENEN SİTELER:*
+• Cloud Mail.ru / CloidMail.ru 🆕 (Zipped & Split)
+• YouTube / Youtu.be
+• AnimeCix / EcchiCix
+• HDFilmCehennemi
+• Ve diğer popüler siteler...
 
 ────────────────────
 _Sadece linki atın, gerisini ben hallederim!_ ✨`;
@@ -515,7 +462,7 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       const stat = fs.statSync(filePath);
       await sock.sendMessage(from, { text: `📤 Gönderiliyor: ${fileName} (${formatBytes(stat.size)})` });
       try {
-        await queueMediaSend(from, {
+        await sock.sendMessage(from, {
           document: { stream: fs.createReadStream(filePath) },
           mimetype: 'video/mp4',
           fileName
@@ -957,7 +904,7 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       return;
     }
 
-     // ─── Downloader Commands ───
+    // ─── Downloader Commands ───
     // Tetikleyici: !indir komutu, !mp3 komutu VEYA direkt desteklenen link
     const isMp3Cmd = text.startsWith('!mp3');
     const isIndir = text.startsWith('!indir') || text.startsWith('!download') || isMp3Cmd;
@@ -970,7 +917,7 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       } else {
         parts = text.split(/\s+/);
         if (parts.length < 2) {
-          await sock.sendMessage(from, { text: '📢 Link gönder, hemen indir! Sıramı görmek için *kuyruk* yaz.' });
+          await sock.sendMessage(from, { text: '📢 Link gönder, hemen indir!çinlerimi görmek için *kuyruk* yaz.' });
           return;
         }
       }
@@ -1038,7 +985,7 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       const supportedDomains = [
         'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm',
         'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
-        'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru'
+        'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru', 'itch.io'
       ];
 
       // ─── Aralık İndirme (sadece 2 hdfilmcehennemi veya 2 animecix linki varsa)
@@ -1149,10 +1096,23 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       const isTurkifsalar = /turkifsalar/i.test(singleUrl);
       const isTurkporno = /turkporno/i.test(singleUrl);
       const isCloudMailRu = singleUrl.includes('cloud.mail.ru') || singleUrl.includes('cloidmail.ru');
+      const isDirectFile = /\.(mp4|mkv|avi|webm|apk|zip|rar|7z|pdf|exe)(\?.*)?$/i.test(singleUrl);
+      const isItch = singleUrl.includes('itch.io');
 
-      if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu) {
+      if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isDirectFile && !isItch) {
         await sock.sendMessage(from, { text: 'Lütfen geçerli bir desteklenen medya linki gönderin.' });
         return;
+      }
+
+      // Check for a target phone number in the message text to send to another number
+      const cleanText = text.replace(/\s+/g, '');
+      const phoneMatch = cleanText.match(/(?:90|0)?(5\d{9})\b/);
+      let targetJid = from;
+      let targetPhoneLabel = '';
+      if (phoneMatch) {
+        targetJid = `90${phoneMatch[1]}@s.whatsapp.net`;
+        targetPhoneLabel = ` (Alıcı: +90 ${phoneMatch[1]})`;
+        console.log(`[TARGET JID] Extracted target phone JID: ${targetJid}`);
       }
 
       // Check if it is an Animecix/Ecchicix Season or Show Main Page URL (not a single episode)
@@ -1181,7 +1141,7 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
           let skipCount = 0;
           for (const ep of episodes) {
             try {
-              addDownloadTask(ep.url, from, `${animeName} - ${ep.name}`, null, priority);
+              addDownloadTask(ep.url, targetJid, `${animeName} - ${ep.name}`, null, priority);
               addedCount++;
             } catch (e) {
               skipCount++;
@@ -1220,7 +1180,7 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
           let skipCount = 0;
           for (const ep of episodes) {
             try {
-              addDownloadTask(ep.url, from, `${seriesName} - ${ep.name}`, null, priority);
+              addDownloadTask(ep.url, targetJid, `${seriesName} - ${ep.name}`, null, priority);
               addedCount++;
             } catch (e) {
               skipCount++;
@@ -1257,7 +1217,7 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
           let skipCount = 0;
           for (const ep of episodes) {
             try {
-              addDownloadTask(ep.url, from, `${seriesName} - ${ep.name}`, null, priority);
+              addDownloadTask(ep.url, targetJid, `${seriesName} - ${ep.name}`, null, priority);
               addedCount++;
             } catch (e) {
               skipCount++;
@@ -1279,10 +1239,9 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       try {
         const isPlaylist = /[?&]list=/.test(singleUrl) && !/[?&]v=/.test(singleUrl);
         
-        if (isYouTubeUrl && !isPlaylist && !isMp3Cmd) {
+        if (isYouTubeUrl && !isPlaylist) {
           const proxyArg = process.env.PROXY_URL ? ` --proxy "${process.env.PROXY_URL}"` : '';
-          const ytDlpCmd = getYtDlpCommand();
-          exec(`"${ytDlpCmd}" ${proxyArg} -F --no-playlist "${singleUrl}"`, async (err, stdout) => {
+          exec(`yt-dlp ${proxyArg} -F --no-playlist "${singleUrl}"`, async (err, stdout) => {
             if (err) {
               await sock.sendMessage(from, { text: `❌ Format analizi başarısız oldu: ${err.message}` });
               return;
@@ -1329,14 +1288,15 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
             try {
               ytTitle = await new Promise((res) => {
                 const proxyArg = process.env.PROXY_URL ? ` --proxy "${process.env.PROXY_URL}"` : '';
-                exec(`"${ytDlpCmd}" ${proxyArg} --get-title --no-playlist "${singleUrl}"`, (e, o) => res(e ? 'YouTube Video' : o.trim()));
+                exec(`yt-dlp ${proxyArg} --get-title --no-playlist "${singleUrl}"`, (e, o) => res(e ? 'YouTube Video' : o.trim()));
               });
             } catch {}
 
             pendingSelections[from] = {
               url: singleUrl,
               title: ytTitle,
-              formats: availableFormats
+              formats: availableFormats,
+              recipientJid: targetJid
             };
 
             let optionsText = `🎬 *YOUTUBE KALİTE SEÇİMİ*\n\n🎥 *Video:* ${ytTitle}\n\nLütfen indirmek istediğiniz kaliteyi seçin:\n\n`;
@@ -1350,9 +1310,9 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
           return;
         }
 
-        const task = addDownloadTask(singleUrl, from, 'Video Çözümleniyor...', isMp3Cmd ? 'mp3' : null, priority);
+        const task = addDownloadTask(singleUrl, targetJid, 'Video Çözümleniyor...', isMp3Cmd ? 'mp3' : null, priority);
         const priorityTag = priority ? '🔴 *ÖNCELİKLİ* ' : '';
-        await sock.sendMessage(from, { text: `📥 ${priorityTag}Görev Sıraya Eklendi!\n🎬 *Link:* ${singleUrl}\n🆔 *Görev Numarası:* \`${task.id}\`\n\nKuyruk durumu: \`!kuyruk\`\nİptal etmek için: \`!iptal ${task.id}\`` });
+        await sock.sendMessage(from, { text: `📥 ${priorityTag}Görev Sıraya Eklendi!${targetPhoneLabel}\n🎬 *Link:* ${singleUrl}\n🆔 *Görev Numarası:* \`${task.id}\`\n\nKuyruk durumu: \`!kuyruk\`\nİptal etmek için: \`!iptal ${task.id}\`` });
       } catch (err) {
         await sock.sendMessage(from, { text: `⚠️ *Hata:* ${err.message}` });
       }
@@ -1429,6 +1389,6 @@ startCaptchaPoller();
 // Start Baileys WhatsApp Bot
 startBot().catch(err => console.error("Error starting bot:", err));
 
-// Run cleanup at startup and then every 15 minutes
+// Run cleanup at startup and then every 30 minutes
 cleanOldDownloads();
-setInterval(cleanOldDownloads, 15 * 60 * 1000);
+setInterval(cleanOldDownloads, 30 * 60 * 1000);
