@@ -27,9 +27,10 @@ export async function extractInstagram(pageUrl) {
 
   // 2. Query Cobalt APIs one by one until one succeeds
   for (const api of apiUrls) {
-    console.log(`[Instagram Extractor] Querying Cobalt API: ${api}`);
+    const cleanApi = api.endsWith('/') ? api.slice(0, -1) : api;
+    console.log(`[Instagram Extractor] Querying Cobalt API: ${cleanApi}`);
     try {
-      const res = await axios.post(api, {
+      const res = await axios.post(cleanApi, {
         url: pageUrl
       }, {
         headers: {
