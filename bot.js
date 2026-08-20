@@ -42,6 +42,7 @@ import {
   activeTasksList
 } from './queue.js';
 import { queueMediaSend } from './pipelines.js';
+import { startTrackerService } from './tracker.js';
 
 import { 
   startServer, 
@@ -176,6 +177,11 @@ async function startBot() {
       console.log('====================================');
       console.log('WhatsApp Bot is successfully connected and online!');
       console.log('====================================');
+      try {
+        startTrackerService();
+      } catch (err) {
+        console.error('[Tracker] Failed to start tracker service:', err.message);
+      }
     }
     notifyStatusUpdate();
   });
@@ -1211,8 +1217,9 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       const isLiteapksUrl = singleUrl.includes('liteapks.com');
       const isModyoloUrl = singleUrl.includes('modyolo.com');
       const isDiziSitesiUrl = singleUrl.includes('dizigom') || singleUrl.includes('dizibox') || singleUrl.includes('koreanturk') || singleUrl.includes('koreanizm') || singleUrl.includes('dizipal') || singleUrl.includes('filmmodu') || singleUrl.includes('fullhdfilmizlesene');
+      const isTorrentUrl = singleUrl.startsWith('magnet:') || singleUrl.toLowerCase().includes('.torrent');
 
-      if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl && !isLiteapksUrl && !isModyoloUrl && !isDiziSitesiUrl) {
+      if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl && !isLiteapksUrl && !isModyoloUrl && !isDiziSitesiUrl && !isTorrentUrl) {
         await sock.sendMessage(from, { text: 'Lütfen geçerli bir desteklenen medya linki gönderin.' });
         return;
       }

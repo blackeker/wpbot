@@ -411,22 +411,38 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
 
   // Fallback sequential download
   console.log('[Downloader] Running sequential stream download...');
+  const partPath = `${outputPath}.part`;
+  let existingSize = 0;
+  if (fs.existsSync(partPath)) {
+    existingSize = fs.statSync(partPath).size;
+  }
+
+  const reqHeaders = { ...headers };
+  const isResuming = existingSize > 0 && supportsRange;
+  if (isResuming) {
+    reqHeaders['Range'] = `bytes=${existingSize}-`;
+    console.log(`[Downloader] Resuming download from byte: ${existingSize}`);
+  }
+
   const res = await axios.get(url, {
-    headers,
+    headers: reqHeaders,
     responseType: 'stream',
-    // Stream indirmede timeout yok — büyük dosyaları kesmez
-    // Bağlantı başlamazsa signal ile iptal edilir
     timeout: 0,
     maxRedirects: 5,
     signal: signal || undefined
   });
 
-  const contentLen = parseInt(res.headers['content-length'] || '0', 10);
-  let downloaded = 0;
-  const seqStart = Date.now();
+  const actualResuming = isResuming && res.status === 206;
+  const writeFlags = actualResuming ? 'a' : 'w';
+  if (!actualResuming) {
+    existingSize = 0;
+  }
+
+  const contentLen = parseInt(res.headers['content-length'] || '0', 10) + existingSize;
+  let downloaded = existingSize;
 
   await new Promise((resolve, reject) => {
-    const writer = fs.createWriteStream(outputPath);
+    const writer = fs.createWriteStream(partPath, { flags: writeFlags });
 
     res.data.on('data', (chunk) => {
       downloaded += chunk.length;
@@ -439,17 +455,21 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
       }
       if (progressCallback) {
         if (contentLen > 0) {
-          // Bilinen boyut: bytes cinsinden ilerle
           progressCallback(downloaded, contentLen);
         } else {
-          // Bilinmeyen boyut: indirilen byte'ı negatif total ile gönder (pipeline bunu yakalar)
-          // downloaded bytes gönder, total = downloaded+1 ile %99'da kal
           progressCallback(downloaded, downloaded + 1);
         }
       }
     });
 
-    writer.on('finish', resolve);
+    writer.on('finish', () => {
+      try {
+        fs.renameSync(partPath, outputPath);
+        resolve();
+      } catch (renameErr) {
+        reject(renameErr);
+      }
+    });
     writer.on('error', (err) => {
       writer.destroy();
       reject(err);

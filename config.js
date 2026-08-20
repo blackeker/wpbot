@@ -17,22 +17,48 @@ if (!fs.existsSync(sessionPath)) {
   fs.mkdirSync(sessionPath, { recursive: true });
 }
 
-// Clean any leftover cache directories from previous sessions on startup
-try {
-  const rootFiles = fs.readdirSync('.');
-  for (const file of rootFiles) {
-    if (file.startsWith('.hdwp_cache_')) {
-      const filePath = path.resolve(file);
-      const stats = fs.statSync(filePath);
-      if (stats.isDirectory()) {
-        fs.rmSync(filePath, { recursive: true, force: true });
-        console.log(`[STARTUP CLEANUP] Leftover cache directory deleted: ${file}`);
+export function cleanLeftoverCacheFiles() {
+  try {
+    const rootFiles = fs.readdirSync('.');
+    const now = Date.now();
+    const maxAge = 2 * 60 * 60 * 1000; // 2 hours
+
+    for (const file of rootFiles) {
+      if (file.startsWith('.hdwp_cache_')) {
+        const filePath = path.resolve(file);
+        try {
+          const stats = fs.statSync(filePath);
+          if (stats.isDirectory() && (now - stats.mtimeMs > maxAge)) {
+            fs.rmSync(filePath, { recursive: true, force: true });
+            console.log(`[CLEANUP] Leftover cache directory deleted: ${file}`);
+          }
+        } catch (err) {}
       }
     }
+
+    if (fs.existsSync(downloadsDir)) {
+      const dlFiles = fs.readdirSync(downloadsDir);
+      for (const file of dlFiles) {
+        if (file.endsWith('.part') || file.includes('.part')) {
+          const filePath = path.join(downloadsDir, file);
+          try {
+            const stats = fs.statSync(filePath);
+            if (stats.isFile() && (now - stats.mtimeMs > maxAge)) {
+              fs.unlinkSync(filePath);
+              console.log(`[CLEANUP] Leftover part file deleted: ${file}`);
+            }
+          } catch (err) {}
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[CLEANUP] Önbellek temizleme hatası:', e.message);
   }
-} catch (e) {
-  // Silent fail to avoid issues before logging hooks are fully active
 }
+
+// Run immediately and every 6 hours
+cleanLeftoverCacheFiles();
+setInterval(cleanLeftoverCacheFiles, 6 * 60 * 60 * 1000);
 
 // Config file reader/writer helpers with full defaults
 const DEFAULT_CONFIG = {

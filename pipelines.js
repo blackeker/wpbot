@@ -5,7 +5,9 @@ import { exec } from 'child_process';
 import ffmpegPath from 'ffmpeg-static';
 import { extractVideoUrl } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
+import { notifyQueueUpdate } from './queue.js';
 import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig } from './config.js';
+import WebTorrent from 'webtorrent';
 
 // ─── Retry Yardımcısı ───
 async function withRetry(fn, retries = 3, delayMs = 3000) {
@@ -202,9 +204,10 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           if (now - lastProgressTime > 4000) { // Her 4 saniyede bir WhatsApp durumunu güncelle
             lastProgressTime = now;
             const bar = getProgressBar(percent);
-            if (taskObject) {
-              taskObject.status = `%${percent} [${bar}] (yt-dlp)`;
-            }
+             if (taskObject) {
+               taskObject.status = `%${percent} [${bar}] (yt-dlp)`;
+               notifyQueueUpdate();
+             }
             progressUpdateCallback(`🎬 *${title}*\n\n📥 İndiriliyor: %${percent} [${bar}]`).catch(() => {});
           }
         }
@@ -271,12 +274,13 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           const progressStream = new ProgressStream(partSize, (uploaded, percent) => {
             if (taskObject) {
               taskObject.status = `Parça ${i + 1}/${splitFiles.length} yükleniyor... %${percent}`;
+              notifyQueueUpdate();
             }
             const now = Date.now();
             if (now - lastWaUpdate > 5000) {
               lastWaUpdate = now;
               const bar = getProgressBar(percent);
-              progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 Parça ${i + 1}/${splitFiles.length} yükleniyor: *%${percent}*\n\`[${bar}]\``).catch(() => {});
+              progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 *Durum:* WhatsApp'a yükleniyor (Parça ${i + 1}/${splitFiles.length} - *%${percent}*)\n\`[${bar}]\``).catch(() => {});
             }
           });
           fileStream.pipe(progressStream);
@@ -299,12 +303,12 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
         const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
           if (taskObject) {
             taskObject.status = `Yükleniyor... %${percent}`;
+            notifyQueueUpdate();
           }
-          const now = Date.now();
           if (now - lastWaUpdate > 5000) {
             lastWaUpdate = now;
             const bar = getProgressBar(percent);
-            progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 WhatsApp'a yükleniyor: *%${percent}*\n\`[${bar}]\`\nBoyut: ${finalSizeStr}`).catch(() => {});
+            progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 *Durum:* WhatsApp'a yükleniyor (*%${percent}*)\n\`[${bar}]\`\n📦 *Boyut:* ${finalSizeStr}`).catch(() => {});
           }
         });
         fileStream.pipe(progressStream);
@@ -320,11 +324,180 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
       }
     } catch (err) {
       console.error(`WhatsApp gönderme hatası (${title}):`, err.message);
+      progressUpdateCallback(`❌ *YouTube Gönderim Hatası*\n━━━━━━━━━━━━━━━━━━━━\nDosya WhatsApp'a yüklenirken bir hata oluştu: ${err.message}`).catch(() => {});
     }
   })();
 
   // Gönderim arka planda devam ederken indirme aşaması bittiği için sonraki göreve geçilsin
   return;
+}
+
+
+export async function executeTorrentPipeline(torrentId, recipientJid, progressUpdateCallback, signal, taskObject = null) {
+  const pipelineStart = Date.now();
+  await progressUpdateCallback(`🧲 *Torrent Başlatılıyor*\n━━━━━━━━━━━━━━━━━━━━\n📡 Metadata aranıyor, lütfen bekleyin...`);
+
+  return new Promise((resolve, reject) => {
+    let client;
+    try {
+      client = new WebTorrent();
+    } catch (e) {
+      return reject(new Error(`WebTorrent istemcisi başlatılamadı: ${e.message}`));
+    }
+
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        try {
+          client.destroy();
+        } catch {}
+        reject(new Error("İndirme iptal edildi."));
+      }, { once: true });
+    }
+
+    client.add(torrentId, { path: downloadsDir }, (torrent) => {
+      console.log(`[Torrent] Torrent eklendi: ${torrent.name}`);
+      if (taskObject) {
+        taskObject.title = torrent.name;
+      }
+
+      let lastPercent = -1;
+      let lastUpdateTime = 0;
+
+      torrent.on('download', (bytes) => {
+        if (signal && signal.aborted) {
+          try { client.destroy(); } catch {}
+          return;
+        }
+
+        const now = Date.now();
+        const percent = Math.min(100, Math.round(torrent.progress * 100));
+        const timePassed = now - lastUpdateTime > 5000;
+        const shouldUpdate = (percent !== lastPercent || timePassed) && (timePassed || percent === 100);
+        if (!shouldUpdate) return;
+
+        lastPercent = percent;
+        lastUpdateTime = now;
+        const bar = getProgressBar(percent);
+        const speedMBs = (torrent.downloadSpeed / 1024 / 1024).toFixed(2);
+        
+        let etaStr = 'Hesaplanıyor...';
+        const etaSeconds = Math.round(torrent.timeRemaining / 1000);
+        if (etaSeconds > 0) {
+          const m = Math.floor(etaSeconds / 60);
+          const s = etaSeconds % 60;
+          etaStr = m > 0 ? `${m}dk ${s}sn` : `${s}sn`;
+        }
+
+        const statusLine = `İlerleme: ${formatBytes(torrent.downloaded)} / ${formatBytes(torrent.length)}`;
+        
+        if (taskObject) {
+          taskObject.status = `%${percent} [${bar}] - ${statusLine} - Kalan: ${etaStr}`;
+          taskObject.speed = speedMBs;
+        }
+
+        progressUpdateCallback(`🧲 *${torrent.name}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndiriliyor: *%${percent}*\n\`[${bar}]\`\n📊 ${statusLine}\n⚡ Hız: ~${speedMBs} MB/s\n⏳ Kalan Süre: ${etaStr}`).catch(() => {});
+      });
+
+      torrent.on('done', async () => {
+        console.log(`[Torrent] İndirme tamamlandı: ${torrent.name}`);
+        const files = torrent.files;
+        if (files.length === 0) {
+          client.destroy();
+          reject(new Error("Torrent içinde dosya bulunamadı."));
+          return;
+        }
+
+        let finalFilePath;
+        let finalTitle;
+        let finalFileExt;
+
+        if (files.length === 1) {
+          finalFilePath = files[0].path;
+          finalFilePath = path.join(downloadsDir, finalFilePath);
+          finalTitle = files[0].name;
+          finalFileExt = path.extname(files[0].name);
+        } else {
+          const largestFile = files.reduce((prev, current) => (prev.length > current.length) ? prev : current);
+          finalFilePath = path.join(downloadsDir, largestFile.path);
+          finalTitle = largestFile.name;
+          finalFileExt = path.extname(largestFile.name);
+        }
+
+        const fileSize = fs.existsSync(finalFilePath) ? fs.statSync(finalFilePath).size : 0;
+        const fileSizeStr = formatBytes(fileSize);
+        const totalDuration = formatDuration(Date.now() - pipelineStart);
+
+        try {
+          client.destroy();
+        } catch {}
+
+        (async () => {
+          const sendTaskObj = {
+            id: taskObject ? taskObject.id : 'wa_' + Date.now(),
+            title: finalTitle,
+            status: 'WhatsApp\'a yükleniyor...',
+            size: fileSizeStr
+          };
+          botState.sendingTasks.push(sendTaskObj);
+
+          try {
+            const lowerExt = finalFileExt.toLowerCase();
+            const isVideo = ['.mp4', '.mkv', '.webm', '.avi', '.ts'].includes(lowerExt);
+            const icon = isVideo ? '🎬' : '📦';
+            let mimeType = 'video/mp4';
+            if (lowerExt === '.apk') {
+              mimeType = 'application/vnd.android.package-archive';
+            } else if (lowerExt === '.zip') {
+              mimeType = 'application/zip';
+            } else if (lowerExt === '.pdf') {
+              mimeType = 'application/pdf';
+            } else if (!isVideo) {
+              mimeType = 'application/octet-stream';
+            }
+
+            const safeTitle = finalTitle.replace(/[^a-zA-Z0-9]/g, '_');
+            const watchUrl = `http://${process.env.VDS_IP || '111.235.150.157'}:7860/downloads/${encodeURIComponent(safeTitle)}${finalFileExt}`;
+
+            const fileStream = fs.createReadStream(finalFilePath);
+            let lastWaUpdate = 0;
+            const progressStream = new ProgressStream(fileSize, (uploaded, percent) => {
+              sendTaskObj.status = `WhatsApp'a yükleniyor... %${percent}`;
+              const now = Date.now();
+              if (now - lastWaUpdate > 5000) {
+                lastWaUpdate = now;
+                const bar = getProgressBar(percent);
+                progressUpdateCallback(`${icon} *${finalTitle}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 WhatsApp'a yükleniyor: *%${percent}*\n\`[${bar}]\`\nBoyut: ${fileSizeStr}`).catch(() => {});
+              }
+            });
+            fileStream.pipe(progressStream);
+
+            await queueMediaSend(recipientJid, {
+              document: { stream: progressStream },
+              mimetype: mimeType,
+              fileName: finalTitle
+            });
+
+            const summary = `${icon} *${finalTitle}*\n\n✅ *Tamamlandı!*\n📦 Boyut: ${fileSizeStr}\n⏱️ Süre: ${totalDuration}\n\n🔗 *İndirme Linki (VDS):*\n${watchUrl}`;
+            await progressUpdateCallback(summary);
+
+            await sendToDepot(finalFilePath, finalTitle, mimeType, finalTitle, recipientJid);
+          } catch (err) {
+            console.error(`WhatsApp gönderme hatası (${finalTitle}):`, err.message);
+            progressUpdateCallback(`❌ *Gönderim Hatası*\n━━━━━━━━━━━━━━━━━━━━\nDosya WhatsApp'a yüklenirken bir hata oluştu: ${err.message}`).catch(() => {});
+          } finally {
+            botState.sendingTasks = botState.sendingTasks.filter(t => t.id !== sendTaskObj.id);
+          }
+        })();
+
+        resolve();
+      });
+
+      torrent.on('error', (err) => {
+        try { client.destroy(); } catch {}
+        reject(err);
+      });
+    });
+  });
 }
 
 // Core Download Pipeline (Reusable for WhatsApp and Dashboard)
@@ -334,6 +507,11 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
 
   const pipelineStart = Date.now();
+
+  const isTorrent = targetUrl.startsWith('magnet:') || targetUrl.toLowerCase().includes('.torrent');
+  if (isTorrent) {
+    return await executeTorrentPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject);
+  }
 
   // ── YouTube & Playlist Desteği ──
   const isYouTube = /youtube\.com|youtu\.be/i.test(targetUrl);
@@ -453,6 +631,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           if (taskObject) {
             taskObject.status = `%${percent} [${bar}] - ${statusLine} - Kalan: ${etaStr}`;
             taskObject.speed = lastSpeedMBs;
+            notifyQueueUpdate();
           }
         } else {
           // Segment bazlı (HLS/M3U8 indirme)
@@ -470,6 +649,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           if (taskObject) {
             taskObject.status = `%${percent} [${bar}] - ${completed}/${total} parça - Kalan: ${etaStr}`;
             taskObject.speed = lastSpeedMBs;
+            notifyQueueUpdate();
           }
         }
 
@@ -603,8 +783,16 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           }
           const partSize = fs.statSync(partPath).size;
           const fileStream = fs.createReadStream(partPath);
+          let lastWaUpdate = 0;
           const progressStream = new ProgressStream(partSize, (uploaded, percent) => {
             sendTaskObj.status = `Parça ${i + 1}/${splitFiles.length} yükleniyor... %${percent}`;
+            notifyQueueUpdate();
+            const now = Date.now();
+            if (now - lastWaUpdate > 5000) {
+              lastWaUpdate = now;
+              const bar = getProgressBar(percent);
+              progressUpdateCallback(`🎬 *${finalTitle}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 *Durum:* WhatsApp'a yükleniyor (Parça ${i + 1}/${splitFiles.length} - *%${percent}*)\n\`[${bar}]\``).catch(() => {});
+            }
           });
           fileStream.pipe(progressStream);
 
@@ -623,8 +811,16 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         }
       } else {
         const fileStream = fs.createReadStream(finalFilePath);
+        let lastWaUpdate = 0;
         const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
           sendTaskObj.status = `WhatsApp'a yükleniyor... %${percent}`;
+          notifyQueueUpdate();
+          const now = Date.now();
+          if (now - lastWaUpdate > 5000) {
+            lastWaUpdate = now;
+            const bar = getProgressBar(percent);
+            progressUpdateCallback(`${icon} *${finalTitle}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 WhatsApp'a yükleniyor: *%${percent}*\n\`[${bar}]\`\nBoyut: ${finalSizeStr}`).catch(() => {});
+          }
         });
         fileStream.pipe(progressStream);
 
@@ -654,6 +850,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     } catch (err) {
       console.error(`WhatsApp gönderme hatası (${result.title}):`, err.message);
       addErrorLog({ title: result.title, url: targetUrl, error: err.message });
+      progressUpdateCallback(`❌ *Gönderim Hatası*\n━━━━━━━━━━━━━━━━━━━━\nDosya WhatsApp'a yüklenirken bir hata oluştu: ${err.message}`).catch(() => {});
     } finally {
       botState.sendingTasks = botState.sendingTasks.filter(t => t.id !== sendTaskObj.id);
     }
