@@ -46,7 +46,7 @@ import {
 } from './queue.js';
 
 import { executeDownloadPipeline } from './pipelines.js';
-import { getAnimecixSeasonEpisodes, getHdfilmcehennemiSeasonEpisodes, getHdkoreSeasonEpisodes } from './extractor.js';
+import { getAnimecixSeasonEpisodes, getHdfilmcehennemiSeasonEpisodes, getHdkoreSeasonEpisodes, extractVideoUrl } from './extractor.js';
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -196,6 +196,57 @@ export function startCaptchaPoller() {
     }
   }, 19000);
 }
+
+// Site-specific direct link extraction API endpoints
+app.get('/api/extract', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ success: false, error: 'url query parametresi gerekli.' });
+  try {
+    const result = await extractVideoUrl(url);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/extract/:site', async (req, res) => {
+  const { site } = req.params;
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ success: false, error: 'url query parametresi gerekli.' });
+
+  try {
+    const lowerUrl = url.toLowerCase();
+    if (site === 'instagram' && !lowerUrl.includes('instagram.com')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece instagram.com linkleri içindir.' });
+    }
+    if (site === 'tiktok' && !lowerUrl.includes('tiktok.com')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece tiktok.com linkleri içindir.' });
+    }
+    if (site === 'mega' && !lowerUrl.includes('mega.nz')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece mega.nz linkleri içindir.' });
+    }
+    if (site === 'yandex' && !lowerUrl.includes('disk.yandex') && !lowerUrl.includes('yadi.sk')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece yandex disk linkleri içindir.' });
+    }
+    if (site === 'gdrive' && !lowerUrl.includes('drive.google.com')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece drive.google.com linkleri içindir.' });
+    }
+    if (site === 'terabox' && !lowerUrl.includes('terabox')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece terabox linkleri içindir.' });
+    }
+    if (site === 'liteapks' && !lowerUrl.includes('liteapks.com')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece liteapks.com linkleri içindir.' });
+    }
+    if (site === 'modyolo' && !lowerUrl.includes('modyolo.com')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece modyolo.com linkleri içindir.' });
+    }
+
+    const result = await extractVideoUrl(url);
+    res.json({ success: true, site, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Local API: trigger a download task (accessible publicly)
 app.post('/api/indir', (req, res) => {
