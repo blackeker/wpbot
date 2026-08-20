@@ -29,11 +29,11 @@ echo ==============================================
 echo       VDS UZERINDE GUNCELLEME TETIKLENIYOR
 echo ==============================================
 echo.
-set VDS_IP=91.232.103.60
-set VDS_USER=root
+set VDS_IP=111.235.150.157
+set VDS_USER=Administrator
 
 echo [*] VDS'e baglaniliyor ve git pull tetikleniyor...
-ssh -i "%USERPROFILE%\.ssh\id_ed25519" -o StrictHostKeyChecking=no %VDS_USER%@%VDS_IP% "cd /root/hdwpindirici && git pull && pm2 restart wp-bot || pm2 restart all || npm restart"
+ssh -i "%USERPROFILE%\.ssh\id_ed25519" -o StrictHostKeyChecking=no %VDS_USER%@%VDS_IP% "cd \"C:\Users\Administrator\Desktop\keke\wpbot\" && git pull && pm2 restart wp-bot || pm2 restart all || npm restart"
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

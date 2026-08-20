@@ -21,40 +21,23 @@ if not exist "node_modules\" (
     npm install
 )
 
-:: 3. Yt-Dlp Kontrolü ve Otomatik Kurulumu
+:: 3. Yt-Dlp Kontrolü
 yt-dlp --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    if not exist "yt-dlp.exe" (
-        echo [!] 'yt-dlp' bulunamadi. Github uzerinden indiriliyor...
-        curl -L -o yt-dlp.exe https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe
-        if exist "yt-dlp.exe" (
-            echo [+] 'yt-dlp.exe' basariyla indirildi ve proje klasorune kaydedildi.
-        ) else (
-            echo [x] Hata: yt-dlp indirilemedi! Lutfen el ile indirin.
-        )
-    ) else (
-        echo [+] Yerel 'yt-dlp.exe' mevcut, kullanilıyor.
-    )
-) else (
-    echo [+] 'yt-dlp' sistemde kurulu.
+    echo [!] Uyari: 'yt-dlp' sistem PATH'inde bulunamadi!
+    echo [!] YouTube ve diger bazi platform indirmeleri calismayabilir.
+    echo [!] Lutfen yt-dlp.exe dosyasini sistem PATH'ine ekleyin veya proje klasorune atin.
+    echo.
 )
-
-:: 4. Logs Klasörü Kontrolü
-if not exist "logs\" mkdir logs
-
-for /f "tokens=2 delims==" %%i in ('wmic os get localdatetime /value') do set datetime=%%i
-set TIMESTAMP=%datetime:~0,4%%datetime:~4,2%%datetime:~6,2%_%datetime:~8,2%%datetime:~10,2%%datetime:~12,2%
-set LOG_FILE=logs\%TIMESTAMP%.json
 
 :start
 echo.
 echo ====================================================
 echo [*] Bot baslatiliyor... (%date% %time%)
-echo [*] Log dosyasi: %LOG_FILE%
 echo ====================================================
 echo.
 
-npm run dev > "%LOG_FILE%" 2>&1
+node bot.js
 
 echo.
 echo ====================================================

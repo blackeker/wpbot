@@ -5,7 +5,7 @@ import { exec } from 'child_process';
 import ffmpegPath from 'ffmpeg-static';
 import { extractVideoUrl } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
-import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState } from './config.js';
+import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig } from './config.js';
 
 // ─── Retry Yardımcısı ───
 async function withRetry(fn, retries = 3, delayMs = 3000) {
@@ -55,6 +55,31 @@ async function processMediaUploadQueue() {
       isUploadingMedia = false;
       processMediaUploadQueue();
     }, 8000);
+  }
+}
+
+// ─── Depo Grubuna Gönderici ───
+async function sendToDepot(filePath, fileName, mimetype, title, recipientJid) {
+  try {
+    const config = readConfig();
+    const depotJid = config.depotGroupJid;
+    if (!depotJid || depotJid === recipientJid) return; // Depo ayarlı değilse veya zaten depoya gönderiliyorsa atla
+
+    if (!fs.existsSync(filePath)) return;
+    if (!botSocketRef.current) return;
+
+    console.log(`[DEPO] Dosya depo grubuna gönderiliyor: ${fileName} -> ${depotJid}`);
+    await botSocketRef.current.sendMessage(depotJid, { text: `📦 *Depo Kaydı*\n🎬 ${title}\n📁 ${fileName}` });
+
+    const fileStream = fs.createReadStream(filePath);
+    await queueMediaSend(depotJid, {
+      document: { stream: fileStream },
+      mimetype: mimetype || 'application/octet-stream',
+      fileName: fileName
+    });
+    console.log(`[DEPO] ✅ Dosya depo grubuna gönderildi: ${fileName}`);
+  } catch (err) {
+    console.error(`[DEPO] ❌ Depo gönderimi başarısız: ${err.message}`);
   }
 }
 
@@ -263,6 +288,11 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           }));
         }
         await progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n✅ Tüm parçalar başarıyla gönderildi!\n\n🔗 *Canlı İzleme (VDS):*\n${watchUrl}`);
+        // Depo grubuna her parçayı gönder
+        for (let i = 0; i < splitFiles.length; i++) {
+          const partPath = path.join(downloadsDir, splitFiles[i]);
+          await sendToDepot(partPath, splitFiles[i], finalMime, title, recipientJid);
+        }
       } else {
         const fileStream = fs.createReadStream(finalPath);
         let lastWaUpdate = 0;
@@ -285,6 +315,8 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           fileName: finalSafeTitle
         });
         await progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n✅ Başarıyla Gönderildi! (${finalSizeStr})\n\n🔗 *Canlı İzleme (VDS):*\n${watchUrl}`);
+        // Depo grubuna gönder
+        await sendToDepot(finalPath, finalSafeTitle, finalMime, title, recipientJid);
       }
     } catch (err) {
       console.error(`WhatsApp gönderme hatası (${title}):`, err.message);
@@ -584,6 +616,11 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         }
         const summary = `${icon} *${finalTitle}*\n\n✅ *Tüm Parçalar Tamamlandı!*\n📦 Toplam Boyut: ${finalSizeStr}\n⏱️ Süre: ${totalDuration}\n\n🔗 *İndirme Linki (VDS):*\n${watchUrl.replace(fileExt, finalFileExt)}`;
         await progressUpdateCallback(summary);
+        // Depo grubuna her parçayı gönder
+        for (let i = 0; i < splitFiles.length; i++) {
+          const partPath = path.join(downloadsDir, splitFiles[i]);
+          await sendToDepot(partPath, splitFiles[i], finalMimeType, finalTitle, recipientJid);
+        }
       } else {
         const fileStream = fs.createReadStream(finalFilePath);
         const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
@@ -600,6 +637,8 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         const summary = `${icon} *${finalTitle}*\n\n✅ *Tamamlandı!*\n📦 Boyut: ${finalSizeStr}\n⏱️ Süre: ${totalDuration}\n\n🔗 *İndirme Linki (VDS):*\n${watchUrl.replace(fileExt, finalFileExt)}`;
         await progressUpdateCallback(summary);
         console.log('✅ Dosya gönderildi');
+        // Depo grubuna gönder
+        await sendToDepot(finalFilePath, `${safeTitle}${finalFileExt}`, finalMimeType, finalTitle, recipientJid);
       }
 
       if (taskObject) { taskObject.endTime = Date.now(); }

@@ -197,12 +197,8 @@ export function startCaptchaPoller() {
   }, 19000);
 }
 
-// Local API: trigger a download task (only accessible from localhost)
+// Local API: trigger a download task (accessible publicly)
 app.post('/api/indir', (req, res) => {
-  const ip = getClientIp(req);
-  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-  if (!isLocal) return res.status(403).json({ error: 'Sadece localhost erişebilir.' });
-
   const { url, jid } = req.body;
   if (!url || !jid) return res.status(400).json({ error: 'url ve jid gerekli.' });
 
@@ -215,25 +211,16 @@ app.post('/api/indir', (req, res) => {
 });
 
 app.post('/api/kuyruk-temizle', (req, res) => {
-  const ip = getClientIp(req);
-  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-  if (!isLocal) return res.status(403).json({ error: 'Sadece localhost erişebilir.' });
   const count = clearQueue();
   res.json({ ok: true, message: `${count} görev silindi.` });
 });
 
 app.post('/api/kuyruk-duraklat', (req, res) => {
-  const ip = getClientIp(req);
-  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-  if (!isLocal) return res.status(403).json({ error: 'Sadece localhost erişebilir.' });
   pauseQueue();
   res.json({ ok: true, message: 'Kuyruk duraklatıldı.' });
 });
 
 app.post('/api/kuyruk-devam', (req, res) => {
-  const ip = getClientIp(req);
-  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-  if (!isLocal) return res.status(403).json({ error: 'Sadece localhost erişebilir.' });
   resumeQueue();
   res.json({ ok: true, message: 'Kuyruk devam ediyor.' });
 });

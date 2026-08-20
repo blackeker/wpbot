@@ -3,8 +3,8 @@
 :: VDS HIZLI VE SIFRESIZ BAGLANTI SCRIPT
 :: ====================================================================
 :: Lutfen asagidaki IP adresini kendi VDS IP adresinizle degistirin:
-set VDS_IP=91.232.103.60
-set VDS_USER=root
+set VDS_IP=111.235.150.157
+set VDS_USER=Administrator
 
 :: SSH Klasorunu kontrol et ve anahtar yoksa uret
 if not exist "%USERPROFILE%\.ssh\id_ed25519.pub" (

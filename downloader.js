@@ -2,15 +2,26 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import crypto from 'crypto';
+import { File } from 'megajs';
 import { exec } from 'child_process';
 import ffmpegPath from 'ffmpeg-static';
 import { gotScraping as originalGotScraping } from 'got-scraping';
 import { CookieJar, Cookie } from 'tough-cookie';
 
+function shouldUseProxy(url) {
+  if (!url) return false;
+  const lowerUrl = String(url).toLowerCase();
+  return lowerUrl.includes('pornhub.com') ||
+         lowerUrl.includes('turkifsahub.com') ||
+         lowerUrl.includes('turkifsalar') ||
+         lowerUrl.includes('turkporno');
+}
+
 const gotScraping = new Proxy(originalGotScraping, {
   apply(target, thisArg, argumentsList) {
     const options = argumentsList[0] || {};
-    if (typeof options === 'object' && process.env.PROXY_URL) {
+    const url = options.url || '';
+    if (typeof options === 'object' && process.env.PROXY_URL && shouldUseProxy(url)) {
       options.proxyUrl = process.env.PROXY_URL;
     }
     return Reflect.apply(target, thisArg, argumentsList);
@@ -25,7 +36,7 @@ const gotScraping = new Proxy(originalGotScraping, {
           opt = options || {};
           opt.url = url;
         }
-        if (process.env.PROXY_URL) {
+        if (process.env.PROXY_URL && shouldUseProxy(opt.url)) {
           opt.proxyUrl = process.env.PROXY_URL;
         }
         return originalGotScraping[prop](opt);
@@ -34,27 +45,6 @@ const gotScraping = new Proxy(originalGotScraping, {
     return Reflect.get(target, prop, receiver);
   }
 });
-
-// Configure Axios defaults proxy if PROXY_URL is set
-if (process.env.PROXY_URL) {
-  try {
-    const parsed = new URL(process.env.PROXY_URL);
-    axios.defaults.proxy = {
-      protocol: parsed.protocol.replace(':', ''),
-      host: parsed.hostname,
-      port: parseInt(parsed.port, 10)
-    };
-    if (parsed.username || parsed.password) {
-      axios.defaults.proxy.auth = {
-        username: decodeURIComponent(parsed.username),
-        password: decodeURIComponent(parsed.password)
-      };
-    }
-    console.log(`[Proxy] Axios default proxy configured: ${parsed.hostname}:${parsed.port}`);
-  } catch (e) {
-    console.error(`[Proxy] Axios proxy config error:`, e.message);
-  }
-}
 
 
 // Helper to resolve URLs relative to a base URL
@@ -126,135 +116,136 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
     fs.mkdirSync(cacheDir, { recursive: true });
   }
 
-  let completed = 0;
-  const concurrency = 8;
-  let activeDownloads = 0;
+  try {
+    let completed = 0;
+    const concurrency = 8;
+    let activeDownloads = 0;
 
-  const pendingSegmentIndexes = [];
-  for (let i = 0; i < segmentUrls.length; i++) {
-    const segmentPath = path.join(cacheDir, `segment_${i}.ts`);
-    if (fs.existsSync(segmentPath) && fs.statSync(segmentPath).size > 0) {
-      completed++;
-    } else {
-      pendingSegmentIndexes.push(i);
-    }
-  }
-
-  if (completed > 0 && progressCallback) {
-    progressCallback(completed, segmentUrls.length);
-  }
-
-  if (completed < segmentUrls.length) {
-    await new Promise((resolve, reject) => {
-      const downloadSegment = async (index) => {
-        if (signal && signal.aborted) return;
-        const url = segmentUrls[index];
-        const segmentPath = path.join(cacheDir, `segment_${index}.ts`);
-        let attempts = 5;
-
-        while (attempts > 0) {
-          if (signal && signal.aborted) return;
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
-            
-            if (signal) {
-              signal.addEventListener('abort', () => controller.abort(), { once: true });
-            }
-
-            // Segment indirme için her zaman axios kullan (gotScraping'den çok daha hızlı)
-            const reqHeaders = { ...(headers || {}) };
-            if (cookieJar) {
-              const cookieString = cookieJar.getCookieStringSync(url);
-              if (cookieString) reqHeaders['Cookie'] = cookieString;
-            }
-            const segRes = await axios.get(url, {
-              headers: Object.keys(reqHeaders).length > 0 ? reqHeaders : undefined,
-              responseType: 'arraybuffer',
-              signal: controller.signal,
-              timeout: 15000
-            });
-            const segData = Buffer.from(segRes.data);
-            clearTimeout(timeoutId);
-            
-            fs.writeFileSync(segmentPath, segData);
-            completed++;
-            if (progressCallback) {
-              progressCallback(completed, segmentUrls.length);
-            }
-            break;
-          } catch (e) {
-            attempts--;
-            if (attempts === 0) {
-              reject(new Error(`Segment ${index} indirme hatası: ${e.message}`));
-              return;
-            }
-            const isRateLimit = e.response && e.response.status === 429;
-            const waitTime = isRateLimit ? 2000 : 100;
-            await new Promise(r => setTimeout(r, waitTime));
-          }
-        }
-
-        activeDownloads--;
-        pump();
-      };
-
-      const pump = () => {
-        if (signal && signal.aborted) return;
-        if (completed === segmentUrls.length) {
-          if (activeDownloads === 0) {
-            resolve();
-          }
-          return;
-        }
-        if (pendingSegmentIndexes.length === 0 && activeDownloads === 0) {
-          resolve();
-          return;
-        }
-        while (activeDownloads < concurrency && pendingSegmentIndexes.length > 0) {
-          const index = pendingSegmentIndexes.shift();
-          activeDownloads++;
-          downloadSegment(index);
-        }
-      };
-
-      if (signal) {
-        signal.addEventListener('abort', () => {
-          reject(new Error("İndirme iptal edildi."));
-        });
-      }
-
-      pump();
-    });
-  }
-
-  // Stitch — async stream pipeline (event loop'u bloke etmez)
-  const fileStream = fs.createWriteStream(outputFilePath);
-  await new Promise(async (resolve, reject) => {
-    fileStream.on('error', reject);
+    const pendingSegmentIndexes = [];
     for (let i = 0; i < segmentUrls.length; i++) {
       const segmentPath = path.join(cacheDir, `segment_${i}.ts`);
-      await new Promise((res, rej) => {
-        const readStream = fs.createReadStream(segmentPath);
-        readStream.on('error', rej);
-        readStream.on('end', res);
-        readStream.pipe(fileStream, { end: false });
+      if (fs.existsSync(segmentPath) && fs.statSync(segmentPath).size > 0) {
+        completed++;
+      } else {
+        pendingSegmentIndexes.push(i);
+      }
+    }
+
+    if (completed > 0 && progressCallback) {
+      progressCallback(completed, segmentUrls.length);
+    }
+
+    if (completed < segmentUrls.length) {
+      await new Promise((resolve, reject) => {
+        const downloadSegment = async (index) => {
+          if (signal && signal.aborted) return;
+          const url = segmentUrls[index];
+          const segmentPath = path.join(cacheDir, `segment_${index}.ts`);
+          let attempts = 5;
+
+          while (attempts > 0) {
+            if (signal && signal.aborted) return;
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 45000);
+              
+              if (signal) {
+                signal.addEventListener('abort', () => controller.abort(), { once: true });
+              }
+
+              // Segment indirme için her zaman axios kullan (gotScraping'den çok daha hızlı)
+              const reqHeaders = { ...(headers || {}) };
+              if (cookieJar) {
+                const cookieString = cookieJar.getCookieStringSync(url);
+                if (cookieString) reqHeaders['Cookie'] = cookieString;
+              }
+              const segRes = await axios.get(url, {
+                headers: Object.keys(reqHeaders).length > 0 ? reqHeaders : undefined,
+                responseType: 'arraybuffer',
+                signal: controller.signal,
+                timeout: 45000,
+                proxy: false
+              });
+              const segData = Buffer.from(segRes.data);
+              clearTimeout(timeoutId);
+              
+              fs.writeFileSync(segmentPath, segData);
+              completed++;
+              if (progressCallback) {
+                progressCallback(completed, segmentUrls.length);
+              }
+              break;
+            } catch (e) {
+              attempts--;
+              if (attempts === 0) {
+                reject(new Error(`Segment ${index} indirme hatası: ${e.message}`));
+                return;
+              }
+              const isRateLimit = e.response && e.response.status === 429;
+              const waitTime = isRateLimit ? 2000 : 100;
+              await new Promise(r => setTimeout(r, waitTime));
+            }
+          }
+
+          activeDownloads--;
+          pump();
+        };
+
+        const pump = () => {
+          if (signal && signal.aborted) return;
+          if (completed === segmentUrls.length) {
+            if (activeDownloads === 0) {
+              resolve();
+            }
+            return;
+          }
+          if (pendingSegmentIndexes.length === 0 && activeDownloads === 0) {
+            resolve();
+            return;
+          }
+          while (activeDownloads < concurrency && pendingSegmentIndexes.length > 0) {
+            const index = pendingSegmentIndexes.shift();
+            activeDownloads++;
+            downloadSegment(index);
+          }
+        };
+
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            reject(new Error("İndirme iptal edildi."));
+          });
+        }
+
+        pump();
       });
     }
-    fileStream.end();
-    fileStream.on('finish', resolve);
-  });
 
-  // Clean cache
-  try {
-    for (let i = 0; i < segmentUrls.length; i++) {
-      const segmentPath = path.join(cacheDir, `segment_${i}.ts`);
-      if (fs.existsSync(segmentPath)) {
-        fs.unlinkSync(segmentPath);
+    // Stitch — async stream pipeline (event loop'u bloke etmez)
+    const fileStream = fs.createWriteStream(outputFilePath);
+    await new Promise(async (resolve, reject) => {
+      fileStream.on('error', reject);
+      for (let i = 0; i < segmentUrls.length; i++) {
+        const segmentPath = path.join(cacheDir, `segment_${i}.ts`);
+        await new Promise((res, rej) => {
+          const readStream = fs.createReadStream(segmentPath);
+          readStream.on('error', rej);
+          readStream.on('end', res);
+          readStream.pipe(fileStream, { end: false });
+        });
       }
+      fileStream.end();
+      fileStream.on('finish', resolve);
+    });
+  } finally {
+    // Clean cache
+    try {
+      if (fs.existsSync(cacheDir)) {
+        fs.rmSync(cacheDir, { recursive: true, force: true });
+      }
+    } catch (e) {
+      console.error(`[CACHE CLEANUP] Failed to remove ${cacheDir}:`, e.message);
     }
-    fs.rmdirSync(cacheDir);
-  } catch (e) {}
+  }
 }
 
 // Download a direct MP4/video file using streaming (no HLS parsing)
@@ -552,6 +543,12 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
       ]
     };
 
+    if (m3u8Url.includes('mega.nz')) {
+      console.log('Mega.nz URL detected, streaming decrypted download...');
+      await downloadMegaFile(m3u8Url, outputPath, signal, progressCallback);
+      return;
+    }
+
     // Eğer URL doğrudan .mp4 / .mkv / .webm veya sibnet veya cloud.mail.ru veya binary/document ise HLS parse etme, direkt indir
     const urlLower = m3u8Url.toLowerCase().split('?')[0];
     const isDirectBinaryFile = /\.(apk|zip|rar|7z|pdf|exe|tar|gz|mp3|wav|png|jpg|jpeg|gif)(\?.*)?$/i.test(urlLower);
@@ -748,4 +745,47 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
   } catch (err) {
     throw new Error(`M3U8 download failed: ${err.message}`);
   }
+}
+
+async function downloadMegaFile(megaUrl, outputPath, signal, progressCallback) {
+  const file = File.fromURL(megaUrl);
+  await file.loadAttributes();
+  const fileStream = file.download();
+  const writeStream = fs.createWriteStream(outputPath);
+  
+  let completed = 0;
+  const total = file.size || 0;
+  
+  return new Promise((resolve, reject) => {
+    if (signal) {
+      const abortHandler = () => {
+        fileStream.destroy();
+        writeStream.destroy();
+        reject(new Error("İndirme iptal edildi."));
+      };
+      signal.addEventListener('abort', abortHandler);
+    }
+
+    fileStream.on('data', (chunk) => {
+      completed += chunk.length;
+      if (progressCallback) {
+        progressCallback(completed, total);
+      }
+    });
+
+    fileStream.on('error', (err) => {
+      writeStream.destroy();
+      reject(err);
+    });
+
+    writeStream.on('finish', () => {
+      resolve();
+    });
+
+    writeStream.on('error', (err) => {
+      reject(err);
+    });
+
+    fileStream.pipe(writeStream);
+  });
 }

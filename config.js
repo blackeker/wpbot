@@ -17,6 +17,23 @@ if (!fs.existsSync(sessionPath)) {
   fs.mkdirSync(sessionPath, { recursive: true });
 }
 
+// Clean any leftover cache directories from previous sessions on startup
+try {
+  const rootFiles = fs.readdirSync('.');
+  for (const file of rootFiles) {
+    if (file.startsWith('.hdwp_cache_')) {
+      const filePath = path.resolve(file);
+      const stats = fs.statSync(filePath);
+      if (stats.isDirectory()) {
+        fs.rmSync(filePath, { recursive: true, force: true });
+        console.log(`[STARTUP CLEANUP] Leftover cache directory deleted: ${file}`);
+      }
+    }
+  }
+} catch (e) {
+  // Silent fail to avoid issues before logging hooks are fully active
+}
+
 // Config file reader/writer helpers with full defaults
 const DEFAULT_CONFIG = {
   whatsappPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || "905052761405",
@@ -35,6 +52,7 @@ const DEFAULT_CONFIG = {
   dashboardPass: process.env.DASHBOARD_PASS || "",
   adminJids: process.env.ADMIN_JIDS || "",
   customCommands: {},
+  depotGroupJid: "",
   cronSchedules: [
     { id: "cleanup", name: "Disk Temizliği", cron: "0 4 * * *", action: "cleanup", active: true }
   ]
@@ -89,6 +107,41 @@ const originalLog = console.log;
 const originalError = console.error;
 const originalWarn = console.warn;
 
+// Initialize markdown logger for 'npm run dev'
+let devLogFilePath = null;
+const isDevMode = process.env.npm_lifecycle_event === 'dev';
+
+if (isDevMode) {
+  try {
+    const logsDir = path.resolve('./logs');
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const day = pad(now.getDate());
+    const month = pad(now.getMonth() + 1);
+    const year = now.getFullYear();
+    const hours = pad(now.getHours());
+    const minutes = pad(now.getMinutes());
+    const seconds = pad(now.getSeconds());
+
+    // Slashes are illegal in file names, so we use '.' for dates and '-' for times
+    const logFileName = `${day}.${month}.${year}---${hours}-${minutes}-${seconds}.md`;
+    devLogFilePath = path.join(logsDir, logFileName);
+
+    fs.writeFileSync(
+      devLogFilePath,
+      `# HDWP Bot Dev Session Log - ${day}/${month}/${year} ${hours}:${minutes}:${seconds}\n\n` +
+      `| Zaman | Tip | Log Mesajı |\n` +
+      `| --- | --- | --- |\n`,
+      'utf8'
+    );
+  } catch (e) {
+    originalError('[LOG INIT ERROR] Failed to initialize file logging:', e.message);
+  }
+}
+
 function handleLogIntercept(type, args) {
   const text = args.map(arg => {
     if (typeof arg === 'object') {
@@ -107,6 +160,16 @@ function handleLogIntercept(type, args) {
   
   if (logEmitter) {
     try { logEmitter(logEntry); } catch (e) {}
+  }
+
+  if (devLogFilePath) {
+    try {
+      const cleanText = text.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+      const typeUpper = type.toUpperCase();
+      fs.appendFileSync(devLogFilePath, `| ${time} | **${typeUpper}** | ${cleanText} |\n`, 'utf8');
+    } catch (e) {
+      // Silent catch to prevent infinite recursion on error logging
+    }
   }
 }
 

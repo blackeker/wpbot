@@ -70,6 +70,19 @@ const PORT = process.env.PORT || 7860;
 setupPingTimer(botState.pingUrl);
 
 async function startBot() {
+  // Auto-update yt-dlp on startup in the background
+  (async () => {
+    const ytDlpCmd = getYtDlpCommand();
+    console.log(`[STARTUP] Checking for yt-dlp updates using: ${ytDlpCmd}`);
+    exec(`"${ytDlpCmd}" -U`, (err, stdout, stderr) => {
+      if (err) {
+        console.error(`[STARTUP] yt-dlp update failed: ${err.message}`);
+      } else {
+        console.log(`[STARTUP] yt-dlp update result: ${stdout.trim()}`);
+      }
+    });
+  })();
+
   restoreSession();
   let version = [2, 3000, 1037641644];
   try {
@@ -169,13 +182,13 @@ async function startBot() {
 
   sock.ev.on('messages.upsert', async (m) => {
     const msg = m.messages[0];
-    if (!msg.message || msg.key.fromMe) return;
+    if (!msg.message) return;
 
     const from = msg.key.remoteJid;
     const config = readConfig();
 
     // Whitelist check (Only process commands/downloads from allowed numbers)
-    if (config.adminJids) {
+    if (!msg.key.fromMe && config.adminJids) {
       const adminList = config.adminJids.split(',').map(num => num.trim().toLowerCase()).filter(Boolean);
       if (adminList.length > 0) {
         const sender = msg.key.participant || from;
@@ -222,7 +235,7 @@ async function startBot() {
       'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
       'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru',
       'dood', 'ds2play', 'streamtape', 'streamta.pe', 'stape.fun', 'filemoon', 'moonplayer',
-      'vk.com', 'vkvideo', 'vk.ru', 'vidmoly', 'dizipal', 'dizibox', 'dizigom', 'diziroll',
+      'vk.com', 'vkvideo', 'vk.ru', 'vidmoly', 'dizipal', 'dizibox', 'dizigom', 'diziroll', 'dramadizilerim', 'instagram.com', 'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com',
       'filmmodu', 'fullhdfilmizlesene', 'rule34video', 'hanime.tv', 'jable.tv', 'missav',
       'erome.com', 'fapello.com', 'camwhores', 'hentaihaven', 'hentaimama', 'hentaiseason',
       'spankbang', 'xvideos', 'xnxx', 'eporner', 'xhamster', 'beeg', 'hqporner', 'youporn',
@@ -342,7 +355,7 @@ Herhangi bir link gönderdiğinizde otomatik indirmeyi başlatırım. Alternatif
 
 🎬 *DESTEKLENEN SİTELER VE KAYNAKLAR:*
 • *Anime:* Anizm (Aniuzm), AnimeCix, EcchiCix, Hentaizm
-• *Dizi / Film:* Dizipal, Dizibox, Dizigom, Diziroll, Filmmodu, FullHDFilmizlesene, HDFilmCehennemi, HDKore, HDabla
+• *Dizi / Film:* Dizipal, Dizibox, Dizigom, Diziroll, Filmmodu, FullHDFilmizlesene, HDFilmCehennemi, HDKore, HDabla, Dramadizilerim
 • *Hosting Servisleri:* Doodstream, Streamtape, Filemoon, VK.com (VKVideo), Vidmoly, Cloud Mail.ru
 • *Sosyal & Video:* YouTube, Youtu.be (Playlist & Format Seçimli)
 • *NSFW / Hentai:* Hanime.tv, Rule34Video, Jable.tv, MissAV, EroMe, Fapello, Camwhores, HentaiHaven, HentaiMama, HentaiSeason, Doeda, Turkifsahub, Turkifsalar, Turkporno, Pornhub, Xvideos, XNXX, SpankBang, Eporner, Xhamster, Beeg, YouPorn, RedTube, TnaFlix, Thumbzilla, Tube8, Txxx, YouJizz, Porntrex, Pornone, Yerli İfşalar & Tüm Yetişkin Tube Siteleri
@@ -546,6 +559,43 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       setupPingTimer(newUrl);
 
       await sock.sendMessage(from, { text: `✅ Canlı tutma adresi güncellendi ve kaydedildi:\n\`${newUrl}\`` });
+      return;
+    }
+
+    // ─── !depo — Depo Grubu Ayarlama ───
+    if (text.startsWith('!depo')) {
+      const parts = text.split(/\s+/);
+      if (parts.length < 2) {
+        const currentDepot = config.depotGroupJid;
+        if (currentDepot) {
+          await sock.sendMessage(from, { text: `📦 *Mevcut Depo Grubu:*\n\`${currentDepot}\`\n\nDeğiştirmek: \`!depo burası\` (grupta yaz)\nSilmek: \`!depo sil\`\nManuel: \`!depo <grup JID>\`` });
+        } else {
+          await sock.sendMessage(from, { text: `📦 *Depo grubu ayarlanmamış.*\n\nBir grupta \`!depo burası\` yazarak o grubu depo yapabilirsin.\nVeya: \`!depo <grup JID>\`` });
+        }
+        return;
+      }
+
+      const arg = parts[1].toLowerCase();
+      if (arg === 'burası' || arg === 'burasi' || arg === 'bura' || arg === 'here') {
+        if (!from.endsWith('@g.us')) {
+          await sock.sendMessage(from, { text: '❌ Bu komut sadece grup sohbetlerinde çalışır. Lütfen bir grupta deneyin.' });
+          return;
+        }
+        writeConfig({ depotGroupJid: from });
+        await sock.sendMessage(from, { text: `✅ *Bu grup depo olarak ayarlandı!*\n\nBundan sonra indirilen tüm dosyalar bu gruba da gönderilecek.\nGrup JID: \`${from}\`` });
+        return;
+      }
+
+      if (arg === 'sil' || arg === 'kaldır' || arg === 'kaldir' || arg === 'remove') {
+        writeConfig({ depotGroupJid: '' });
+        await sock.sendMessage(from, { text: '✅ Depo grubu ayarı kaldırıldı. Dosyalar artık sadece isteği yapana gönderilecek.' });
+        return;
+      }
+
+      // Manual JID setting
+      const jid = parts[1].trim();
+      writeConfig({ depotGroupJid: jid });
+      await sock.sendMessage(from, { text: `✅ *Depo grubu ayarlandı:*\n\`${jid}\`\n\nTüm indirilen dosyalar bu gruba da gönderilecek.` });
       return;
     }
 
@@ -1038,7 +1088,8 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       const supportedDomains = [
         'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm',
         'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
-        'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru'
+        'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru', 'instagram.com',
+        'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com'
       ];
 
       // ─── Aralık İndirme (sadece 2 hdfilmcehennemi veya 2 animecix linki varsa)
@@ -1149,8 +1200,16 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       const isTurkifsalar = /turkifsalar/i.test(singleUrl);
       const isTurkporno = /turkporno/i.test(singleUrl);
       const isCloudMailRu = singleUrl.includes('cloud.mail.ru') || singleUrl.includes('cloidmail.ru');
+      const isInstagramUrl = singleUrl.includes('instagram.com');
+      const isTikTokUrl = singleUrl.includes('tiktok.com');
+      const isYandexUrl = singleUrl.includes('disk.yandex') || singleUrl.includes('yadi.sk');
+      const isGDriveUrl = singleUrl.includes('drive.google.com');
+      const isMegaUrl = singleUrl.includes('mega.nz');
+      const isYabancidiziUrl = singleUrl.includes('yabancidizi.co') || singleUrl.includes('yabancidizi.pw') || singleUrl.includes('yabancidizi.vip') || singleUrl.includes('yabancidizi.fun') || singleUrl.includes('yabancidizi.com');
+      const isSezonlukdiziUrl = singleUrl.includes('sezonlukdizi.org') || singleUrl.includes('sezonlukdizi.pro') || singleUrl.includes('sezonlukdizi.co') || singleUrl.includes('sezonlukdizi.com');
+      const isTeraboxUrl = singleUrl.includes('terabox.com') || singleUrl.includes('teraboxapp.com') || singleUrl.includes('nephobox.com') || singleUrl.includes('terabox');
 
-      if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu) {
+      if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl) {
         await sock.sendMessage(from, { text: 'Lütfen geçerli bir desteklenen medya linki gönderin.' });
         return;
       }
@@ -1324,6 +1383,12 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
                 height: 0
               });
             }
+
+            availableFormats.push({
+              format_id: 'mp3',
+              label: '🎵 Sadece Ses (MP3 olarak indir)',
+              height: -1
+            });
 
             let ytTitle = 'YouTube Video';
             try {
