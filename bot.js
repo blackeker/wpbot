@@ -235,7 +235,7 @@ async function startBot() {
       'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
       'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru',
       'dood', 'ds2play', 'streamtape', 'streamta.pe', 'stape.fun', 'filemoon', 'moonplayer',
-      'vk.com', 'vkvideo', 'vk.ru', 'vidmoly', 'dizipal', 'dizibox', 'dizigom', 'diziroll', 'dramadizilerim', 'instagram.com', 'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com',
+      'vk.com', 'vkvideo', 'vk.ru', 'vidmoly', 'dizipal', 'dizibox', 'dizigom', 'diziroll', 'dramadizilerim', 'instagram.com', 'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com', 'liteapks.com', 'modyolo.com', 'koreanturk', 'koreanizm',
       'filmmodu', 'fullhdfilmizlesene', 'rule34video', 'hanime.tv', 'jable.tv', 'missav',
       'erome.com', 'fapello.com', 'camwhores', 'hentaihaven', 'hentaimama', 'hentaiseason',
       'spankbang', 'xvideos', 'xnxx', 'eporner', 'xhamster', 'beeg', 'hqporner', 'youporn',
@@ -1089,7 +1089,7 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
         'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm',
         'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
         'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru', 'instagram.com',
-        'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com'
+        'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com', 'liteapks.com', 'modyolo.com', 'koreanturk', 'koreanizm', 'dizigom', 'dizibox', 'dizipal', 'filmmodu', 'fullhdfilmizlesene'
       ];
 
       // ─── Aralık İndirme (sadece 2 hdfilmcehennemi veya 2 animecix linki varsa)
@@ -1208,8 +1208,11 @@ _Sadece linki atın, gerisini ben hallederim!_ ✨`;
       const isYabancidiziUrl = singleUrl.includes('yabancidizi.co') || singleUrl.includes('yabancidizi.pw') || singleUrl.includes('yabancidizi.vip') || singleUrl.includes('yabancidizi.fun') || singleUrl.includes('yabancidizi.com');
       const isSezonlukdiziUrl = singleUrl.includes('sezonlukdizi.org') || singleUrl.includes('sezonlukdizi.pro') || singleUrl.includes('sezonlukdizi.co') || singleUrl.includes('sezonlukdizi.com');
       const isTeraboxUrl = singleUrl.includes('terabox.com') || singleUrl.includes('teraboxapp.com') || singleUrl.includes('nephobox.com') || singleUrl.includes('terabox');
+      const isLiteapksUrl = singleUrl.includes('liteapks.com');
+      const isModyoloUrl = singleUrl.includes('modyolo.com');
+      const isDiziSitesiUrl = singleUrl.includes('dizigom') || singleUrl.includes('dizibox') || singleUrl.includes('koreanturk') || singleUrl.includes('koreanizm') || singleUrl.includes('dizipal') || singleUrl.includes('filmmodu') || singleUrl.includes('fullhdfilmizlesene');
 
-      if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl) {
+      if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl && !isLiteapksUrl && !isModyoloUrl && !isDiziSitesiUrl) {
         await sock.sendMessage(from, { text: 'Lütfen geçerli bir desteklenen medya linki gönderin.' });
         return;
       }

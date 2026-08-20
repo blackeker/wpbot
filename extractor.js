@@ -302,6 +302,20 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
   if (targetUrl.includes('terabox.com') || targetUrl.includes('teraboxapp.com') || targetUrl.includes('nephobox.com') || targetUrl.includes('terabox')) {
     return extractTerabox(targetUrl);
   }
+  if (targetUrl.includes('liteapks.com')) {
+    return extractLiteapks(targetUrl);
+  }
+  if (targetUrl.includes('modyolo.com')) {
+    return extractModyolo(targetUrl);
+  }
+  if (targetUrl.includes('dizigom') || targetUrl.includes('dizibox') || targetUrl.includes('koreanturk') || targetUrl.includes('koreanizm') || targetUrl.includes('dizipal') || targetUrl.includes('filmmodu') || targetUrl.includes('fullhdfilmizlesene')) {
+    let siteName = 'Film/Dizi Sitesi';
+    if (targetUrl.includes('dizigom')) siteName = 'Dizigom';
+    else if (targetUrl.includes('koreanturk')) siteName = 'Koreanturk';
+    else if (targetUrl.includes('dizipal')) siteName = 'Dizipal';
+    else if (targetUrl.includes('filmmodu')) siteName = 'FilmModu';
+    return extractDiziSitesi(targetUrl, siteName);
+  }
   try {
     const pageRes = await gotScraping.get({
       url: pageUrl,
@@ -461,3 +475,9 @@ import { extractSezonlukdizi } from "./extractors/sezonlukdizi.js";
 export { extractSezonlukdizi };
 import { extractTerabox } from "./extractors/terabox.js";
 export { extractTerabox };
+import { extractLiteapks } from "./extractors/liteapks.js";
+export { extractLiteapks };
+import { extractModyolo } from "./extractors/modyolo.js";
+export { extractModyolo };
+import { extractDiziSitesi } from "./extractors/dizisitesi.js";
+export { extractDiziSitesi };
