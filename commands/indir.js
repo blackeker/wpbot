@@ -81,7 +81,7 @@ export default {
       'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm',
       'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
       'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru', 'instagram.com',
-      'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com', 'liteapks.com', 'modyolo.com', 'koreanturk', 'koreanizm', 'dizigom', 'dizibox', 'dizipal', 'filmmodu', 'fullhdfilmizlesene'
+      'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com', 'liteapks.com', 'modyolo.com', 'koreanturk', 'koreanizm', 'dizigom', 'dizibox', 'dizipal', 'filmmodu', 'fullhdfilmizlesene', 'dramadizilerim'
     ];
 
     // ─── Aralık İndirme (2 link varsa) ───
@@ -200,9 +200,10 @@ export default {
     const isLiteapksUrl = singleUrl.includes('liteapks.com');
     const isModyoloUrl = singleUrl.includes('modyolo.com');
     const isDiziSitesiUrl = singleUrl.includes('dizigom') || singleUrl.includes('dizibox') || singleUrl.includes('koreanturk') || singleUrl.includes('koreanizm') || singleUrl.includes('dizipal') || singleUrl.includes('filmmodu') || singleUrl.includes('fullhdfilmizlesene');
+    const isDramadizilerim = singleUrl.includes('dramadizilerim.com');
     const isTorrentUrl = singleUrl.startsWith('magnet:') || singleUrl.toLowerCase().includes('.torrent');
 
-    if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl && !isLiteapksUrl && !isModyoloUrl && !isDiziSitesiUrl && !isTorrentUrl) {
+    if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl && !isLiteapksUrl && !isModyoloUrl && !isDiziSitesiUrl && !isTorrentUrl && !isDramadizilerim) {
       await sock.sendMessage(from, { text: 'Lütfen geçerli bir desteklenen medya linki gönderin.' });
       return;
     }
@@ -298,6 +299,50 @@ export default {
       await sock.sendMessage(from, { text: '🔍 HDKore yayınlanan dizi bölümleri taranıyor...' });
       try {
         const { seriesName, episodes } = await getHdkoreSeasonEpisodes(singleUrl);
+
+        if (episodes.length === 0) {
+          await sock.sendMessage(from, { text: '❌ Bu dizide hiçbir bölüm bulunamadı.' });
+          return;
+        }
+
+        await sock.sendMessage(from, { text: `🎬 *${seriesName}* Dizisi Bulundu!\n📦 Toplam *${episodes.length}* adet bölüm sıraya ekleniyor...` });
+
+        let addedCount = 0;
+        let skipCount = 0;
+        for (const ep of episodes) {
+          try {
+            addDownloadTask(ep.url, from, `${seriesName} - ${ep.name}`, null, priority);
+            addedCount++;
+          } catch (e) {
+            skipCount++;
+          }
+        }
+
+        let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
+        if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+        if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+        replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+        await sock.sendMessage(from, { text: replyMsg });
+      } catch (err) {
+        await sock.sendMessage(from, { text: `❌ Dizi bölümleri alınırken hata oluştu: ${err.message}` });
+      }
+      return;
+    }
+
+    // Dramadizilerim Dizi/Sezon kontrolü
+    const isDramadizilerimSeries = isDramadizilerim && 
+      (singleUrl.includes('/dizi/') || (!singleUrl.includes('&e=') && !singleUrl.includes('?e=')));
+
+    if (isDramadizilerimSeries) {
+      let targetDiziUrl = singleUrl;
+      if (targetDiziUrl.includes('/izle/')) {
+        targetDiziUrl = targetDiziUrl.replace('/izle/', '/dizi/');
+      }
+      
+      const { getDramadizilerimSeasonEpisodes } = await import('../extractor.js');
+      await sock.sendMessage(from, { text: '🔍 Dramadizilerim yayınlanan dizi bölümleri taranıyor...' });
+      try {
+        const { seriesName, episodes } = await getDramadizilerimSeasonEpisodes(targetDiziUrl);
 
         if (episodes.length === 0) {
           await sock.sendMessage(from, { text: '❌ Bu dizide hiçbir bölüm bulunamadı.' });

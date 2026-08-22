@@ -85,3 +85,56 @@ export async function extractDramadizilerim(pageUrl) {
     throw err;
   }
 }
+
+export async function getDramadizilerimSeasonEpisodes(pageUrl) {
+  const { gotScraping } = await import('../extractor.js');
+  const cheerio = await import('cheerio');
+  
+  const res = await gotScraping.get({
+    url: pageUrl,
+    headerGeneratorOptions: {
+      devices: ['desktop'],
+      locales: ['tr-TR', 'en-US'],
+      operatingSystems: ['windows']
+    }
+  });
+
+  const $ = cheerio.load(res.body || res.data);
+  const title = $('title').text().replace(/izle.*/i, '').trim() || 'Dramadizilerim';
+  
+  const episodesMap = new Map();
+  
+  const parsedUrl = new URL(pageUrl);
+  const targetSeason = parsedUrl.searchParams.get('s') || '1';
+
+  $('a').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    if (href.includes('?s=') && href.includes('&e=')) {
+      try {
+        const fullUrl = href.startsWith('http') ? href : new URL(href, pageUrl).toString();
+        const epUrlObj = new URL(fullUrl);
+        const sParam = epUrlObj.searchParams.get('s');
+        const eParam = epUrlObj.searchParams.get('e');
+        
+        if (sParam === targetSeason) {
+          const epName = `Sezon ${sParam} Bölüm ${eParam}`;
+          episodesMap.set(fullUrl, {
+            url: fullUrl,
+            name: epName,
+            season: sParam,
+            episode: eParam
+          });
+        }
+      } catch (err) {}
+    }
+  });
+
+  const episodes = Array.from(episodesMap.values()).sort((a, b) => {
+    return parseInt(a.episode, 10) - parseInt(b.episode, 10);
+  });
+
+  return {
+    seriesName: title,
+    episodes
+  };
+}
