@@ -97,16 +97,23 @@ function formatDuration(ms) {
 // ── YouTube Pipeline ──
 export async function executeYouTubePipeline(targetUrl, recipientJid, progressUpdateCallback, signal, isPlaylist, selectedFormat = null, taskObject = null) {
   const { spawn } = await import('child_process');
+  const { getYtDlpCommand } = await import('./config.js');
   
-  const ytDlpCmd = fs.existsSync('./yt-dlp.exe') ? '.\\yt-dlp.exe' : 'yt-dlp';
+  const ytDlpCmd = getYtDlpCommand();
+  const env = { ...process.env };
+  const ffmpegDir = path.dirname(ffmpegPath);
+  const ytDlpDir = path.dirname(ytDlpCmd);
+  const separator = process.platform === 'win32' ? ';' : ':';
+  const newPaths = [ffmpegDir, ytDlpDir, '/usr/local/bin', '/usr/bin', '/bin'];
+  env.PATH = `${newPaths.join(separator)}${separator}${env.PATH || ''}`;
   
   const execAsync = (cmd) => new Promise((resolve, reject) => {
     let modifiedCmd = cmd;
     const activeProxy = getProxyUrl();
-    if (activeProxy && (cmd.includes('yt-dlp') || cmd.includes('yt-dlp.exe'))) {
-      modifiedCmd = cmd.replace(/"?yt-dlp"?|"?\.\\yt-dlp\.exe"?/, (m) => `${m} --proxy "${activeProxy}"`);
+    if (activeProxy && (cmd.includes('yt-dlp') || cmd.includes('yt-dlp.exe') || cmd.includes('/usr/local/bin/yt-dlp') || cmd.includes('/usr/bin/yt-dlp'))) {
+      modifiedCmd = cmd.replace(/"?yt-dlp"?|"?\.\\yt-dlp\.exe"?|"?\/usr\/local\/bin\/yt-dlp"?|"?\/usr\/bin\/yt-dlp"?/, (m) => `${m} --proxy "${activeProxy}"`);
     }
-    exec(modifiedCmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+    exec(modifiedCmd, { maxBuffer: 10 * 1024 * 1024, env }, (err, stdout, stderr) => {
       if (err) reject(new Error(stderr || err.message));
       else resolve(stdout.trim());
     });
@@ -189,7 +196,7 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
         args.push('--proxy', activeProxy);
       }
       args.push(targetUrl);
-      const proc = spawn(ytDlpCmd, args);
+      const proc = spawn(ytDlpCmd, args, { env });
       
       const onAbort = () => {
         try { proc.kill(); } catch {}

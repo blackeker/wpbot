@@ -1,6 +1,9 @@
 import fs from 'fs';
-import { getProxyUrl } from "../config.js";
+import path from 'path';
+import { exec } from 'child_process';
+import { getProxyUrl, getYtDlpCommand } from "../config.js";
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
+import * as cheerio from 'cheerio';
 export async function extractPornhub(pageUrl) {
   try {
     const pageRes = await gotScraping.get({
@@ -59,11 +62,16 @@ export async function extractPornhub(pageUrl) {
     }
     if (!videoUrl) {
       console.log('[Pornhub Extractor] Flashvars not found or failed, trying yt-dlp fallback...');
-      const ytDlpCmd = fs.existsSync('./yt-dlp.exe') ? '.\\yt-dlp.exe' : 'yt-dlp';
+      const ytDlpCmd = getYtDlpCommand();
       const dump = await new Promise((resolve, reject) => {
         const activeProxy = getProxyUrl();
         const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
-        exec(`"${ytDlpCmd}" --dump-json --no-playlist${proxyArg} --add-header "Cookie:hasVisited=1; accessAgeDisclaimerPH=1; platform=pc; bs=1; cookiesBannerSeen=1" "${pageUrl}"`, (err, stdout, stderr) => {
+        const env = { ...process.env };
+        const ytDlpDir = path.dirname(ytDlpCmd);
+        const separator = process.platform === 'win32' ? ';' : ':';
+        env.PATH = `${ytDlpDir}${separator}/usr/local/bin${separator}/usr/bin${separator}/bin${separator}${env.PATH || ''}`;
+        
+        exec(`"${ytDlpCmd}" --dump-json --no-playlist${proxyArg} --add-header "Cookie:hasVisited=1; accessAgeDisclaimerPH=1; platform=pc; bs=1; cookiesBannerSeen=1" "${pageUrl}"`, { env }, (err, stdout, stderr) => {
           if (err) reject(new Error(stderr || err.message));else resolve(stdout.trim());
         });
       });
