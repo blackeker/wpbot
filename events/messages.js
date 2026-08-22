@@ -201,11 +201,10 @@ Herhangi bir link gönderdiğinizde otomatik indirmeyi başlatırım. Alternatif
 • *!botkontrol* → Botun çalışma durumunu test eder.
 
 🎬 *DESTEKLENEN SİTELER VE KAYNAKLAR:*
-• *Anime:* Anizm (Aniuzm), AnimeCix, EcchiCix, Hentaizm
+• *Anime:* Anizm (Aniuzm), AnimeCix
 • *Dizi / Film:* Dizipal, Dizibox, Dizigom, Diziroll, Filmmodu, FullHDFilmizlesene, HDFilmCehennemi, HDKore, HDabla, Dramadizilerim
 • *Hosting Servisleri:* Doodstream, Streamtape, Filemoon, VK.com (VKVideo), Vidmoly, Cloud Mail.ru
 • *Sosyal & Video:* YouTube, Youtu.be (Playlist & Format Seçimli)
-• *NSFW / Hentai:* Hanime.tv, Rule34Video, Camwhores, HentaiHaven, Doeda, Turkporno, Pornhub, Xvideos & Yetişkin Tube Siteleri
 
 ────────────────────
 _Sadece linki atın, gerisini ben hallederim!_ ✨`;
