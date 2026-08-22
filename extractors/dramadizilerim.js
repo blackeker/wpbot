@@ -50,7 +50,7 @@ export async function extractDramadizilerim(pageUrl) {
       req.continue();
     });
 
-    await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     
     // Extract title
     showTitle = await page.title().catch(() => 'Dramadizilerim Video');
