@@ -322,6 +322,7 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
     return extractDiziSitesi(targetUrl, siteName);
   }
   try {
+    const mainUrl = new URL(pageUrl).origin;
     const pageRes = await gotScraping.get({
       url: pageUrl,
       headerGeneratorOptions: {
