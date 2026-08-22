@@ -84,31 +84,43 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
     } catch (e) {}
   }
   
-  const { exec } = await import('child_process');
+  const { spawn } = await import('child_process');
   
   return new Promise((resolve, reject) => {
     const activeProxy = getProxyUrl();
-    const proxyArg = activeProxy ? `-http_proxy "${activeProxy}"` : '';
+    const args = ['-y'];
     
-    // Replace quotes in headers to prevent shell issues
-    const safeHeaderStr = headerStr.replace(/"/g, '\\"');
+    if (activeProxy) {
+      args.push('-http_proxy', activeProxy);
+    }
     
-    const cmd = `"${ffmpegPath}" -y ${proxyArg} -headers "${safeHeaderStr}" -i "${playlistUrl}" -c copy -movflags +faststart "${outputFilePath}"`;
+    if (headerStr) {
+      args.push('-headers', headerStr);
+    }
     
-    console.log(`[HLS Downloader] Downloading using FFmpeg...`);
+    args.push('-i', playlistUrl, '-c', 'copy', '-movflags', '+faststart', outputFilePath);
+    
+    console.log(`[HLS Downloader] Downloading using FFmpeg spawn...`);
     
     const env = { ...process.env };
     const ffmpegDir = path.dirname(ffmpegPath);
     const separator = process.platform === 'win32' ? ';' : ':';
     env.PATH = `${ffmpegDir}${separator}${env.PATH || ''}`;
     
-    const proc = exec(cmd, { env }, (err, stdout, stderr) => {
-      if (err) {
-        console.error('[HLS Downloader] FFmpeg error:', stderr || err.message);
-        reject(new Error(`HLS indirme hatası: ${err.message}`));
-      } else {
+    const proc = spawn(ffmpegPath, args, { env });
+    
+    let stderr = '';
+    proc.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    
+    proc.on('close', (code) => {
+      if (code === 0) {
         console.log('[HLS Downloader] HLS stream successfully downloaded and merged by FFmpeg!');
         resolve();
+      } else {
+        console.error('[HLS Downloader] FFmpeg error:', stderr);
+        reject(new Error(`HLS indirme hatası (Kod ${code}): ${stderr}`));
       }
     });
     
@@ -119,7 +131,6 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
       };
       signal.addEventListener('abort', onAbort);
       
-      // Cleanup listener on resolve/reject
       const originalResolve = resolve;
       const originalReject = reject;
       resolve = (val) => {
