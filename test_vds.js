@@ -1,10 +1,10 @@
-import { extractVideo } from './extractor.js';
+import { extractVideoUrl } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
 import fs from 'fs';
 
 (async () => {
   console.log('[TEST] Starting extraction test on VDS...');
-  const res = await extractVideo('https://dramadizilerim.com/izle/gi-zli-ejderha-kralla-evli-li-k?s=1&e=3');
+  const res = await extractVideoUrl('https://dramadizilerim.com/izle/gi-zli-ejderha-kralla-evli-li-k?s=1&e=3');
   console.log('[TEST] Extracted title:', res.title);
   console.log('[TEST] Video URL:', res.url ? res.url.substring(0, 80) + '...' : 'NONE');
 
