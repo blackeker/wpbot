@@ -72,7 +72,18 @@ export async function extractDramadizilerim(pageUrl) {
       console.log(`[Dramadizilerim Extractor] Lazy player click warning: ${e.message}`);
     }
 
-    await browser.close();
+    const closeBrowser = async () => {
+      try {
+        await Promise.race([
+          browser.close(),
+          sleep(2000).then(() => {
+            if (browser.process()) browser.process().kill('SIGKILL');
+          })
+        ]);
+      } catch (e) {}
+    };
+
+    await closeBrowser();
 
     if (capturedVideoUrl) {
       if (capturedVideoUrl.includes('?url=')) {
@@ -96,7 +107,11 @@ export async function extractDramadizilerim(pageUrl) {
     
     throw new Error('Video kaynağı yakalanamadı.');
   } catch (err) {
-    await browser.close().catch(() => {});
+    if (browser) {
+      try {
+        if (browser.process()) browser.process().kill('SIGKILL');
+      } catch (e) {}
+    }
     throw err;
   }
 }
