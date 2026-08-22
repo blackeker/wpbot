@@ -35,8 +35,10 @@ export async function handleMessage(sock, m) {
   const from = msg.key.remoteJid;
   const config = readConfig();
 
-  if (config.groupJid && from === config.groupJid && msg.key.fromMe) {
-    return;
+  if (msg.key.fromMe) {
+    if (config.groupJid && from !== config.groupJid) {
+      return;
+    }
   }
 
   // Whitelist check
