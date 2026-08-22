@@ -607,6 +607,9 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   const vdsIp = process.env.VDS_IP || '111.235.150.157';
   const watchUrl = `http://${vdsIp}:7860/downloads/${encodeURIComponent(safeTitle)}${fileExt}`;
 
+  const isHls = result.url.includes('.m3u8') || result.source === 'HLS' || result.source === 'DramaDizilerim' || result.url.includes('mydramawave.com') || result.url.includes('.m3u8');
+  const downloadPath = isHls ? filePath + '.ts' : filePath;
+
   if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
 
   await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndirme başlatılıyor...\n📡 Kaynak: ${result.source}\n🔗 Canlı İzle: ${watchUrl}`);
@@ -621,7 +624,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     await withRetry(async () => {
       // Sıfırla: retry sırasında lastUpdateTime eski kalmasın
       lastUpdateTime = 0;
-      await downloadM3u8(result.url, filePath, signal, async (completed, total) => {
+      await downloadM3u8(result.url, downloadPath, signal, async (completed, total) => {
         const now = Date.now();
         const isBytes = total > 1000; // 1000'den büyükse bytes bazlı (direkt indirme)
         const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
@@ -685,7 +688,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
       }, result.referer || null, result.cookies || null, result.userAgent || null, result.headers || null);
     });
   } catch (err) {
-    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+    try { if (fs.existsSync(downloadPath)) fs.unlinkSync(downloadPath); } catch {}
     if (err.message !== 'İndirme iptal edildi.') {
       addErrorLog({ title: result.title, url: targetUrl, error: err.message });
     }
@@ -693,8 +696,37 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   }
 
   if (signal && signal.aborted) {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    try { if (fs.existsSync(downloadPath)) fs.unlinkSync(downloadPath); } catch {}
     throw new Error("İndirme iptal edildi.");
+  }
+
+  // Remux HLS to MP4 using FFmpeg (makes video natively playable in standard players and WhatsApp)
+  if (isHls && fs.existsSync(downloadPath)) {
+    await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n🔄 Video formatı optimize ediliyor...`);
+    if (taskObject) {
+      taskObject.status = 'Format optimize ediliyor (ffmpeg)...';
+      notifyQueueUpdate();
+    }
+    
+    const { exec } = await import('child_process');
+    await new Promise((resolve, reject) => {
+      const cmd = `"${ffmpegPath}" -y -i "${downloadPath}" -c copy -movflags +faststart "${filePath}"`;
+      const env = { ...process.env };
+      const ffmpegDir = path.dirname(ffmpegPath);
+      const separator = process.platform === 'win32' ? ';' : ':';
+      env.PATH = `${ffmpegDir}${separator}${env.PATH || ''}`;
+      
+      exec(cmd, { env }, (err, stdout, stderr) => {
+        try { fs.unlinkSync(downloadPath); } catch {}
+        if (err) {
+          console.error('[FFmpeg Remux Error]', stderr || err.message);
+          // Fallback: If remux fails, just rename to .mp4
+          try { fs.renameSync(downloadPath, filePath); resolve(); } catch (renameErr) { reject(err); }
+        } else {
+          resolve();
+        }
+      });
+    });
   }
 
   const fileSize = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
