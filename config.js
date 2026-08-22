@@ -17,7 +17,7 @@ if (!fs.existsSync(sessionPath)) {
   fs.mkdirSync(sessionPath, { recursive: true });
 }
 
-export function cleanLeftoverCacheFiles() {
+export async function cleanLeftoverCacheFiles() {
   try {
     const rootFiles = fs.readdirSync('.');
     const now = Date.now();
