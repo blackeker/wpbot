@@ -226,27 +226,22 @@ export default {
           return;
         }
 
-        let seasonMsg = `🎬 *${animeName}* Sezonu Bulundu!\n📦 Toplam *${episodes.length}* hazır bölüm sıraya ekleniyor...`;
-        if (preSkipped > 0) seasonMsg += `\n⏩ *${preSkipped}* bölüm henüz yüklenmemiş, otomatik atlandı.`;
-        await sock.sendMessage(from, { text: seasonMsg });
+        pendingSelections[from] = {
+          type: 'series',
+          seriesName: animeName,
+          episodes: episodes,
+          priority: priority
+        };
 
-        let addedCount = 0;
-        let skipCount = 0;
-        for (const ep of episodes) {
-          try {
-            addDownloadTask(ep.url, from, `${animeName} - ${ep.name}`, null, priority);
-            addedCount++;
-          } catch (e) {
-            skipCount++;
-          }
+        let seasonPrompt = `🎬 *${animeName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* hazır bölüm bulundu.\n\n` +
+          `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
+          `1️⃣ *Tüm Sezonu İndir* (Hepsini indirmek için: *hepsi* veya *1* yazın)\n` +
+          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *5-15* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
+          `❌ İptal etmek için *iptal* yazın.`;
+        if (preSkipped > 0) {
+          seasonPrompt += `\n\n*(Not: Platforma henüz yüklenmemiş ${preSkipped} bölüm otomatik atlandı)*`;
         }
-
-        let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
-        if (preSkipped > 0) replyMsg += `\n⏩ *${preSkipped}* bölüm platforma yüklenmediği için atlandı.`;
-        if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
-        if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
-        replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
-        await sock.sendMessage(from, { text: replyMsg });
+        await sock.sendMessage(from, { text: seasonPrompt });
       } catch (err) {
         await sock.sendMessage(from, { text: `❌ Sezon bölümleri alınırken hata oluştu: ${err.message}` });
       }
@@ -267,24 +262,19 @@ export default {
           return;
         }
 
-        await sock.sendMessage(from, { text: `🎬 *${seriesName}* Dizi/Sezonu Bulundu!\n📦 Toplam *${episodes.length}* adet yayınlanmış bölüm sıraya ekleniyor...` });
+        pendingSelections[from] = {
+          type: 'series',
+          seriesName: seriesName,
+          episodes: episodes,
+          priority: priority
+        };
 
-        let addedCount = 0;
-        let skipCount = 0;
-        for (const ep of episodes) {
-          try {
-            addDownloadTask(ep.url, from, `${seriesName} - ${ep.name}`, null, priority);
-            addedCount++;
-          } catch (e) {
-            skipCount++;
-          }
-        }
-
-        let replyMsg = `✅ Toplam *${addedCount}* yayınlanmış bölüm başarıyla sıraya eklendi.`;
-        if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
-        if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
-        replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
-        await sock.sendMessage(from, { text: replyMsg });
+        let seasonPrompt = `🎬 *${seriesName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* bölüm bulundu.\n\n` +
+          `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
+          `1️⃣ *Tüm Sezonu İndir* (Hepsini indirmek için: *hepsi* veya *1* yazın)\n` +
+          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *5-15* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
+          `❌ İptal etmek için *iptal* yazın.`;
+        await sock.sendMessage(from, { text: seasonPrompt });
       } catch (err) {
         await sock.sendMessage(from, { text: `❌ Dizi bölümleri alınırken hata oluştu: ${err.message}` });
       }
@@ -305,24 +295,19 @@ export default {
           return;
         }
 
-        await sock.sendMessage(from, { text: `🎬 *${seriesName}* Dizisi Bulundu!\n📦 Toplam *${episodes.length}* adet bölüm sıraya ekleniyor...` });
+        pendingSelections[from] = {
+          type: 'series',
+          seriesName: seriesName,
+          episodes: episodes,
+          priority: priority
+        };
 
-        let addedCount = 0;
-        let skipCount = 0;
-        for (const ep of episodes) {
-          try {
-            addDownloadTask(ep.url, from, `${seriesName} - ${ep.name}`, null, priority);
-            addedCount++;
-          } catch (e) {
-            skipCount++;
-          }
-        }
-
-        let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
-        if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
-        if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
-        replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
-        await sock.sendMessage(from, { text: replyMsg });
+        let seasonPrompt = `🎬 *${seriesName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* bölüm bulundu.\n\n` +
+          `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
+          `1️⃣ *Tüm Sezonu İndir* (Hepsini indirmek için: *hepsi* veya *1* yazın)\n` +
+          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *5-15* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
+          `❌ İptal etmek için *iptal* yazın.`;
+        await sock.sendMessage(from, { text: seasonPrompt });
       } catch (err) {
         await sock.sendMessage(from, { text: `❌ Dizi bölümleri alınırken hata oluştu: ${err.message}` });
       }
@@ -349,24 +334,19 @@ export default {
           return;
         }
 
-        await sock.sendMessage(from, { text: `🎬 *${seriesName}* Dizisi Bulundu!\n📦 Toplam *${episodes.length}* adet bölüm sıraya ekleniyor...` });
+        pendingSelections[from] = {
+          type: 'series',
+          seriesName: seriesName,
+          episodes: episodes,
+          priority: priority
+        };
 
-        let addedCount = 0;
-        let skipCount = 0;
-        for (const ep of episodes) {
-          try {
-            addDownloadTask(ep.url, from, `${seriesName} - ${ep.name}`, null, priority);
-            addedCount++;
-          } catch (e) {
-            skipCount++;
-          }
-        }
-
-        let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
-        if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
-        if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
-        replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
-        await sock.sendMessage(from, { text: replyMsg });
+        let seasonPrompt = `🎬 *${seriesName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* bölüm bulundu.\n\n` +
+          `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
+          `1️⃣ *Tüm Sezonu İndir* (Hepsini indirmek için: *hepsi* veya *1* yazın)\n` +
+          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *5-15* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
+          `❌ İptal etmek için *iptal* yazın.`;
+        await sock.sendMessage(from, { text: seasonPrompt });
       } catch (err) {
         await sock.sendMessage(from, { text: `❌ Dizi bölümleri alınırken hata oluştu: ${err.message}` });
       }

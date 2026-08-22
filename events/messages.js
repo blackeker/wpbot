@@ -97,22 +97,85 @@ export async function handleMessage(sock, m) {
 
   // 0. Pending Quality Selection Handler
   if (pendingSelections[from]) {
-    const selectionIndex = parseInt(text, 10) - 1;
     const selection = pendingSelections[from];
-    if (!isNaN(selectionIndex) && selectionIndex >= 0 && selectionIndex < selection.formats.length) {
-      const chosen = selection.formats[selectionIndex];
-      delete pendingSelections[from];
-      try {
-        const task = addDownloadTask(selection.url, from, selection.title, chosen.format_id);
-        await sock.sendMessage(from, { text: `✅ *${chosen.label}* kalitesi seçildi!\n\n📥 Sıraya eklendi, bekleme sırası çok olmadığı sürece kısa süre içinde başlayacak.\n\n🔢 Görev no: *${task.id}*  |  Kuyruk: *kuyruk* yaz` });
-      } catch (err) {
-        await sock.sendMessage(from, { text: `⚠️ Bir sorun oluştu: ${err.message}` });
+    
+    if (selection.type === 'series') {
+      const input = text.trim().toLowerCase();
+      
+      if (input === 'iptal' || input === 'vazgeç' || input === 'cancel') {
+        delete pendingSelections[from];
+        await sock.sendMessage(from, { text: '❌ Dizi indirme işlemi iptal edildi.' });
+        return;
       }
-      return;
-    } else if (ltext === 'iptal' || ltext === 'vazgeç' || ltext === 'cancel') {
-      delete pendingSelections[from];
-      await sock.sendMessage(from, { text: '❌ Kalite seçimi iptal edildi.' });
-      return;
+      
+      let selectedEpisodes = [];
+      let label = '';
+      
+      if (input === 'hepsi' || input === '1' || input === 'tümü' || input === 'full' || input === 'sezon') {
+        selectedEpisodes = selection.episodes;
+        label = 'Tüm Sezon';
+      } else {
+        const rangeMatch = input.match(/^(\d+)-(\d+)$/);
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          
+          if (start > 0 && end >= start && start <= selection.episodes.length) {
+            const startIndex = start - 1;
+            const endIndex = Math.min(end, selection.episodes.length);
+            selectedEpisodes = selection.episodes.slice(startIndex, endIndex);
+            label = `${start} ile ${endIndex} arası bölümler`;
+          }
+        }
+      }
+      
+      if (selectedEpisodes.length > 0) {
+        delete pendingSelections[from];
+        await sock.sendMessage(from, { text: `🎬 *${selection.seriesName}* - *${label}* sıraya ekleniyor...\n📦 Toplam *${selectedEpisodes.length}* bölüm sıraya ekleniyor...` });
+        
+        let addedCount = 0;
+        let skipCount = 0;
+        for (const ep of selectedEpisodes) {
+          try {
+            addDownloadTask(ep.url, from, `${selection.seriesName} - ${ep.name}`, null, selection.priority);
+            addedCount++;
+          } catch (e) {
+            skipCount++;
+          }
+        }
+        
+        let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
+        if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+        if (selection.priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+        replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+        await sock.sendMessage(from, { text: replyMsg });
+        return;
+      } else {
+        await sock.sendMessage(from, { 
+          text: `⚠️ Geçersiz seçim! Lütfen şunlardan birini yazın:\n\n` +
+                `- Tüm bölümler için: *hepsi* (veya *1*)\n` +
+                `- Belirli bölüm aralığı için: *başlangıç-bitiş* (Örn: *10-20*)\n` +
+                `- İptal etmek için: *iptal*`
+        });
+        return;
+      }
+    } else {
+      const selectionIndex = parseInt(text, 10) - 1;
+      if (!isNaN(selectionIndex) && selectionIndex >= 0 && selectionIndex < selection.formats.length) {
+        const chosen = selection.formats[selectionIndex];
+        delete pendingSelections[from];
+        try {
+          const task = addDownloadTask(selection.url, from, selection.title, chosen.format_id);
+          await sock.sendMessage(from, { text: `✅ *${chosen.label}* kalitesi seçildi!\n\n📥 Sıraya eklendi, bekleme sırası çok olmadığı sürece kısa süre içinde başlayacak.\n\n🔢 Görev no: *${task.id}*  |  Kuyruk: *kuyruk* yaz` });
+        } catch (err) {
+          await sock.sendMessage(from, { text: `⚠️ Bir sorun oluştu: ${err.message}` });
+        }
+        return;
+      } else if (ltext === 'iptal' || ltext === 'vazgeç' || ltext === 'cancel') {
+        delete pendingSelections[from];
+        await sock.sendMessage(from, { text: '❌ Kalite seçimi iptal edildi.' });
+        return;
+      }
     }
   }
 
