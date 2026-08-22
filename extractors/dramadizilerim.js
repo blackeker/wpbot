@@ -57,15 +57,19 @@ export async function extractDramadizilerim(pageUrl) {
     showTitle = showTitle.replace(/\s*[-–|]\s*(İzle|izle|Türkçe|Dramadizilerim).*/i, '').trim();
 
     // Click lazy player if exists
-    const lazyPlayer = await page.$('.lazy-player');
-    if (lazyPlayer) {
-      await page.click('.lazy-player');
-      
-      // Wait for matching url (up to 20 seconds)
-      for (let i = 0; i < 20; i++) {
-        if (capturedVideoUrl) break;
-        await sleep(1000);
+    try {
+      const lazyPlayer = await page.$('.lazy-player');
+      if (lazyPlayer) {
+        await page.evaluate(el => el.click(), lazyPlayer);
+        
+        // Wait for matching url (up to 20 seconds)
+        for (let i = 0; i < 20; i++) {
+          if (capturedVideoUrl) break;
+          await sleep(1000);
+        }
       }
+    } catch (e) {
+      console.log(`[Dramadizilerim Extractor] Lazy player click warning: ${e.message}`);
     }
 
     await browser.close();
