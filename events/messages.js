@@ -10,7 +10,8 @@ import {
   writeConfig, 
   cleanOldDownloads, 
   pendingHentaizmLogins, 
-  downloadsDir 
+  downloadsDir,
+  sentMessageIds
 } from '../config.js';
 import { 
   downloadQueue, 
@@ -29,8 +30,14 @@ export async function handleMessage(sock, m) {
   const msg = m.messages[0];
   if (!msg.message) return;
 
+  if (sentMessageIds.has(msg.key.id)) return;
+
   const from = msg.key.remoteJid;
   const config = readConfig();
+
+  if (config.groupJid && from === config.groupJid && msg.key.fromMe) {
+    return;
+  }
 
   // Whitelist check
   if (!msg.key.fromMe && config.adminJids) {

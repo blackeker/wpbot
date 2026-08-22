@@ -8,6 +8,7 @@ export const configPath = path.join(sessionPath, 'config.json');
 export const downloadsDir = path.resolve('./downloads');
 export const historyPath = path.join(sessionPath, 'history.json');
 export const errorLogPath = path.join(sessionPath, 'errors.json');
+export const sentMessageIds = new Set();
 
 // Ensure directories exist
 if (!fs.existsSync(downloadsDir)) {
@@ -84,6 +85,7 @@ const DEFAULT_CONFIG = {
   adminJids: process.env.ADMIN_JIDS || "",
   customCommands: {},
   depotGroupJid: "",
+  groupJid: "",
   cronSchedules: [
     { id: "cleanup", name: "Disk Temizliği", cron: "0 4 * * *", action: "cleanup", active: true }
   ]
