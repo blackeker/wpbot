@@ -67,193 +67,71 @@ function resolveUrl(baseUrl, relativeUrl) {
 }
 
 async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePrefix, signal, headers, progressCallback, cookieJar = null) {
-  let chromeVersion = 145;
-  if (headers && headers["User-Agent"]) {
-    const chromeMatch = headers["User-Agent"].match(/Chrome\/(\d+)/);
-    if (chromeMatch) {
-      chromeVersion = parseInt(chromeMatch[1], 10);
+  // Format headers for FFmpeg
+  let headerStr = '';
+  if (headers) {
+    for (const [key, value] of Object.entries(headers)) {
+      headerStr += `${key}: ${value}\r\n`;
     }
   }
-
-  const headerGeneratorOptions = {
-    devices: ['desktop'],
-    locales: ['tr-TR', 'en-US'],
-    operatingSystems: ['windows'],
-    browsers: [
-      {
-        name: 'chrome',
-        minVersion: chromeVersion,
-        maxVersion: chromeVersion
-      }
-    ]
-  };
-
-  // Fetch stream playlist
-  const res = await gotScraping.get({
-    url: playlistUrl,
-    headers,
-    cookieJar: cookieJar || undefined,
-    headerGeneratorOptions,
-    signal: signal || undefined,
-    responseType: 'text',
-    timeout: { request: 15000 }
-  });
-  const content = typeof res.body === 'string' ? res.body : res.body.toString('utf8');
   
-  const segmentUrls = [];
-  const lines = content.split('\n');
-  for (let line of lines) {
-    line = line.trim();
-    if (line && !line.startsWith('#')) {
-      segmentUrls.push(resolveUrl(playlistUrl, line));
-    }
+  if (cookieJar) {
+    try {
+      const cookies = cookieJar.getCookieStringSync(playlistUrl);
+      if (cookies) {
+        headerStr += `Cookie: ${cookies}\r\n`;
+      }
+    } catch (e) {}
   }
-
-  if (segmentUrls.length === 0) {
-    throw new Error("No segments found in HLS stream.");
-  }
-
-  const urlHash = crypto.createHash('md5').update(playlistUrl).digest('hex');
-  const cacheDir = path.resolve(`./.hdwp_cache_${cachePrefix}_${urlHash}`);
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-  }
-
-  try {
-    let completed = 0;
-    const concurrency = 8;
-    let activeDownloads = 0;
-
-    const pendingSegmentIndexes = [];
-    for (let i = 0; i < segmentUrls.length; i++) {
-      const segmentPath = path.join(cacheDir, `segment_${i}.ts`);
-      if (fs.existsSync(segmentPath) && fs.statSync(segmentPath).size > 0) {
-        completed++;
+  
+  const { exec } = await import('child_process');
+  
+  return new Promise((resolve, reject) => {
+    const activeProxy = getProxyUrl();
+    const proxyArg = activeProxy ? `-http_proxy "${activeProxy}"` : '';
+    
+    // Replace quotes in headers to prevent shell issues
+    const safeHeaderStr = headerStr.replace(/"/g, '\\"');
+    
+    const cmd = `"${ffmpegPath}" -y ${proxyArg} -headers "${safeHeaderStr}" -i "${playlistUrl}" -c copy -movflags +faststart "${outputFilePath}"`;
+    
+    console.log(`[HLS Downloader] Downloading using FFmpeg...`);
+    
+    const env = { ...process.env };
+    const ffmpegDir = path.dirname(ffmpegPath);
+    const separator = process.platform === 'win32' ? ';' : ':';
+    env.PATH = `${ffmpegDir}${separator}${env.PATH || ''}`;
+    
+    const proc = exec(cmd, { env }, (err, stdout, stderr) => {
+      if (err) {
+        console.error('[HLS Downloader] FFmpeg error:', stderr || err.message);
+        reject(new Error(`HLS indirme hatası: ${err.message}`));
       } else {
-        pendingSegmentIndexes.push(i);
+        console.log('[HLS Downloader] HLS stream successfully downloaded and merged by FFmpeg!');
+        resolve();
       }
+    });
+    
+    if (signal) {
+      const onAbort = () => {
+        try { proc.kill(); } catch {}
+        reject(new Error("İndirme iptal edildi."));
+      };
+      signal.addEventListener('abort', onAbort);
+      
+      // Cleanup listener on resolve/reject
+      const originalResolve = resolve;
+      const originalReject = reject;
+      resolve = (val) => {
+        signal.removeEventListener('abort', onAbort);
+        originalResolve(val);
+      };
+      reject = (err) => {
+        signal.removeEventListener('abort', onAbort);
+        originalReject(err);
+      };
     }
-
-    if (completed > 0 && progressCallback) {
-      progressCallback(completed, segmentUrls.length);
-    }
-
-    if (completed < segmentUrls.length) {
-      await new Promise((resolve, reject) => {
-        const downloadSegment = async (index) => {
-          if (signal && signal.aborted) return;
-          const url = segmentUrls[index];
-          const segmentPath = path.join(cacheDir, `segment_${index}.ts`);
-          let attempts = 5;
-
-          while (attempts > 0) {
-            if (signal && signal.aborted) return;
-            try {
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 45000);
-              
-              if (signal) {
-                signal.addEventListener('abort', () => controller.abort(), { once: true });
-              }
-
-              // Segment indirme için her zaman axios kullan (gotScraping'den çok daha hızlı)
-              const reqHeaders = { ...(headers || {}) };
-              if (cookieJar) {
-                const cookieString = cookieJar.getCookieStringSync(url);
-                if (cookieString) reqHeaders['Cookie'] = cookieString;
-              }
-              const segRes = await axios.get(url, {
-                headers: Object.keys(reqHeaders).length > 0 ? reqHeaders : undefined,
-                responseType: 'arraybuffer',
-                signal: controller.signal,
-                timeout: 45000,
-                proxy: false
-              });
-              const segData = Buffer.from(segRes.data);
-              clearTimeout(timeoutId);
-              
-              fs.writeFileSync(segmentPath, segData);
-              completed++;
-              if (progressCallback) {
-                progressCallback(completed, segmentUrls.length);
-              }
-              break;
-            } catch (e) {
-              attempts--;
-              if (attempts === 0) {
-                reject(new Error(`Segment ${index} indirme hatası: ${e.message}`));
-                return;
-              }
-              const isRateLimit = e.response && e.response.status === 429;
-              const waitTime = isRateLimit ? 2000 : 100;
-              await new Promise(r => setTimeout(r, waitTime));
-            }
-          }
-
-          activeDownloads--;
-          pump();
-        };
-
-        const pump = () => {
-          if (signal && signal.aborted) return;
-          if (completed === segmentUrls.length) {
-            if (activeDownloads === 0) {
-              resolve();
-            }
-            return;
-          }
-          if (pendingSegmentIndexes.length === 0 && activeDownloads === 0) {
-            resolve();
-            return;
-          }
-          while (activeDownloads < concurrency && pendingSegmentIndexes.length > 0) {
-            const index = pendingSegmentIndexes.shift();
-            activeDownloads++;
-            downloadSegment(index);
-          }
-        };
-
-        if (signal) {
-          signal.addEventListener('abort', () => {
-            reject(new Error("İndirme iptal edildi."));
-          });
-        }
-
-        pump();
-      });
-    }
-
-    // Stitch using low-level fd copy (prevents stream buffer race conditions)
-    const fileFd = fs.openSync(outputFilePath, 'w');
-    try {
-      const buffer = Buffer.alloc(64 * 1024);
-      for (let i = 0; i < segmentUrls.length; i++) {
-        const segmentPath = path.join(cacheDir, `segment_${i}.ts`);
-        if (fs.existsSync(segmentPath)) {
-          const segmentFd = fs.openSync(segmentPath, 'r');
-          let bytesRead;
-          do {
-            bytesRead = fs.readSync(segmentFd, buffer, 0, buffer.length, null);
-            if (bytesRead > 0) {
-              fs.writeSync(fileFd, buffer, 0, bytesRead);
-            }
-          } while (bytesRead > 0);
-          fs.closeSync(segmentFd);
-        }
-      }
-    } finally {
-      fs.closeSync(fileFd);
-    }
-  } finally {
-    // Clean cache
-    try {
-      if (fs.existsSync(cacheDir)) {
-        fs.rmSync(cacheDir, { recursive: true, force: true });
-      }
-    } catch (e) {
-      console.error(`[CACHE CLEANUP] Failed to remove ${cacheDir}:`, e.message);
-    }
-  }
+  });
 }
 
 // Download a direct MP4/video file using streaming (no HLS parsing)
