@@ -3,8 +3,17 @@ import path from 'path';
 import axios from 'axios';
 import crypto from 'crypto';
 import { File } from 'megajs';
-import { exec } from 'child_process';
-import ffmpegPath from 'ffmpeg-static';
+import { exec, execSync } from 'child_process';
+import ffmpegStaticPath from 'ffmpeg-static';
+
+let ffmpegPath = ffmpegStaticPath;
+try {
+  execSync('ffmpeg -version', { stdio: 'ignore' });
+  ffmpegPath = 'ffmpeg';
+} catch (e) {
+  ffmpegPath = ffmpegStaticPath;
+}
+
 import { gotScraping as originalGotScraping } from 'got-scraping';
 import { CookieJar, Cookie } from 'tough-cookie';
 import { getProxyUrl } from './config.js';
@@ -116,9 +125,11 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
     console.log(`[HLS Downloader] Downloading using FFmpeg spawn...`);
     
     const env = { ...process.env };
-    const ffmpegDir = path.dirname(ffmpegPath);
-    const separator = process.platform === 'win32' ? ';' : ':';
-    env.PATH = `${ffmpegDir}${separator}${env.PATH || ''}`;
+    if (ffmpegPath !== 'ffmpeg') {
+      const ffmpegDir = path.dirname(ffmpegPath);
+      const separator = process.platform === 'win32' ? ';' : ':';
+      env.PATH = `${ffmpegDir}${separator}${env.PATH || ''}`;
+    }
     
     let settled = false;
     const done = (fn) => { if (!settled) { settled = true; fn(); } };
