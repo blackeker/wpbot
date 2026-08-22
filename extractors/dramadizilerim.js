@@ -75,6 +75,17 @@ export async function extractDramadizilerim(pageUrl) {
     await browser.close();
 
     if (capturedVideoUrl) {
+      if (capturedVideoUrl.includes('?url=')) {
+        try {
+          const parsed = new URL(capturedVideoUrl);
+          const innerUrl = parsed.searchParams.get('url');
+          if (innerUrl) {
+            capturedVideoUrl = decodeURIComponent(innerUrl);
+            console.log(`[Dramadizilerim Extractor] Unwrapped direct M3U8 URL: ${capturedVideoUrl}`);
+          }
+        } catch (e) {}
+      }
+
       return {
         title: showTitle,
         url: capturedVideoUrl,

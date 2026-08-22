@@ -449,6 +449,17 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
     throw new Error("İndirme iptal edildi.");
   }
 
+  if (m3u8Url && m3u8Url.includes('?url=http')) {
+    try {
+      const parsed = new URL(m3u8Url);
+      const innerUrl = parsed.searchParams.get('url');
+      if (innerUrl && (innerUrl.includes('.m3u8') || innerUrl.includes('.mp4') || innerUrl.includes('/vt/'))) {
+        m3u8Url = decodeURIComponent(innerUrl);
+        console.log(`[Downloader] Unwrapped embedded stream URL: ${m3u8Url}`);
+      }
+    } catch (e) {}
+  }
+
   try {
     // Referer'ı belirle: override > URL domain tespiti > varsayılan
     let referer = 'https://www.hdfilmcehennemi.nl/';
