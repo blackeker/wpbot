@@ -1,6 +1,6 @@
 {
   "name": "hdwpindirici",
-  "version": "1.0.0",
+  "version": "3.0.17",
   "description": "WhatsApp Film/Dizi Indirme Botu",
   "main": "bot.js",
   "type": "module",
