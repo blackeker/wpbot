@@ -1061,6 +1061,10 @@
               <label class="form-label">Proxy Sunucu URL (got-scraping / yt-dlp için)</label>
               <input type="text" id="settings-proxy-url" class="glass-input" placeholder="http://user:pass@ip:port">
             </div>
+            <div class="form-group">
+              <label class="form-label">Proxy Rotasyon Havuzu (Virgülle ayrılmış liste)</label>
+              <input type="text" id="settings-proxy-list" class="glass-input" placeholder="http://pr1:80,http://pr2:80">
+            </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
               <div class="form-group">
                 <label class="form-label">Disk Önbellek Yaşı (Saat)</label>
@@ -1477,7 +1481,10 @@
             <div class="task-card-title">${q.title}</div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
               <span style="font-size:0.75rem; color:var(--text-muted);">Sıra: ${idx + 1}</span>
-              <button class="btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="cancelQueueTask('${q.id}')">İptal Et</button>
+              <div>
+                <button class="btn-success" style="padding:4px 8px; font-size:0.75rem; margin-right:4px; background:var(--accent-emerald); border:none; border-radius:4px; color:#fff; cursor:pointer;" onclick="prioritizeQueueTask('${q.id}')">Öne Al ⬆️</button>
+                <button class="btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="cancelQueueTask('${q.id}')">İptal Et</button>
+              </div>
             </div>
           </div>
         `).join('');
@@ -1523,6 +1530,7 @@
                   </span>
                 </td>
                 <td style="padding:12px; text-align:right;">
+                  <button class="btn-success" style="padding:4px 8px; font-size:0.75rem; margin-right:4px; background:var(--accent-emerald); border:none; border-radius:4px; color:#fff; cursor:pointer;" onclick="prioritizeQueueTask('${q.id}')">Öne Al ⬆️</button>
                   <button class="btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="cancelQueueTask('${q.id}')">İptal Et</button>
                 </td>
               </tr>
@@ -1547,6 +1555,19 @@
           body: JSON.stringify({ id: taskId })
         });
         showToast('İptal İstendi', 'İptal talebi gönderildi.', 'info');
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    async function prioritizeQueueTask(taskId) {
+      try {
+        const res = await fetch(`/api/indir/prioritize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId })
+        });
+        showToast('Öne Alındı', 'Görev öncelikli sıraya taşındı.', 'success');
       } catch (e) {
         showToast('Hata', e.message, 'error');
       }
@@ -2001,6 +2022,7 @@
           document.getElementById('settings-vds-ip').value = s.vdsIp || '';
           document.getElementById('settings-ping-url').value = s.pingUrl || '';
           document.getElementById('settings-proxy-url').value = s.proxyUrl || '';
+          document.getElementById('settings-proxy-list').value = s.proxyList || '';
           document.getElementById('settings-retention').value = s.downloadRetentionHours || 4;
           document.getElementById('settings-cache-limit').value = s.maxDownloadsCacheGB || 15;
           document.getElementById('settings-concurrency').value = s.concurrencyLimit || 1;
@@ -2063,6 +2085,7 @@
         vdsIp: document.getElementById('settings-vds-ip').value.trim(),
         pingUrl: document.getElementById('settings-ping-url').value.trim(),
         proxyUrl: document.getElementById('settings-proxy-url').value.trim(),
+        proxyList: document.getElementById('settings-proxy-list').value.trim(),
         downloadRetentionHours: parseFloat(document.getElementById('settings-retention').value),
         maxDownloadsCacheGB: parseFloat(document.getElementById('settings-cache-limit').value),
         concurrencyLimit: parseInt(document.getElementById('settings-concurrency').value, 10),

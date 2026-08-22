@@ -37,6 +37,7 @@ import {
   activeTask, 
   addDownloadTask, 
   cancelDownloadTask,
+  prioritizeDownloadTask,
   clearQueue,
   pauseQueue,
   resumeQueue,
@@ -337,6 +338,18 @@ app.post('/api/indir/cancel', (req, res) => {
   const result = cancelDownloadTask(id);
   if (result) {
     res.json({ success: true, message: 'Görev iptal edildi.' });
+  } else {
+    res.status(404).json({ error: 'Görev bulunamadı.' });
+  }
+});
+
+// Queue: Prioritize Task
+app.post('/api/indir/prioritize', (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'id gereklidir.' });
+  const result = prioritizeDownloadTask(id);
+  if (result) {
+    res.json({ success: true, message: 'Görev önceliklendirildi.' });
   } else {
     res.status(404).json({ error: 'Görev bulunamadı.' });
   }

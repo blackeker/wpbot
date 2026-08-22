@@ -191,6 +191,20 @@ export function cancelDownloadTask(taskIdOrIndex) {
   return task;
 }
 
+export function prioritizeDownloadTask(taskId) {
+  const index = downloadQueue.findIndex(t => t.id === taskId);
+  if (index === -1) return false;
+
+  const task = downloadQueue[index];
+  task.priority = true;
+  downloadQueue.splice(index, 1);
+  downloadQueue.unshift(task);
+
+  saveQueueToFile();
+  notifyQueueUpdate();
+  return true;
+}
+
 export function clearQueue() {
   const count = downloadQueue.length;
   downloadQueue.length = 0;

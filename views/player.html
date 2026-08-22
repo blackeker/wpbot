@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{FILENAME}} - Premium Video Player</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/Plyr.css" />
   <style>
     :root {
       --bg-color: #080710;
@@ -85,12 +86,22 @@
 <body>
   <div class="player-container">
     <h2>🍿 {{FILENAME}}</h2>
-    <video controls autoplay>
+    <video id="player" playsinline controls autoplay>
       <source src="/downloads/{{ENCODED_FILENAME}}" type="video/mp4">
       Tarayıcınız video oynatmayı desteklemiyor.
     </video>
     <br>
     <a href="/watch" class="back-btn">← Tüm Videolar Listesi</a>
   </div>
+  <script src="https://cdn.plyr.io/3.7.8/Plyr.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const player = new Plyr('#player', {
+        controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'],
+        settings: ['quality', 'speed', 'loop']
+      });
+      window.player = player;
+    });
+  </script>
 </body>
 </html>

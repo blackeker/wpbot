@@ -1,9 +1,12 @@
 import { gotScraping as originalGotScraping } from 'got-scraping';
+import { getProxyUrl } from './config.js';
+
 export const gotScraping = new Proxy(originalGotScraping, {
   apply(target, thisArg, argumentsList) {
     const options = argumentsList[0] || {};
-    if (typeof options === 'object' && process.env.PROXY_URL) {
-      options.proxyUrl = process.env.PROXY_URL;
+    const activeProxy = getProxyUrl();
+    if (typeof options === 'object' && activeProxy) {
+      options.proxyUrl = activeProxy;
     }
     return Reflect.apply(target, thisArg, argumentsList);
   },
@@ -17,8 +20,9 @@ export const gotScraping = new Proxy(originalGotScraping, {
           opt = options || {};
           opt.url = url;
         }
-        if (process.env.PROXY_URL) {
-          opt.proxyUrl = process.env.PROXY_URL;
+        const activeProxy = getProxyUrl();
+        if (activeProxy) {
+          opt.proxyUrl = activeProxy;
         }
         return originalGotScraping[prop](opt);
       };
@@ -37,6 +41,9 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import dns from 'dns';
 puppeteer.use(StealthPlugin());
 const originalLookup = dns.lookup;
+const dnsResolver = new dns.Resolver();
+dnsResolver.setServers(['8.8.8.8', '1.1.1.1']);
+
 dns.lookup = function (hostname, options, callback) {
   if (typeof options === 'function') {
     callback = options;
@@ -44,12 +51,10 @@ dns.lookup = function (hostname, options, callback) {
   }
   originalLookup(hostname, options, (err, address, family) => {
     if (err && (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN' || err.code === 'EREFUSED')) {
-      const resolver = new dns.Resolver();
-      resolver.setServers(['8.8.8.8', '1.1.1.1']);
       const isAll = options && options.all;
-      resolver.resolve4(hostname, (err4, addresses) => {
+      dnsResolver.resolve4(hostname, (err4, addresses) => {
         if (err4 || !addresses || addresses.length === 0) {
-          resolver.resolve6(hostname, (err6, addresses6) => {
+          dnsResolver.resolve6(hostname, (err6, addresses6) => {
             if (err6 || !addresses6 || addresses6.length === 0) {
               return callback(err);
             }

@@ -6,8 +6,9 @@ import ffmpegPath from 'ffmpeg-static';
 import { extractVideoUrl } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
 import { notifyQueueUpdate } from './queue.js';
-import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig } from './config.js';
+import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig, getProxyUrl } from './config.js';
 import WebTorrent from 'webtorrent';
+import { getCachedResult, saveToCache } from './cache.js';
 
 // ─── Retry Yardımcısı ───
 async function withRetry(fn, retries = 3, delayMs = 3000) {
@@ -101,8 +102,9 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
   
   const execAsync = (cmd) => new Promise((resolve, reject) => {
     let modifiedCmd = cmd;
-    if (process.env.PROXY_URL && (cmd.includes('yt-dlp') || cmd.includes('yt-dlp.exe'))) {
-      modifiedCmd = cmd.replace(/"?yt-dlp"?|"?\.\\yt-dlp\.exe"?/, (m) => `${m} --proxy "${process.env.PROXY_URL}"`);
+    const activeProxy = getProxyUrl();
+    if (activeProxy && (cmd.includes('yt-dlp') || cmd.includes('yt-dlp.exe'))) {
+      modifiedCmd = cmd.replace(/"?yt-dlp"?|"?\.\\yt-dlp\.exe"?/, (m) => `${m} --proxy "${activeProxy}"`);
     }
     exec(modifiedCmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) reject(new Error(stderr || err.message));
@@ -182,16 +184,19 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           '-o', mp4Path
         );
       }
-      if (process.env.PROXY_URL) {
-        args.push('--proxy', process.env.PROXY_URL);
+      const activeProxy = getProxyUrl();
+      if (activeProxy) {
+        args.push('--proxy', activeProxy);
       }
       args.push(targetUrl);
       const proc = spawn(ytDlpCmd, args);
       
+      const onAbort = () => {
+        try { proc.kill(); } catch {}
+      };
+
       if (signal) {
-        signal.addEventListener('abort', () => {
-          try { proc.kill(); } catch {}
-        });
+        signal.addEventListener('abort', onAbort);
       }
 
       let lastProgressTime = 0;
@@ -219,6 +224,9 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
       });
 
       proc.on('close', (code) => {
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
         if (code === 0) resolve();
         else reject(new Error(`yt-dlp başarısız oldu (kod: ${code}). Hata: ${errorMsg}`));
       });
@@ -345,13 +353,15 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
       return reject(new Error(`WebTorrent istemcisi başlatılamadı: ${e.message}`));
     }
 
+    let onAbort;
     if (signal) {
-      signal.addEventListener('abort', () => {
+      onAbort = () => {
         try {
           client.destroy();
         } catch {}
         reject(new Error("İndirme iptal edildi."));
-      }, { once: true });
+      };
+      signal.addEventListener('abort', onAbort);
     }
 
     client.add(torrentId, { path: downloadsDir }, (torrent) => {
@@ -399,6 +409,9 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
       });
 
       torrent.on('done', async () => {
+        if (signal && onAbort) {
+          signal.removeEventListener('abort', onAbort);
+        }
         console.log(`[Torrent] İndirme tamamlandı: ${torrent.name}`);
         const files = torrent.files;
         if (files.length === 0) {
@@ -493,6 +506,9 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
       });
 
       torrent.on('error', (err) => {
+        if (signal && onAbort) {
+          signal.removeEventListener('abort', onAbort);
+        }
         try { client.destroy(); } catch {}
         reject(err);
       });
@@ -522,13 +538,18 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     return await executeYouTubePipeline(targetUrl, recipientJid, progressUpdateCallback, signal, isPlaylist, taskFormat, taskObject);
   }
 
-  // ── Extraction (retry destekli) ──
-  let result;
-  try {
-    result = await withRetry(() => extractVideoUrl(targetUrl, recipientJid));
-  } catch (err) {
-    addErrorLog({ title: targetUrl, url: targetUrl, error: err.message });
-    throw err;
+  // ── Extraction (retry destekli VEYA önbellek) ──
+  let result = getCachedResult(targetUrl);
+  if (result) {
+    console.log(`[Cache Hit] Serving extracted result from cache for: ${targetUrl}`);
+  } else {
+    try {
+      result = await withRetry(() => extractVideoUrl(targetUrl, recipientJid));
+      saveToCache(targetUrl, result);
+    } catch (err) {
+      addErrorLog({ title: targetUrl, url: targetUrl, error: err.message });
+      throw err;
+    }
   }
   console.log('Extraction success:', result);
   if (taskObject && taskObject.url === targetUrl) {

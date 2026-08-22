@@ -1,3 +1,5 @@
+import fs from 'fs';
+import { getProxyUrl } from "../config.js";
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
 export async function extractPornhub(pageUrl) {
   try {
@@ -59,7 +61,8 @@ export async function extractPornhub(pageUrl) {
       console.log('[Pornhub Extractor] Flashvars not found or failed, trying yt-dlp fallback...');
       const ytDlpCmd = fs.existsSync('./yt-dlp.exe') ? '.\\yt-dlp.exe' : 'yt-dlp';
       const dump = await new Promise((resolve, reject) => {
-        const proxyArg = process.env.PROXY_URL ? ` --proxy "${process.env.PROXY_URL}"` : '';
+        const activeProxy = getProxyUrl();
+        const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
         exec(`"${ytDlpCmd}" --dump-json --no-playlist${proxyArg} --add-header "Cookie:hasVisited=1; accessAgeDisclaimerPH=1; platform=pc; bs=1; cookiesBannerSeen=1" "${pageUrl}"`, (err, stdout, stderr) => {
           if (err) reject(new Error(stderr || err.message));else resolve(stdout.trim());
         });

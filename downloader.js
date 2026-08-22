@@ -7,6 +7,7 @@ import { exec } from 'child_process';
 import ffmpegPath from 'ffmpeg-static';
 import { gotScraping as originalGotScraping } from 'got-scraping';
 import { CookieJar, Cookie } from 'tough-cookie';
+import { getProxyUrl } from './config.js';
 
 function shouldUseProxy(url) {
   if (!url) return false;
@@ -21,8 +22,9 @@ const gotScraping = new Proxy(originalGotScraping, {
   apply(target, thisArg, argumentsList) {
     const options = argumentsList[0] || {};
     const url = options.url || '';
-    if (typeof options === 'object' && process.env.PROXY_URL && shouldUseProxy(url)) {
-      options.proxyUrl = process.env.PROXY_URL;
+    const activeProxy = getProxyUrl();
+    if (typeof options === 'object' && activeProxy && shouldUseProxy(url)) {
+      options.proxyUrl = activeProxy;
     }
     return Reflect.apply(target, thisArg, argumentsList);
   },
@@ -36,8 +38,9 @@ const gotScraping = new Proxy(originalGotScraping, {
           opt = options || {};
           opt.url = url;
         }
-        if (process.env.PROXY_URL && shouldUseProxy(opt.url)) {
-          opt.proxyUrl = process.env.PROXY_URL;
+        const activeProxy = getProxyUrl();
+        if (activeProxy && shouldUseProxy(opt.url)) {
+          opt.proxyUrl = activeProxy;
         }
         return originalGotScraping[prop](opt);
       };
@@ -320,45 +323,73 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
         downloadedMap.set(i, 0);
 
         const promise = (async () => {
-          const res = await axios.get(url, {
-            headers: {
-              ...headers,
-              'Range': `bytes=${start}-${end}`
-            },
-            responseType: 'stream',
-            signal: signal || undefined,
-            timeout: 20000
-          });
+          let lastErr;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              if (signal && signal.aborted) {
+                throw new Error("İndirme iptal edildi.");
+              }
 
-          const writer = fs.createWriteStream(partPath);
-          res.data.pipe(writer);
-
-          res.data.on('data', (chunk) => {
-            const currentVal = downloadedMap.get(i) || 0;
-            downloadedMap.set(i, currentVal + chunk.length);
-
-            // Compute total progress
-            let totalDownloaded = 0;
-            for (let val of downloadedMap.values()) {
-              totalDownloaded += val;
-            }
-
-            if (progressCallback) {
-              progressCallback(totalDownloaded, totalBytes);
-            }
-          });
-
-          return new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-            res.data.on('error', reject);
-            if (signal) {
-              signal.addEventListener('abort', () => {
-                writer.destroy();
-                reject(new Error("İndirme iptal edildi."));
+              const res = await axios.get(url, {
+                headers: {
+                  ...headers,
+                  'Range': `bytes=${start}-${end}`
+                },
+                responseType: 'stream',
+                signal: signal || undefined,
+                timeout: 25000
               });
+
+              const writer = fs.createWriteStream(partPath);
+              res.data.pipe(writer);
+
+              res.data.on('data', (chunk) => {
+                const currentVal = downloadedMap.get(i) || 0;
+                downloadedMap.set(i, currentVal + chunk.length);
+
+                let totalDownloaded = 0;
+                for (let val of downloadedMap.values()) {
+                  totalDownloaded += val;
+                }
+
+                if (progressCallback) {
+                  progressCallback(totalDownloaded, totalBytes);
+                }
+              });
+
+              await new Promise((resolve, reject) => {
+                const onAbort = () => {
+                  writer.destroy();
+                  reject(new Error("İndirme iptal edildi."));
+                };
+
+                writer.on('finish', () => {
+                  if (signal) signal.removeEventListener('abort', onAbort);
+                  resolve();
+                });
+
+                const onError = (e) => {
+                  if (signal) signal.removeEventListener('abort', onAbort);
+                  reject(e);
+                };
+
+                writer.on('error', onError);
+                res.data.on('error', onError);
+
+                if (signal) {
+                  signal.addEventListener('abort', onAbort);
+                }
+              });
+
+              return; // success
+            } catch (err) {
+              lastErr = err;
+              if (err.message === 'İndirme iptal edildi.') throw err;
+              console.warn(`[Segmented Downloader] Chunk #${i} download failed (Attempt ${attempt}/3): ${err.message}`);
+              await new Promise(r => setTimeout(r, 2000));
             }
-          });
+          }
+          throw lastErr;
         })();
 
         promises.push(promise);

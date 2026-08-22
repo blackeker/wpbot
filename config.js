@@ -51,6 +51,10 @@ export function cleanLeftoverCacheFiles() {
         }
       }
     }
+    try {
+      const { clearExpiredCache } = await import('./cache.js');
+      clearExpiredCache();
+    } catch (e) {}
   } catch (e) {
     console.error('[CLEANUP] Önbellek temizleme hatası:', e.message);
   }
@@ -67,6 +71,7 @@ const DEFAULT_CONFIG = {
   vdsIp: process.env.VDS_IP || "111.235.150.157",
   pingUrl: process.env.PING_URL || "",
   proxyUrl: process.env.PROXY_URL || "",
+  proxyList: "",
   downloadRetentionHours: parseFloat(process.env.DOWNLOAD_MAX_AGE_HOURS || "4"),
   maxDownloadsCacheGB: parseFloat(process.env.MAX_DOWNLOADS_CACHE_GB || "15"),
   concurrencyLimit: parseInt(process.env.CONCURRENCY_LIMIT || "1", 10),
@@ -118,6 +123,21 @@ export function writeConfig(data) {
   
   if (updated.downloadRetentionHours) process.env.DOWNLOAD_MAX_AGE_HOURS = String(updated.downloadRetentionHours);
   if (updated.maxDownloadsCacheGB) process.env.MAX_DOWNLOADS_CACHE_GB = String(updated.maxDownloadsCacheGB);
+}
+
+let proxyPoolIndex = 0;
+
+export function getProxyUrl() {
+  const config = readConfig();
+  if (config.proxyList && config.proxyList.trim() !== "") {
+    const list = config.proxyList.split(',').map(p => p.trim()).filter(Boolean);
+    if (list.length > 0) {
+      const proxy = list[proxyPoolIndex % list.length];
+      proxyPoolIndex++;
+      return proxy;
+    }
+  }
+  return config.proxyUrl || process.env.PROXY_URL || "";
 }
 
 // ─── Real-time Log Forwarder Hook System ───
