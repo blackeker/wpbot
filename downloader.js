@@ -68,10 +68,15 @@ function resolveUrl(baseUrl, relativeUrl) {
 
 async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePrefix, signal, headers, progressCallback, cookieJar = null) {
   // Format headers for FFmpeg
-  let headerStr = '';
-  if (headers) {
-    for (const [key, value] of Object.entries(headers)) {
-      headerStr += `${key}: ${value}\r\n`;
+  const mergedHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    ...(headers || {})
+  };
+
+  let headerLines = [];
+  for (const [key, value] of Object.entries(mergedHeaders)) {
+    if (value) {
+      headerLines.push(`${key}: ${value}`);
     }
   }
   
@@ -79,16 +84,24 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
     try {
       const cookies = cookieJar.getCookieStringSync(playlistUrl);
       if (cookies) {
-        headerStr += `Cookie: ${cookies}\r\n`;
+        headerLines.push(`Cookie: ${cookies}`);
       }
     } catch (e) {}
   }
+
+  const headerStr = headerLines.length > 0 ? headerLines.join('\r\n') + '\r\n' : '';
   
   const { spawn } = await import('child_process');
   
   return new Promise((resolve, reject) => {
     const activeProxy = getProxyUrl();
-    const args = ['-y'];
+    const args = [
+      '-y',
+      '-loglevel', 'error',
+      '-reconnect', '1',
+      '-reconnect_streamed', '1',
+      '-reconnect_delay_max', '5'
+    ];
     
     if (activeProxy) {
       args.push('-http_proxy', activeProxy);
@@ -107,40 +120,38 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
     const separator = process.platform === 'win32' ? ';' : ':';
     env.PATH = `${ffmpegDir}${separator}${env.PATH || ''}`;
     
+    let settled = false;
+    const done = (fn) => { if (!settled) { settled = true; fn(); } };
+
     const proc = spawn(ffmpegPath, args, { env });
     
     let stderr = '';
     proc.stderr.on('data', (chunk) => {
       stderr += chunk.toString();
     });
+
+    proc.on('error', (err) => {
+      console.error('[HLS Downloader] FFmpeg spawn error:', err.message);
+      done(() => reject(new Error(`FFmpeg başlatılamadı: ${err.message}`)));
+    });
     
     proc.on('close', (code) => {
       if (code === 0) {
         console.log('[HLS Downloader] HLS stream successfully downloaded and merged by FFmpeg!');
-        resolve();
+        done(() => resolve());
       } else {
-        console.error('[HLS Downloader] FFmpeg error:', stderr);
-        reject(new Error(`HLS indirme hatası (Kod ${code}): ${stderr}`));
+        const cleanStderr = stderr.trim();
+        console.error(`[HLS Downloader] FFmpeg error (code ${code}):`, cleanStderr || 'No stderr details');
+        done(() => reject(new Error(`FFmpeg indirme hatası (Kod ${code}): ${cleanStderr || 'Bilinmeyen hata'}`)));
       }
     });
     
     if (signal) {
       const onAbort = () => {
         try { proc.kill(); } catch {}
-        reject(new Error("İndirme iptal edildi."));
+        done(() => reject(new Error("İndirme iptal edildi.")));
       };
-      signal.addEventListener('abort', onAbort);
-      
-      const originalResolve = resolve;
-      const originalReject = reject;
-      resolve = (val) => {
-        signal.removeEventListener('abort', onAbort);
-        originalResolve(val);
-      };
-      reject = (err) => {
-        signal.removeEventListener('abort', onAbort);
-        originalReject(err);
-      };
+      signal.addEventListener('abort', onAbort, { once: true });
     }
   });
 }

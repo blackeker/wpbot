@@ -304,7 +304,7 @@ export async function processQueue() {
       );
 
     } catch (error) {
-      console.error('Error running queued task:', error);
+      console.error('Error running queued task:', error?.message || error?.stack || error);
       const isNoSource = error.message && (
         error.message.includes('video kaynağı bulunamadı') ||
         error.message.includes('Çözümlenebilir video') ||
