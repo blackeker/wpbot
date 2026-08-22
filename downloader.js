@@ -223,22 +223,27 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
       });
     }
 
-    // Stitch — async stream pipeline (event loop'u bloke etmez)
-    const fileStream = fs.createWriteStream(outputFilePath);
-    await new Promise(async (resolve, reject) => {
-      fileStream.on('error', reject);
+    // Stitch using low-level fd copy (prevents stream buffer race conditions)
+    const fileFd = fs.openSync(outputFilePath, 'w');
+    try {
+      const buffer = Buffer.alloc(64 * 1024);
       for (let i = 0; i < segmentUrls.length; i++) {
         const segmentPath = path.join(cacheDir, `segment_${i}.ts`);
-        await new Promise((res, rej) => {
-          const readStream = fs.createReadStream(segmentPath);
-          readStream.on('error', rej);
-          readStream.on('end', res);
-          readStream.pipe(fileStream, { end: false });
-        });
+        if (fs.existsSync(segmentPath)) {
+          const segmentFd = fs.openSync(segmentPath, 'r');
+          let bytesRead;
+          do {
+            bytesRead = fs.readSync(segmentFd, buffer, 0, buffer.length, null);
+            if (bytesRead > 0) {
+              fs.writeSync(fileFd, buffer, 0, bytesRead);
+            }
+          } while (bytesRead > 0);
+          fs.closeSync(segmentFd);
+        }
       }
-      fileStream.end();
-      fileStream.on('finish', resolve);
-    });
+    } finally {
+      fs.closeSync(fileFd);
+    }
   } finally {
     // Clean cache
     try {
@@ -399,29 +404,27 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
 
       // Merge segments sequentially
       console.log('[Segmented Downloader] Merging part files...');
-      const finalWriter = fs.createWriteStream(outputPath);
-      await new Promise(async (resolve, reject) => {
-        finalWriter.on('error', reject);
-        try {
-          for (const partPath of partFiles) {
-            if (fs.existsSync(partPath)) {
-              await new Promise((res, rej) => {
-                const readStream = fs.createReadStream(partPath);
-                readStream.on('error', rej);
-                readStream.on('end', () => {
-                  try { fs.unlinkSync(partPath); } catch (e) {}
-                  res();
-                });
-                readStream.pipe(finalWriter, { end: false });
-              });
-            }
+      // Merge segments sequentially using low-level fd copy (prevents stream buffer race conditions)
+      const finalFd = fs.openSync(outputPath, 'w');
+      try {
+        const buffer = Buffer.alloc(64 * 1024);
+        for (const partPath of partFiles) {
+          if (fs.existsSync(partPath)) {
+            const partFd = fs.openSync(partPath, 'r');
+            let bytesRead;
+            do {
+              bytesRead = fs.readSync(partFd, buffer, 0, buffer.length, null);
+              if (bytesRead > 0) {
+                fs.writeSync(finalFd, buffer, 0, bytesRead);
+              }
+            } while (bytesRead > 0);
+            fs.closeSync(partFd);
+            try { fs.unlinkSync(partPath); } catch (e) {}
           }
-          finalWriter.end();
-          finalWriter.on('finish', resolve);
-        } catch (e) {
-          reject(e);
         }
-      });
+      } finally {
+        fs.closeSync(finalFd);
+      }
       console.log('[Segmented Downloader] Download and merge completed successfully!');
       return;
 
