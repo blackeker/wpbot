@@ -7,14 +7,18 @@ echo "=========================================================="
 echo "      WhatsApp Film/Dizi Indirme Botu Baslatiliyor"
 echo "=========================================================="
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." >/dev/null 2>&1 && pwd )"
+cd "$DIR"
+
 # 1. yt-dlp Kontrolü
-if [ ! -f "./yt-dlp" ]; then
-    echo "[!] 'yt-dlp' bulunamadi. Indiriliyor..."
-    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp
-    chmod +x yt-dlp
-    echo "[+] 'yt-dlp' basariyla indirildi."
+mkdir -p bin
+if [ ! -f "./bin/yt-dlp" ]; then
+    echo "[!] 'bin/yt-dlp' bulunamadi. Indiriliyor..."
+    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o bin/yt-dlp
+    chmod +x bin/yt-dlp
+    echo "[+] 'bin/yt-dlp' basariyla indirildi."
 else
-    chmod +x yt-dlp 2>/dev/null
+    chmod +x bin/yt-dlp 2>/dev/null
 fi
 
 # 2. node_modules Kontrolü

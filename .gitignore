@@ -5,6 +5,8 @@ session_backup/
 downloads/
 logs/
 .env
+bin/yt-dlp.exe
+bin/yt-dlp
 yt-dlp.exe
 yt-dlp
 *.zip

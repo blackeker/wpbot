@@ -301,9 +301,11 @@ export function formatBytes(bytes, decimals = 2) {
 
 export function getYtDlpCommand() {
   if (process.platform === 'win32') {
+    if (fs.existsSync('./bin/yt-dlp.exe')) return path.resolve('./bin/yt-dlp.exe');
     if (fs.existsSync('./yt-dlp.exe')) return path.resolve('./yt-dlp.exe');
     return 'yt-dlp';
   } else {
+    if (fs.existsSync('./bin/yt-dlp')) return path.resolve('./bin/yt-dlp');
     if (fs.existsSync('./yt-dlp')) return path.resolve('./yt-dlp');
     return 'yt-dlp';
   }

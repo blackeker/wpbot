@@ -1,6 +1,7 @@
 @echo off
 title HDWP Bot - Yerel Push ve VDS Guncelleme
 color 0A
+cd /d "%~dp0.."
 
 echo ==============================================
 echo       HDWP BOT YEREL YUKLEME VE VDS TETIKLEME

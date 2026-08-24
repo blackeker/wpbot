@@ -1,6 +1,7 @@
 @echo off
 title HDWP WhatsApp Bot - Windows VDS
 color 0B
+cd /d "%~dp0.."
 
 echo ====================================================
 echo         HDWP WHATSAPP BOT - BASLATICI

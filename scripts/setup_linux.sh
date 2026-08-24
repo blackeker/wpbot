@@ -34,16 +34,20 @@ if ! command -v pm2 &> /dev/null; then
     sudo npm install -g pm2
 fi
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." >/dev/null 2>&1 && pwd )"
+cd "$DIR"
+
 # 4. yt-dlp Linux Binary Kurulumu
 echo "[4/5] yt-dlp kontrol ediliyor..."
-if [ ! -f "./yt-dlp" ]; then
+mkdir -p bin
+if [ ! -f "./bin/yt-dlp" ]; then
     echo "[+] yt-dlp Linux surumu indiriliyor..."
-    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp
-    chmod +x yt-dlp
+    curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o bin/yt-dlp
+    chmod +x bin/yt-dlp
     echo "[+] yt-dlp basariyla indirildi ve calistirma yetkisi verildi."
 else
-    chmod +x yt-dlp
-    echo "[+] Yerel yt-dlp mevcut."
+    chmod +x bin/yt-dlp
+    echo "[+] Yerel bin/yt-dlp mevcut."
 fi
 
 # 5. NPM Paketlerini Kur

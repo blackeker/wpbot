@@ -236,53 +236,32 @@ wpbot/
 │   ├── pingurl.js             # Canlılık ping adresi ayarlama
 │   ├── tekrargonder.js        # Başarısız medyayı tekrar gönderme
 │   └── temizle.js             # Kuyruk temizleme
+├── bin/                       # Çalıştırılabilir ikili dosyalar (yt-dlp, yt-dlp.exe)
 ├── config.js                  # Konfigürasyon yönetimi ve yardımcı fonksiyonlar
 ├── discordApi.js              # Discord Bot Captcha entegrasyon arayüzü
+├── docs/                      # Proje dokümantasyon dosyaları (API.md, PROMPT.md)
 ├── downloader.js              # Medya indirme sürücüsü ve akış kontrolü
 ├── downloads/                 # İndirilen dosyaların tutulduğu geçici dizin
-├── dpi.bat                    # DPI bypass yardımcı scripti
 ├── ecosystem.config.cjs       # PM2 üretim ortamı yapılandırması
 ├── events/                    # WhatsApp olay dinleyicileri
 │   ├── connection.js          # Bağlantı ve kopma olayları
 │   └── messages.js            # Mesaj alma ve komut yönlendirme
 ├── extractor.js               # Merkezi medya çıkarma motoru
 ├── extractors/                # Özel site ve servis çıkarıcıları (25 Modül)
-│   ├── animecix.js            # Animecix video/sezon extractor
-│   ├── cloudmailru.js         # Cloud Mail.ru extractor
-│   ├── dizisitesi.js          # Dizi siteleri extractor
-│   ├── doeda.js               # Doeda extractor
-│   ├── dramadizilerim.js      # Drama dizilerim extractor
-│   ├── gdrive.js              # Google Drive extractor
-│   ├── hdabla.js              # HdAbla extractor
-│   ├── hdfilmcehennemi.js     # HD Film Cehennemi extractor
-│   ├── hdkore.js              # HD Kore extractor
-│   ├── hentaizm.js            # Hentaizm extractor
-│   ├── instagram.js           # Instagram Reel/Video extractor
-│   ├── itch.js                # Itch.io extractor
-│   ├── liteapks.js            # LiteAPKs APK extractor
-│   ├── mega.js                # Mega.nz extractor
-│   ├── modyolo.js             # Modyolo APK extractor
-│   ├── ninemod.js             # Ninemod extractor
-│   ├── pornhub.js             # Pornhub extractor
-│   ├── sezonlukdizi.js        # Sezonluk Dizi extractor
-│   ├── terabox.js             # TeraBox extractor
-│   ├── tiktok.js              # TikTok No-Watermark extractor
-│   ├── turkifsahub.js         # Türk İfsa Hub extractor
-│   ├── turkifsalar.js         # Türk İfsalar extractor
-│   ├── turkporno.js           # Türk Porno extractor
-│   ├── yabancidizi.js         # Yabancı Dizi extractor
-│   └── yandex.js              # Yandex Disk extractor
 ├── goodbyedpi/                # DPI engelleri için GoodbyeDPI paketi
-├── guncelle.bat               # Otomatik Git güncelleme scripti
 ├── package.json               # Proje bağımlılıkları ve npm betikleri
 ├── pipelines.js               # Medya işleme ve indirme hattı
 ├── queue.js                   # Asenkron görev kuyruk motoru
+├── scripts/                   # Başlatıcı ve yardımcı betikler (.bat, .sh)
+│   ├── baglan.bat             # VDS SSH hızlı bağlantı betiği
+│   ├── baslat.bat             # Windows bot başlatma betiği
+│   ├── baslat.sh              # Linux bot başlatma betiği
+│   ├── dpi.bat                # GoodbyeDPI başlatıcı betiği
+│   ├── guncelle.bat           # Otomatik Git push ve VDS tetikleme betiği
+│   └── setup_linux.sh         # Linux otomatik kurulum betiği
 ├── server.js                  # Express.js REST API ve WebSocket sunucusu
-├── setup_linux.sh             # Linux otomatik kurulum betiği
 ├── tracker.js                 # Bant genişliği takip modülü
-├── views/                     # Web arayüz şablonları
-├── yt-dlp                     # Linux binary binary dosyası
-└── yt-dlp.exe                 # Windows çalıştırılabilir dosyası
+└── views/                     # Web arayüz şablonları
 ```
 
 ---

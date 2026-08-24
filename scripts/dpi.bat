@@ -6,7 +6,7 @@ if "%ERRORLEVEL%"=="0" (
     pause
     exit /b
 )
-cd /d "%~dp0goodbyedpi\goodbyedpi-0.2.3rc3-2\x86_64"
+cd /d "%~dp0..\goodbyedpi\goodbyedpi-0.2.3rc3-2\x86_64"
 echo [+] GoodbyeDPI arka planda baslatiliyor...
 start "" goodbyedpi.exe -9
 echo [+] Basariyla baslatildi!
