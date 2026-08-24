@@ -609,7 +609,10 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
 
   if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
 
-  await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndirme başlatılıyor...\n📡 Kaynak: ${result.source}\n🔗 Canlı İzle: ${watchUrl}`);
+  const actualFilePath = (result.filePath && fs.existsSync(result.filePath)) ? result.filePath : filePath;
+  const isPreCompiled = result.filePath && fs.existsSync(result.filePath);
+
+  await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndirme / İşlem başlatılıyor...\n📡 Kaynak: ${result.source}\n🔗 Canlı İzle: ${watchUrl}`);
 
   // ── İndirme (retry destekli) ──
   let lastPercent = -1;
@@ -618,10 +621,11 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   let lastSpeedMBs = 0;
 
   try {
-    await withRetry(async () => {
-      // Sıfırla: retry sırasında lastUpdateTime eski kalmasın
-      lastUpdateTime = 0;
-      await downloadM3u8(result.url, filePath, signal, async (completed, total) => {
+    if (!isPreCompiled) {
+      await withRetry(async () => {
+        // Sıfırla: retry sırasında lastUpdateTime eski kalmasın
+        lastUpdateTime = 0;
+        await downloadM3u8(result.url, actualFilePath, signal, async (completed, total) => {
         const now = Date.now();
         const isBytes = total > 1000; // 1000'den büyükse bytes bazlı (direkt indirme)
         const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
@@ -684,8 +688,9 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndiriliyor: *%${percent}*\n\`[${bar}]\`\n📊 ${statusLine}\n⚡ Hız: ~${lastSpeedMBs} MB/s\n⏳ Kalan Süre: ${etaStr}\n🔗 Canlı İzle: ${watchUrl}`);
       }, result.referer || null, result.cookies || null, result.userAgent || null, result.headers || null);
     });
+    }
   } catch (err) {
-    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+    try { if (!isPreCompiled && fs.existsSync(actualFilePath)) fs.unlinkSync(actualFilePath); } catch {}
     if (err.message !== 'İndirme iptal edildi.') {
       addErrorLog({ title: result.title, url: targetUrl, error: err.message });
     }
@@ -693,11 +698,11 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   }
 
   if (signal && signal.aborted) {
-    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+    try { if (!isPreCompiled && fs.existsSync(actualFilePath)) fs.unlinkSync(actualFilePath); } catch {}
     throw new Error("İndirme iptal edildi.");
   }
 
-  const fileSize = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+  const fileSize = fs.existsSync(actualFilePath) ? fs.statSync(actualFilePath).size : 0;
   const fileSizeStr = formatBytes(fileSize);
   const totalDuration = formatDuration(Date.now() - pipelineStart);
 

@@ -307,13 +307,58 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
   if (targetUrl.includes('terabox.com') || targetUrl.includes('teraboxapp.com') || targetUrl.includes('nephobox.com') || targetUrl.includes('terabox')) {
     return extractTerabox(targetUrl);
   }
+  if (targetUrl.includes('mediafire.com')) {
+    return extractMediafire(targetUrl);
+  }
+  if (targetUrl.includes('pixeldrain.com')) {
+    return extractPixeldrain(targetUrl);
+  }
+  if (targetUrl.includes('dropbox.com')) {
+    return extractDropbox(targetUrl);
+  }
+  if (targetUrl.includes('wetransfer.com')) {
+    return extractWeTransfer(targetUrl);
+  }
+  if (targetUrl.includes('apkmirror.com')) {
+    return extractAPKMirror(targetUrl);
+  }
+  if (targetUrl.includes('apkpure.com')) {
+    return extractAPKPure(targetUrl);
+  }
+  if (targetUrl.includes('happymod.com')) {
+    return extractHappyMod(targetUrl);
+  }
+  if (targetUrl.includes('mangadenizi.com') || targetUrl.includes('mangadenizi.net')) {
+    return extractMangaDenizi(targetUrl);
+  }
+  if (targetUrl.includes('asurascans.com') || targetUrl.includes('asuracomic.net') || targetUrl.includes('asura.gg')) {
+    return extractAsuraScans(targetUrl);
+  }
+  if (targetUrl.includes('webtoontr.com') || targetUrl.includes('webtoon.tr')) {
+    return extractWebtoonTR(targetUrl);
+  }
+  if (targetUrl.includes('mangatr.net') || targetUrl.includes('serimanga.com') || targetUrl.includes('tempestscans.com')) {
+    return extractMangaTR(targetUrl);
+  }
+  if (targetUrl.includes('merlinscans.org') || targetUrl.includes('merlintoon.com')) {
+    return extractMerlinScans(targetUrl);
+  }
+  if (targetUrl.includes('dizipal')) {
+    return extractDizipal(targetUrl);
+  }
+  if (targetUrl.includes('fullhdfilmizlesene')) {
+    return extractFullHDFilmIzlesene(targetUrl);
+  }
+  if (targetUrl.includes('filmmodu')) {
+    return extractFilmModu(targetUrl);
+  }
   if (targetUrl.includes('liteapks.com')) {
     return extractLiteapks(targetUrl);
   }
   if (targetUrl.includes('modyolo.com')) {
     return extractModyolo(targetUrl);
   }
-  if (targetUrl.includes('dizigom') || targetUrl.includes('dizibox') || targetUrl.includes('koreanturk') || targetUrl.includes('koreanizm') || targetUrl.includes('dizipal') || targetUrl.includes('filmmodu') || targetUrl.includes('fullhdfilmizlesene')) {
+  if (targetUrl.includes('dizigom') || targetUrl.includes('dizibox') || targetUrl.includes('koreanturk') || targetUrl.includes('koreanizm')) {
     let siteName = 'Film/Dizi Sitesi';
     if (targetUrl.includes('dizigom')) siteName = 'Dizigom';
     else if (targetUrl.includes('koreanturk')) siteName = 'Koreanturk';
@@ -487,3 +532,33 @@ import { extractModyolo } from "./extractors/modyolo.js";
 export { extractModyolo };
 import { extractDiziSitesi } from "./extractors/dizisitesi.js";
 export { extractDiziSitesi };
+import { extractMediafire } from "./extractors/mediafire.js";
+export { extractMediafire };
+import { extractPixeldrain } from "./extractors/pixeldrain.js";
+export { extractPixeldrain };
+import { extractDropbox } from "./extractors/dropbox.js";
+export { extractDropbox };
+import { extractWeTransfer } from "./extractors/wetransfer.js";
+export { extractWeTransfer };
+import { extractDizipal } from "./extractors/dizipal.js";
+export { extractDizipal };
+import { extractFullHDFilmIzlesene } from "./extractors/fullhdfilmizlesene.js";
+export { extractFullHDFilmIzlesene };
+import { extractFilmModu } from "./extractors/filmmodu.js";
+export { extractFilmModu };
+import { extractAPKMirror } from "./extractors/apkmirror.js";
+export { extractAPKMirror };
+import { extractAPKPure } from "./extractors/apkpure.js";
+export { extractAPKPure };
+import { extractHappyMod } from "./extractors/happymod.js";
+export { extractHappyMod };
+import { extractMangaDenizi } from "./extractors/mangadenizi.js";
+export { extractMangaDenizi };
+import { extractAsuraScans } from "./extractors/asurascans.js";
+export { extractAsuraScans };
+import { extractWebtoonTR } from "./extractors/webtoontr.js";
+export { extractWebtoonTR };
+import { extractMangaTR } from "./extractors/mangatr.js";
+export { extractMangaTR };
+import { extractMerlinScans } from "./extractors/merlinscans.js";
+export { extractMerlinScans };
