@@ -1,4 +1,6 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
+import * as cheerio from 'cheerio';
+import { CookieJar } from 'tough-cookie';
 export async function extractItch(pageUrl) {
   const cookieJar = new CookieJar();
 

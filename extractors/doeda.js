@@ -1,4 +1,6 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
+import * as cheerio from 'cheerio';
+import axios from 'axios';
 export async function extractDoeda(pageUrl) {
   try {
     const pageRes = await gotScraping.get({

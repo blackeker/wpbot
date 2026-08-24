@@ -1,4 +1,10 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
+import * as cheerio from 'cheerio';
+import axios from 'axios';
+import { CookieJar } from 'tough-cookie';
+import fs from 'fs';
+import path from 'path';
+import { readConfig, writeConfig, pendingHentaizmLogins, botSocketRef, downloadsDir } from '../config.js';
 export
 // ==========================================
 // HENTAIZM DECRYPTER AND RESOLVER FUNCTIONS

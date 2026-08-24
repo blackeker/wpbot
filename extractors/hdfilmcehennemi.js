@@ -1,4 +1,5 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
+import * as cheerio from 'cheerio';
 const mainUrl = "https://www.hdfilmcehennemi.nl";
 
 // ROT13 for strings

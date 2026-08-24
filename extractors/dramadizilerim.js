@@ -1,5 +1,7 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { gotScraping } from "../extractor.js";
+import * as cheerio from 'cheerio';
 
 puppeteer.use(StealthPlugin());
 
@@ -118,9 +120,6 @@ export async function extractDramadizilerim(pageUrl) {
 }
 
 export async function getDramadizilerimSeasonEpisodes(pageUrl) {
-  const { gotScraping } = await import('../extractor.js');
-  const cheerio = await import('cheerio');
-  
   const res = await gotScraping.get({
     url: pageUrl,
     headerGeneratorOptions: {

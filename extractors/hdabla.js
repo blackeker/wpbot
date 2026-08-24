@@ -1,4 +1,5 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
+import * as cheerio from 'cheerio';
 export
 // ==========================================
 // HDABLA DECRYPTER AND RESOLVER FUNCTIONS

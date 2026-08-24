@@ -1,4 +1,11 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
+import * as cheerio from 'cheerio';
+import axios from 'axios';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+puppeteer.use(StealthPlugin());
+
 // ==========================================
 // HDKORE1 EXTRACTOR AND RESOLVER FUNCTIONS
 // ==========================================
