@@ -76,6 +76,7 @@ const DEFAULT_CONFIG = {
   downloadRetentionHours: parseFloat(process.env.DOWNLOAD_MAX_AGE_HOURS || "4"),
   maxDownloadsCacheGB: parseFloat(process.env.MAX_DOWNLOADS_CACHE_GB || "15"),
   concurrencyLimit: parseInt(process.env.CONCURRENCY_LIMIT || "1", 10),
+  burnSubtitles: process.env.BURN_SUBTITLES === 'true',
   autoCleanAfterSend: true,
   discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || "",
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "",

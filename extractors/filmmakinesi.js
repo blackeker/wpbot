@@ -183,12 +183,35 @@ export async function extractFilmMakinesi(pageUrl) {
         const decryptedUrl = decryptSource(unpackedHtml);
         if (decryptedUrl) {
           console.log(`[FilmMakinesi] Decrypted stream URL: ${decryptedUrl}`);
+          
+          // Extract subtitle URL
+          let subtitleUrl = null;
+          try {
+            const tracksMatch = unpackedHtml.match(/tracks\s*:\s*(\[[\s\S]*?\])/) || res.body.match(/tracks\s*:\s*(\[[\s\S]*?\])/);
+            if (tracksMatch) {
+              const tracksStr = tracksMatch[1];
+              // Try to find the file corresponding to Turkish subtitle
+              const trMatch = tracksStr.match(/"file"\s*:\s*"([^"]+)"[^}]*(?:tr|turkish|türkçe)/i) || 
+                              tracksStr.match(/"file"\s*:\s*"([^"]+tr[^"]+)"/i) ||
+                              tracksStr.match(/"file"\s*:\s*"([^"]+)"[^}]*default_ses_durum/i);
+              
+              if (trMatch) {
+                const subFile = trMatch[1].replace(/\\/g, '');
+                subtitleUrl = new URL(subFile, embedUrl).href;
+                console.log(`[FilmMakinesi] Found Turkish Subtitle URL: ${subtitleUrl}`);
+              }
+            }
+          } catch (subErr) {
+            console.error('[FilmMakinesi] Subtitle extraction failed:', subErr.message);
+          }
+
           return {
             title,
-            source: 'filmmodu', // or 'filmmakinesi'
+            source: 'filmmodu',
             url: decryptedUrl,
             directUrl: decryptedUrl,
-            isHls: decryptedUrl.includes('m3u8')
+            isHls: decryptedUrl.includes('m3u8'),
+            subtitleUrl
           };
         }
       } catch (err) {
