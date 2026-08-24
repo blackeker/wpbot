@@ -242,7 +242,6 @@ wpbot/
 ├── downloads/                 # İndirilen dosyaların tutulduğu geçici dizin
 ├── dpi.bat                    # DPI bypass yardımcı scripti
 ├── ecosystem.config.cjs       # PM2 üretim ortamı yapılandırması
-├── embed_body.html            # Web dashboard HTML/JS arayüzü
 ├── events/                    # WhatsApp olay dinleyicileri
 │   ├── connection.js          # Bağlantı ve kopma olayları
 │   └── messages.js            # Mesaj alma ve komut yönlendirme
@@ -278,7 +277,6 @@ wpbot/
 ├── package.json               # Proje bağımlılıkları ve npm betikleri
 ├── pipelines.js               # Medya işleme ve indirme hattı
 ├── queue.js                   # Asenkron görev kuyruk motoru
-├── refactor.cjs               # Kod düzenleme yardımcı betiği
 ├── server.js                  # Express.js REST API ve WebSocket sunucusu
 ├── setup_linux.sh             # Linux otomatik kurulum betiği
 ├── tracker.js                 # Bant genişliği takip modülü
