@@ -37,14 +37,22 @@ export function cleanHentaizmTitle(rawTitle) {
 }
 
 // Triggers a login captcha request to the user
-export async function initiateHentaizmLogin(fromJid) {
+export async function initiateHentaizmLogin(fromJid, pageUrl = 'https://www.hentaizm2.com') {
   try {
     const sock = botSocketRef.current;
     if (!sock) {
       console.error("[Hentaizm Login] Socket not connected yet.");
       return;
     }
-    console.log(`[Hentaizm Login] Initiating login for JID: ${fromJid}`);
+
+    let baseUrl = 'https://www.hentaizm2.com';
+    try {
+      if (pageUrl) {
+        baseUrl = new URL(pageUrl).origin;
+      }
+    } catch (e) {}
+
+    console.log(`[Hentaizm Login] Initiating login for JID: ${fromJid} on ${baseUrl}`);
     const cookieJar = new CookieJar();
     const headerOpts = {
       devices: ['desktop'],
@@ -53,7 +61,7 @@ export async function initiateHentaizmLogin(fromJid) {
     };
 
     // 1. Visit login page to establish session cookie
-    const loginUrl = "https://www.hentaizm1.com/login.php";
+    const loginUrl = `${baseUrl}/login.php`;
     await gotScraping.get({
       url: loginUrl,
       cookieJar,
@@ -61,7 +69,7 @@ export async function initiateHentaizmLogin(fromJid) {
     });
 
     // 2. Fetch captcha image using same session cookies
-    const captchaUrl = "https://www.hentaizm1.com/captcha.php";
+    const captchaUrl = `${baseUrl}/captcha.php`;
     const captchaRes = await gotScraping.get({
       url: captchaUrl,
       cookieJar,
@@ -77,6 +85,7 @@ export async function initiateHentaizmLogin(fromJid) {
     pendingHentaizmLogins[fromJid] = {
       cookieJar,
       captchaPath,
+      baseUrl,
       attempts: 0
     };
 
@@ -123,7 +132,7 @@ export async function extractHentaizm(pageUrl, fromJid = null) {
     if (html.includes('Videoları görmek için üye girişi yapmanız gerekiyor') || html.includes('login.php') && $('#player-area').text().includes('üye girişi')) {
       if (fromJid) {
         console.log(`[Hentaizm] Login required for task. Initiating auto-login trigger for ${fromJid}...`);
-        await initiateHentaizmLogin(fromJid);
+        await initiateHentaizmLogin(fromJid, pageUrl);
         throw new Error("Üye girişi gerekiyor. WhatsApp üzerinden gönderilen doğrulama kodunu yanıtlayın.");
       } else {
         throw new Error("Hentaizm videolarını izlemek için üye girişi yapılması gerekmektedir.");

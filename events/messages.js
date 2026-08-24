@@ -198,9 +198,10 @@ export async function handleMessage(sock, m) {
 
     try {
       const gotScrapingModule = await import('got-scraping');
+      const baseUrl = loginState.baseUrl || 'https://www.hentaizm2.com';
       
       const loginRes = await gotScrapingModule.gotScraping.post({
-        url: "https://www.hentaizm1.com/login.php",
+        url: `${baseUrl}/login.php`,
         cookieJar: loginState.cookieJar,
         form: {
           username: "blackeker@gmail.com",
@@ -217,7 +218,7 @@ export async function handleMessage(sock, m) {
         }
       });
 
-      const cookies = loginState.cookieJar.getCookieStringSync("https://www.hentaizm1.com/");
+      const cookies = loginState.cookieJar.getCookieStringSync(`${baseUrl}/`);
       const isLogged = cookies.includes('wordpress_logged_in') || loginRes.body.includes('Profil') || loginRes.body.includes('Çıkış');
 
       if (isLogged) {
