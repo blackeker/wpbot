@@ -200,7 +200,9 @@ export function getAndUnpack(script) {
   c = parseInt(c, 10);
   k = k.split('|');
   const e = c => {
-    return (c < a ? '' : e(Math.floor(c / a))) + String.fromCharCode(c % a > 35 ? c % a + 29 : c % a + 87);
+    const r = c % a;
+    const digit = r > 35 ? String.fromCharCode(r + 29) : r.toString(36);
+    return (c < a ? '' : e(Math.floor(c / a))) + digit;
   };
   const d = {};
   for (let i = 0; i < k.length; i++) {
@@ -351,6 +353,9 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
   }
   if (targetUrl.includes('filmmodu')) {
     return extractFilmModu(targetUrl);
+  }
+  if (targetUrl.includes('filmmakinesi.to') || targetUrl.includes('filmmakinesi')) {
+    return extractFilmMakinesi(targetUrl);
   }
   if (targetUrl.includes('liteapks.com')) {
     return extractLiteapks(targetUrl);
@@ -561,4 +566,6 @@ export { extractWebtoonTR };
 import { extractMangaTR } from "./extractors/mangatr.js";
 export { extractMangaTR };
 import { extractMerlinScans } from "./extractors/merlinscans.js";
-export { extractMerlinScans };
+export { extractMerlinScans };
+import { extractFilmMakinesi } from "./extractors/filmmakinesi.js";
+export { extractFilmMakinesi };
