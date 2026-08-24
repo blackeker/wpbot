@@ -33,7 +33,7 @@ export default {
           const cookieString = `${name}=${value}; Domain=${domain}; Path=${path}${secure ? '; Secure' : ''}${expiresSeconds > 0 ? `; Expires=${new Date(expiresSeconds * 1000).toUTCString()}` : ''}`;
           const cookie = Cookie.parse(cookieString);
           if (cookie) {
-            await jar.setCookie(cookie, "https://www.hentaizm1.com/");
+            await jar.setCookie(cookie, "https://www.hentaizm2.com/");
             parsedCount++;
           }
         }

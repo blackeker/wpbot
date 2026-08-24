@@ -79,14 +79,14 @@ async function scanAnimecix() {
 async function scanHentaizm() {
   const links = [];
   try {
-    const res = await gotScraping.get('https://www.hentaizm.tv/');
+    const res = await gotScraping.get('https://www.hentaizm2.com/');
     const $ = cheerio.load(res.body);
     $('a').each((i, el) => {
       const href = $(el).attr('href');
       const title = $(el).text().trim();
       if (href && (href.includes('/hentai/') || href.includes('/bolum/') || href.includes('/izle/'))) {
         links.push({
-          url: href.startsWith('http') ? href : `https://www.hentaizm.tv${href}`,
+          url: href.startsWith('http') ? href : `https://www.hentaizm2.com${href}`,
           title: title || 'Hentaizm Yeni Bölüm',
           source: 'Hentaizm'
         });
