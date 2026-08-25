@@ -401,25 +401,25 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
     return extractFilmMakinesi(targetUrl);
   }
   if (targetUrl.includes('jav.guru')) {
-    return extractGenericWebpage(targetUrl, 'JavGuru');
+    return extractJavGuru(targetUrl);
   }
   if (targetUrl.includes('kopeda')) {
-    return extractGenericWebpage(targetUrl, 'Kopeda');
+    return extractKopeda(targetUrl);
   }
   if (targetUrl.includes('koreanpornmovie')) {
-    return extractGenericWebpage(targetUrl, 'Korean Movies');
+    return extractKoreanPornMovie(targetUrl);
   }
   if (targetUrl.includes('kalite18')) {
-    return extractGenericWebpage(targetUrl, 'Kalite18');
+    return extractKalite18(targetUrl);
   }
   if (targetUrl.includes('maheir')) {
-    return extractGenericWebpage(targetUrl, 'Maheir');
+    return extractMaheir(targetUrl);
   }
   if (targetUrl.includes('rule34video')) {
-    return extractGenericWebpage(targetUrl, 'Rule34 Video');
+    return extractRule34Video(targetUrl);
   }
   if (targetUrl.includes('xhamster.com') || targetUrl.includes('xhamster')) {
-    return extractGenericWebpage(targetUrl, 'xHamster');
+    return extractXhamster(targetUrl);
   }
   if (targetUrl.includes('liteapks.com')) {
     return extractLiteapks(targetUrl);
@@ -638,4 +638,18 @@ export { extractMerlinScans };
 import { extractFilmMakinesi } from "./extractors/filmmakinesi.js";
 export { extractFilmMakinesi };
 import { extractGenericWebpage } from "./extractors/generic_webpage.js";
-export { extractGenericWebpage };
+export { extractGenericWebpage };
+import { extractXhamster } from "./extractors/xhamster.js";
+export { extractXhamster };
+import { extractJavGuru } from "./extractors/javguru.js";
+export { extractJavGuru };
+import { extractKopeda } from "./extractors/kopeda.js";
+export { extractKopeda };
+import { extractKoreanPornMovie } from "./extractors/koreanpornmovie.js";
+export { extractKoreanPornMovie };
+import { extractKalite18 } from "./extractors/kalite18.js";
+export { extractKalite18 };
+import { extractMaheir } from "./extractors/maheir.js";
+export { extractMaheir };
+import { extractRule34Video } from "./extractors/rule34video.js";
+export { extractRule34Video };
