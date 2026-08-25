@@ -204,6 +204,13 @@ app.get('/api/extract', async (req, res) => {
   if (!url) return res.status(400).json({ success: false, error: 'url query parametresi gerekli.' });
   try {
     const result = await extractVideoUrl(url);
+    if (result && result.filePath) {
+      const config = readConfig();
+      const vdsIp = config.vdsIp || '111.235.150.157';
+      const port = config.port || 7860;
+      const filename = path.basename(result.filePath);
+      result.downloadUrl = `http://${vdsIp}:${port}/downloads/${encodeURIComponent(filename)}`;
+    }
     res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -217,6 +224,15 @@ app.get('/api/extract/:site', async (req, res) => {
 
   try {
     const lowerUrl = url.toLowerCase();
+    const validSites = [
+      'instagram', 'tiktok', 'mega', 'yandex', 'gdrive', 'terabox', 'liteapks', 'modyolo',
+      'hentaizm', 'hentaizm_manga', 'pornhub', 'doeda', 'xhamster', 'turkifsahub', 'turkifsalar',
+      'turkporno', 'hdabla', 'rule34video', 'maheir', 'kalite18', 'koreanpornmovie', 'kopeda', 'jav_guru'
+    ];
+    if (!validSites.includes(site)) {
+      return res.status(400).json({ success: false, error: `Geçersiz site parametresi. Desteklenenler: ${validSites.join(', ')}` });
+    }
+
     if (site === 'instagram' && !lowerUrl.includes('instagram.com')) {
       return res.status(400).json({ success: false, error: 'Bu endpoint sadece instagram.com linkleri içindir.' });
     }
@@ -241,8 +257,60 @@ app.get('/api/extract/:site', async (req, res) => {
     if (site === 'modyolo' && !lowerUrl.includes('modyolo.com')) {
       return res.status(400).json({ success: false, error: 'Bu endpoint sadece modyolo.com linkleri içindir.' });
     }
+    if (site === 'hentaizm' && !lowerUrl.includes('hentaizm')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece hentaizm linkleri içindir.' });
+    }
+    if (site === 'hentaizm_manga' && (!lowerUrl.includes('hentaizm') || !lowerUrl.includes('manga'))) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece hentaizm manga linkleri içindir.' });
+    }
+    if (site === 'pornhub' && !lowerUrl.includes('pornhub.com')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece pornhub.com linkleri içindir.' });
+    }
+    if (site === 'doeda' && !lowerUrl.includes('doeda')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece doeda linkleri içindir.' });
+    }
+    if (site === 'xhamster' && !lowerUrl.includes('xhamster')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece xhamster linkleri içindir.' });
+    }
+    if (site === 'turkifsahub' && !lowerUrl.includes('turkifsahub.com')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece turkifsahub.com linkleri içindir.' });
+    }
+    if (site === 'turkifsalar' && !lowerUrl.includes('turkifsalar')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece turkifsalar linkleri içindir.' });
+    }
+    if (site === 'turkporno' && !lowerUrl.includes('turkporno')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece turkporno linkleri içindir.' });
+    }
+    if (site === 'hdabla' && !lowerUrl.includes('hdabla') && !lowerUrl.includes('fakitonye')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece hdabla linkleri içindir.' });
+    }
+    if (site === 'rule34video' && !lowerUrl.includes('rule34video')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece rule34video linkleri içindir.' });
+    }
+    if (site === 'maheir' && !lowerUrl.includes('maheir')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece maheir linkleri içindir.' });
+    }
+    if (site === 'kalite18' && !lowerUrl.includes('kalite18')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece kalite18 linkleri içindir.' });
+    }
+    if (site === 'koreanpornmovie' && !lowerUrl.includes('koreanpornmovie')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece koreanpornmovie linkleri içindir.' });
+    }
+    if (site === 'kopeda' && !lowerUrl.includes('kopeda')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece kopeda linkleri içindir.' });
+    }
+    if (site === 'jav_guru' && !lowerUrl.includes('jav.guru')) {
+      return res.status(400).json({ success: false, error: 'Bu endpoint sadece jav.guru linkleri içindir.' });
+    }
 
     const result = await extractVideoUrl(url);
+    if (result && result.filePath) {
+      const config = readConfig();
+      const vdsIp = config.vdsIp || '111.235.150.157';
+      const port = config.port || 7860;
+      const filename = path.basename(result.filePath);
+      result.downloadUrl = `http://${vdsIp}:${port}/downloads/${encodeURIComponent(filename)}`;
+    }
     res.json({ success: true, site, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

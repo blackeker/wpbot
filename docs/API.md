@@ -68,8 +68,10 @@ curl -X GET "http://localhost:7860/api/extract?url=https://www.instagram.com/ree
 
 ### 1.2. Platforma Özel Bağlantı Çıkarıcı
 * **Endpoint:** `GET /api/extract/:site`
-* **Path Parametresi (`:site`):** `instagram`, `tiktok`, `mega`, `yandex`, `gdrive`, `terabox`, `liteapks`, `modyolo`
+* **Path Parametresi (`:site`):** `instagram`, `tiktok`, `mega`, `yandex`, `gdrive`, `terabox`, `liteapks`, `modyolo`, `hentaizm`, `hentaizm_manga`, `pornhub`, `doeda`, `xhamster`, `turkifsahub`, `turkifsalar`, `turkporno`, `hdabla`, `rule34video`, `maheir`, `kalite18`, `koreanpornmovie`, `kopeda`, `jav_guru`
 * **Query Parametreleri:** `url` (String, Zorunlu)
+
+* **Önemli Not:** Eğer çözümleme sonucu yerel olarak üretilen bir dosya (örneğin hentaizm_manga için oluşturulan `.pdf` manga arşivi) ise, yanıtın içerisinde doğrudan HTTP üzerinden indirilebilecek bir `downloadUrl` alanı da döner.
 
 #### Örnek cURL:
 ```bash
