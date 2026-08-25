@@ -631,15 +631,29 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
       let bestStreamUrl = '';
       let maxBandwidth = 0;
 
+      let firstAudioPlaylistUrl = null;
       // Extract Turkish audio playlist URL
       for (const line of lines) {
         if (line.startsWith('#EXT-X-MEDIA:') && line.includes('TYPE=AUDIO')) {
           const langMatch = line.match(/LANGUAGE="([^"]+)"/i);
+          const nameMatch = line.match(/NAME="([^"]+)"/i);
           const uriMatch = line.match(/URI="([^"]+)"/i);
-          if (langMatch && uriMatch && langMatch[1].toLowerCase() === 'tr') {
-            audioPlaylistUrl = resolveUrl(m3u8Url, uriMatch[1]);
+          if (uriMatch) {
+            const val = uriMatch[1];
+            const resolved = resolveUrl(m3u8Url, val);
+            if (!firstAudioPlaylistUrl) {
+              firstAudioPlaylistUrl = resolved;
+            }
+            const langValue = (langMatch ? langMatch[1] : (nameMatch ? nameMatch[1] : '')).toLowerCase();
+            if (langValue === 'tr' || langValue === 'tr-tr' || langValue.startsWith('tr') || langValue === 'tur' || langValue === 'turkish') {
+              audioPlaylistUrl = resolved;
+            }
           }
         }
+      }
+      if (!audioPlaylistUrl && firstAudioPlaylistUrl) {
+        console.log("No Turkish audio track found, falling back to first audio track:", firstAudioPlaylistUrl);
+        audioPlaylistUrl = firstAudioPlaylistUrl;
       }
 
       for (let i = 0; i < lines.length; i++) {

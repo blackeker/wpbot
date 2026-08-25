@@ -1,5 +1,6 @@
 import { gotScraping as originalGotScraping } from 'got-scraping';
 import { getProxyUrl } from './config.js';
+import vm from 'vm';
 
 export const gotScraping = new Proxy(originalGotScraping, {
   apply(target, thisArg, argumentsList) {
@@ -189,6 +190,48 @@ export function dcHello(parts) {
     }
   }
   return null;
+}
+
+export function decryptDynamicVM(unpackedScript) {
+  try {
+    const cleaned = unpackedScript.replace(/\\'/g, "'");
+    const callMatch = cleaned.match(/(dc_[A-Za-z0-9_]+)\(\s*(\[[\s\S]*?\])\s*\)/);
+    if (!callMatch) return null;
+    const funcName = callMatch[1];
+    const argsStr = callMatch[2];
+    
+    const funcIndex = cleaned.indexOf(`function ${funcName}`);
+    if (funcIndex === -1) return null;
+    
+    let braceCount = 0;
+    let inBrace = false;
+    let funcDef = '';
+    for (let i = funcIndex; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      funcDef += char;
+      if (char === '{') {
+        braceCount++;
+        inBrace = true;
+      } else if (char === '}') {
+        braceCount--;
+        if (inBrace && braceCount === 0) {
+          break;
+        }
+      }
+    }
+    
+    const code = `
+      ${funcDef}
+      const atob = (str) => Buffer.from(str, 'base64').toString('binary');
+      const btoa = (str) => Buffer.from(str, 'binary').toString('base64');
+      \n${funcName}(${argsStr});
+    `;
+    
+    return vm.runInNewContext(code, { Buffer });
+  } catch (e) {
+    console.error('[VM Decrypt] Failed to execute decryption in VM:', e.message);
+    return null;
+  }
 }
 
 // Unpacker logic for eval-packed JS
@@ -442,12 +485,16 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
           if (!scriptText) continue;
           const unpacked = getAndUnpack(scriptText);
 
-          // Dynamically find the array of strings inside the unpacked script
-          const arrayMatch = unpacked.match(/\[\s*"[^"]+"(?:\s*,\s*"[^"]+")*\s*\]/);
-          if (!arrayMatch) continue;
-          const base64List = [...arrayMatch[0].matchAll(/"([^"]+)"/g)].map(m => m[1]);
-          if (base64List.length === 0) continue;
-          const decryptedUrl = dcHello(base64List);
+          let decryptedUrl = decryptDynamicVM(unpacked);
+          if (!decryptedUrl) {
+            const arrayMatch = unpacked.match(/\[\s*"[^"]+"(?:\s*,\s*"[^"]+")*\s*\]/);
+            if (arrayMatch) {
+              const base64List = [...arrayMatch[0].matchAll(/"([^"]+)"/g)].map(m => m[1]);
+              if (base64List.length > 0) {
+                decryptedUrl = dcHello(base64List);
+              }
+            }
+          }
           if (decryptedUrl) {
             return {
               title,

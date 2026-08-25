@@ -10,6 +10,23 @@ import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, ad
 import WebTorrent from 'webtorrent';
 import { getCachedResult, saveToCache } from './cache.js';
 
+function replaceTurkishChars(str) {
+  if (!str) return '';
+  return str
+    .replace(/Ğ/g, 'G')
+    .replace(/ğ/g, 'g')
+    .replace(/Ü/g, 'U')
+    .replace(/ü/g, 'u')
+    .replace(/Ş/g, 'S')
+    .replace(/ş/g, 's')
+    .replace(/İ/g, 'I')
+    .replace(/ı/g, 'i')
+    .replace(/Ö/g, 'O')
+    .replace(/ö/g, 'o')
+    .replace(/Ç/g, 'C')
+    .replace(/ç/g, 'c');
+}
+
 // ─── Retry Yardımcısı ───
 async function withRetry(fn, retries = 3, delayMs = 3000) {
   let lastError;
@@ -149,7 +166,7 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
   let title = 'YouTube_Video';
   try {
     title = await execAsync(`"${ytDlpCmd}" --get-title --no-playlist "${targetUrl}"`);
-    title = title.replace(/[^a-zA-Z0-9\s]/g, '').trim().slice(0, 60) || 'YouTube_Video';
+    title = replaceTurkishChars(title).replace(/[^a-zA-Z0-9\s]/g, '').trim().slice(0, 60) || 'YouTube_Video';
   } catch {}
 
   const safeTitle = title.replace(/\s+/g, '_');
@@ -165,10 +182,10 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
 
   await progressUpdateCallback(`🎬 *${title}*\n\n📥 YouTube indirme hazırlığı yapılıyor...`);
 
+  const isMp3 = selectedFormat === 'mp3';
   // Spawn kullanarak gerçek zamanlı ilerleme takibi yapıyoruz
   try {
     await new Promise((resolve, reject) => {
-      const isMp3 = selectedFormat === 'mp3';
       const args = [];
       if (isMp3) {
         args.push(
@@ -475,7 +492,7 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
               mimeType = 'application/octet-stream';
             }
 
-            const safeTitle = finalTitle.replace(/[^a-zA-Z0-9]/g, '_');
+            const safeTitle = replaceTurkishChars(finalTitle).replace(/[^a-zA-Z0-9]/g, '_');
             const watchUrl = `http://${process.env.VDS_IP || '111.235.150.157'}:7860/downloads/${encodeURIComponent(safeTitle)}${finalFileExt}`;
 
             const fileStream = fs.createReadStream(finalFilePath);
@@ -602,7 +619,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     mimeType = 'application/octet-stream';
   }
 
-  const safeTitle = cleanTitle.replace(/[^a-zA-Z0-9]/g, '_');
+  const safeTitle = replaceTurkishChars(cleanTitle).replace(/[^a-zA-Z0-9]/g, '_');
   const filePath = path.join(downloadsDir, `${safeTitle}${fileExt}`);
   const vdsIp = process.env.VDS_IP || '111.235.150.157';
   const watchUrl = `http://${vdsIp}:7860/downloads/${encodeURIComponent(safeTitle)}${fileExt}`;
