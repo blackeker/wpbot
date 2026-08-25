@@ -400,6 +400,27 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
   if (targetUrl.includes('filmmakinesi.to') || targetUrl.includes('filmmakinesi')) {
     return extractFilmMakinesi(targetUrl);
   }
+  if (targetUrl.includes('jav.guru')) {
+    return extractGenericWebpage(targetUrl, 'JavGuru');
+  }
+  if (targetUrl.includes('kopeda')) {
+    return extractGenericWebpage(targetUrl, 'Kopeda');
+  }
+  if (targetUrl.includes('koreanpornmovie')) {
+    return extractGenericWebpage(targetUrl, 'Korean Movies');
+  }
+  if (targetUrl.includes('kalite18')) {
+    return extractGenericWebpage(targetUrl, 'Kalite18');
+  }
+  if (targetUrl.includes('maheir')) {
+    return extractGenericWebpage(targetUrl, 'Maheir');
+  }
+  if (targetUrl.includes('rule34video')) {
+    return extractGenericWebpage(targetUrl, 'Rule34 Video');
+  }
+  if (targetUrl.includes('xhamster.com') || targetUrl.includes('xhamster')) {
+    return extractGenericWebpage(targetUrl, 'xHamster');
+  }
   if (targetUrl.includes('liteapks.com')) {
     return extractLiteapks(targetUrl);
   }
@@ -615,4 +636,6 @@ export { extractMangaTR };
 import { extractMerlinScans } from "./extractors/merlinscans.js";
 export { extractMerlinScans };
 import { extractFilmMakinesi } from "./extractors/filmmakinesi.js";
-export { extractFilmMakinesi };
+export { extractFilmMakinesi };
+import { extractGenericWebpage } from "./extractors/generic_webpage.js";
+export { extractGenericWebpage };
