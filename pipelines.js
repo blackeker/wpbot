@@ -720,87 +720,126 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   }
 
   // ── Altyazı Muxing / Gömme Adımı ──
-  if (result.subtitleUrl && fs.existsSync(actualFilePath)) {
-    try {
-      await progressUpdateCallback(`✍️ Altyazı dosyası indiriliyor...\n🔗 Link: ${result.subtitleUrl}`);
-      const gotScrapingModule = await import('got-scraping');
-      const subRes = await gotScrapingModule.gotScraping({
-        url: result.subtitleUrl,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
-      
-      let subContent = subRes.body;
-      // Convert VTT to SRT if needed
-      if (subContent.trim().startsWith('WEBVTT') || result.subtitleUrl.includes('.vtt')) {
-        subContent = subContent
-          .replace(/^\ufeff?WEBVTT[^\n]*\n/i, '') // Remove WEBVTT header
-          .replace(/(\d{2}:\d{2}:\d{2})\.(\d{3})/g, '$1,$2') // Replace dot with comma in timestamps
-          .replace(/<[^>]+>/g, ''); // Strip HTML/Style tags
-      }
-      
-      const tempSubPath = path.join(downloadsDir, `temp_sub_${Date.now()}.srt`);
-      fs.writeFileSync(tempSubPath, subContent, 'utf8');
-      console.log(`[Subtitles] Saved subtitle to ${tempSubPath}`);
+  let subtitlesList = [];
+  if (result.subtitles && Array.isArray(result.subtitles) && result.subtitles.length > 0) {
+    subtitlesList = result.subtitles;
+  } else if (result.subtitleUrl) {
+    subtitlesList = [{ url: result.subtitleUrl, language: 'tur', label: 'Türkçe' }];
+  }
 
+  if (subtitlesList.length > 0 && fs.existsSync(actualFilePath)) {
+    try {
       const config = readConfig();
       const burnSubtitles = process.env.BURN_SUBTITLES === 'true' || config.burnSubtitles === true;
-
-      // Determine output path
-      const subbedTempPath = path.join(downloadsDir, `subbed_temp_${Date.now()}${fileExt}`);
+      const gotScrapingModule = await import('got-scraping');
       
-      if (burnSubtitles) {
-        // Hardsub (transcoding)
-        await progressUpdateCallback(`✍️ Altyazılar videoya kalıcı olarak gömülüyor (Transcoding)... Bu işlem işlemci gücüne göre birkaç dakika sürebilir.`);
-        
-        // Escape paths for Windows FFmpeg subtitles filter
-        const relativeSubPath = path.relative(process.cwd(), tempSubPath).replace(/\\/g, '/');
-        
-        const ffmpegCmd = `"${ffmpegPath}" -y -i "${actualFilePath}" -vf "subtitles=${relativeSubPath}" -c:v libx264 -preset ultrafast -c:a copy "${subbedTempPath}"`;
-        console.log(`[Subtitles] Running hardsub command: ${ffmpegCmd}`);
-        
-        await new Promise((resolve, reject) => {
-          exec(ffmpegCmd, (err, stdout, stderr) => {
-            if (err) {
-              console.error(`[Subtitles] Hardsub transcoding failed:`, stderr || err.message);
-              reject(err);
-            } else {
-              resolve();
+      const tempSubPaths = [];
+      const preparedSubs = [];
+
+      for (let i = 0; i < subtitlesList.length; i++) {
+        const sub = subtitlesList[i];
+        try {
+          await progressUpdateCallback(`✍️ Altyazı dosyası indiriliyor (${i + 1}/${subtitlesList.length}): ${sub.label}...`);
+          const subRes = await gotScrapingModule.gotScraping({
+            url: sub.url,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
           });
-        });
-      } else {
-        // Softsub (muxing)
-        await progressUpdateCallback(`✍️ Altyazı dosyası video içine gömülüyor (Softsub)...`);
+          
+          let subContent = subRes.body;
+          if (subContent.trim().startsWith('WEBVTT') || sub.url.includes('.vtt')) {
+            subContent = subContent
+              .replace(/^\ufeff?WEBVTT[^\n]*\n/i, '')
+              .replace(/(\d{2}:\d{2}:\d{2})\.(\d{3})/g, '$1,$2')
+              .replace(/<[^>]+>/g, '');
+          }
+          
+          const tempSubPath = path.join(downloadsDir, `temp_sub_${i}_${Date.now()}.srt`);
+          fs.writeFileSync(tempSubPath, subContent, 'utf8');
+          tempSubPaths.push(tempSubPath);
+          preparedSubs.push(sub);
+          console.log(`[Subtitles] Saved subtitle track ${sub.label} to ${tempSubPath}`);
+        } catch (subDownloadErr) {
+          console.error(`[Subtitles] Failed to download subtitle ${sub.label}:`, subDownloadErr.message);
+        }
+      }
+
+      if (preparedSubs.length > 0) {
+        const subbedTempPath = path.join(downloadsDir, `subbed_temp_${Date.now()}${fileExt}`);
         
-        const subCodec = fileExt.toLowerCase() === '.mkv' ? 'srt' : 'mov_text';
-        const ffmpegCmd = `"${ffmpegPath}" -y -i "${actualFilePath}" -i "${tempSubPath}" -c:v copy -c:a copy -c:s ${subCodec} -map 0 -map 1? -metadata:s:s:0 language=tur -metadata:s:s:0 title="Türkçe" "${subbedTempPath}"`;
-        console.log(`[Subtitles] Running softsub command: ${ffmpegCmd}`);
-        
-        await new Promise((resolve, reject) => {
-          exec(ffmpegCmd, (err, stdout, stderr) => {
-            if (err) {
-              console.error(`[Subtitles] Softsub muxing failed:`, stderr || err.message);
-              reject(err);
-            } else {
-              resolve();
-            }
+        if (burnSubtitles) {
+          // Hardsub (transcode with ONLY the first/Turkish subtitle)
+          const primarySubIndex = preparedSubs.findIndex(s => s.language === 'tur');
+          const subToBurnPath = primarySubIndex !== -1 ? tempSubPaths[primarySubIndex] : tempSubPaths[0];
+          const subToBurn = primarySubIndex !== -1 ? preparedSubs[primarySubIndex] : preparedSubs[0];
+          
+          await progressUpdateCallback(`✍️ Altyazı videoya kalıcı olarak gömülüyor (Hardsub: ${subToBurn.label})... Bu işlem sunucunun işlemci gücüne göre birkaç dakika sürebilir.`);
+          
+          const relativeSubPath = path.relative(process.cwd(), subToBurnPath).replace(/\\/g, '/');
+          const ffmpegCmd = `"${ffmpegPath}" -y -i "${actualFilePath}" -vf "subtitles=${relativeSubPath}" -c:v libx264 -preset ultrafast -c:a copy "${subbedTempPath}"`;
+          console.log(`[Subtitles] Running hardsub command: ${ffmpegCmd}`);
+          
+          await new Promise((resolve, reject) => {
+            exec(ffmpegCmd, (err, stdout, stderr) => {
+              if (err) {
+                console.error(`[Subtitles] Hardsub transcoding failed:`, stderr || err.message);
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
           });
-        });
+        } else {
+          // Softsub (mux ALL subtitles into tracks)
+          await progressUpdateCallback(`✍️ Altyazı dosyaları video içine ekleniyor (Softsub - Çoklu Dil)...`);
+          
+          const subCodec = fileExt.toLowerCase() === '.mkv' ? 'srt' : 'mov_text';
+          const ffmpegInputs = [`-i "${actualFilePath}"`];
+          const ffmpegMaps = ['-map 0'];
+          const ffmpegMetadata = [];
+          
+          for (let i = 0; i < tempSubPaths.length; i++) {
+            ffmpegInputs.push(`-i "${tempSubPaths[i]}"`);
+            ffmpegMaps.push(`-map ${i + 1}`);
+            
+            const sub = preparedSubs[i];
+            const lang = sub.language || 'tur';
+            const title = sub.label || 'Altyazı';
+            
+            ffmpegMetadata.push(`-metadata:s:s:${i} language=${lang}`);
+            ffmpegMetadata.push(`-metadata:s:s:${i} title="${title}"`);
+          }
+          
+          const ffmpegCmd = `"${ffmpegPath}" -y ${ffmpegInputs.join(' ')} -c:v copy -c:a copy -c:s ${subCodec} ${ffmpegMaps.join(' ')} ${ffmpegMetadata.join(' ')} "${subbedTempPath}"`;
+          console.log(`[Subtitles] Running softsub command: ${ffmpegCmd}`);
+          
+          await new Promise((resolve, reject) => {
+            exec(ffmpegCmd, (err, stdout, stderr) => {
+              if (err) {
+                console.error(`[Subtitles] Softsub muxing failed:`, stderr || err.message);
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          });
+        }
+
+        // Cleanup and replace file
+        if (fs.existsSync(subbedTempPath) && fs.statSync(subbedTempPath).size > 0) {
+          fs.unlinkSync(actualFilePath);
+          fs.renameSync(subbedTempPath, actualFilePath);
+          console.log(`[Subtitles] Successfully processed subtitles for: ${actualFilePath}`);
+        } else {
+          throw new Error('Altyazılı video dosyası oluşturulamadı (FFmpeg boş çıktı verdi).');
+        }
       }
 
-      // Cleanup and replace file
-      if (fs.existsSync(subbedTempPath) && fs.statSync(subbedTempPath).size > 0) {
-        fs.unlinkSync(actualFilePath);
-        fs.renameSync(subbedTempPath, actualFilePath);
-        console.log(`[Subtitles] Successfully processed subtitles for: ${actualFilePath}`);
-      } else {
-        throw new Error('Altyazılı video dosyası oluşturulamadı (FFmpeg boş çıktı verdi).');
+      // Cleanup temp subtitle files
+      for (const tempPath of tempSubPaths) {
+        try { fs.unlinkSync(tempPath); } catch (e) {}
       }
-
-      // Cleanup temp subtitle file
-      try { fs.unlinkSync(tempSubPath); } catch (e) {}
     } catch (subErr) {
       console.error(`[Subtitles] Subtitle processing error:`, subErr.message);
       await progressUpdateCallback(`⚠️ Altyazı işlemi başarısız oldu, orijinal video gönderiliyor: ${subErr.message}`);

@@ -184,22 +184,49 @@ export async function extractFilmMakinesi(pageUrl) {
         if (decryptedUrl) {
           console.log(`[FilmMakinesi] Decrypted stream URL: ${decryptedUrl}`);
           
-          // Extract subtitle URL
+          // Extract subtitles
           let subtitleUrl = null;
+          const subtitles = [];
           try {
             const tracksMatch = unpackedHtml.match(/tracks\s*:\s*(\[[\s\S]*?\])/) || res.body.match(/tracks\s*:\s*(\[[\s\S]*?\])/);
             if (tracksMatch) {
               const tracksStr = tracksMatch[1];
-              // Try to find the file corresponding to Turkish subtitle
-              const trMatch = tracksStr.match(/"file"\s*:\s*"([^"]+)"[^}]*(?:tr|turkish|türkçe)/i) || 
-                              tracksStr.match(/"file"\s*:\s*"([^"]+tr[^"]+)"/i) ||
-                              tracksStr.match(/"file"\s*:\s*"([^"]+)"[^}]*default_ses_durum/i);
-              
-              if (trMatch) {
-                const subFile = trMatch[1].replace(/\\/g, '');
-                subtitleUrl = new URL(subFile, embedUrl).href;
-                console.log(`[FilmMakinesi] Found Turkish Subtitle URL: ${subtitleUrl}`);
+              const trackRegex = /\{[^{}]*?"file"\s*:\s*"([^"]+)"[^{}]*?\}/g;
+              let trackMatch;
+              while ((trackMatch = trackRegex.exec(tracksStr)) !== null) {
+                const trackObjStr = trackMatch[0];
+                const fileVal = trackMatch[1].replace(/\\/g, '');
+                if (fileVal.includes('.vtt') || fileVal.includes('.srt')) {
+                  const labelMatch = trackObjStr.match(/"label"\s*:\s*"([^"]+)"/i) || trackObjStr.match(/'label'\s*:\s*'([^']+)'/i);
+                  const langMatch = trackObjStr.match(/"language"\s*:\s*"([^"]+)"/i) || trackObjStr.match(/'language'\s*:\s*'([^']+)'/i) || trackObjStr.match(/"lang"\s*:\s*"([^"]+)"/i);
+                  const label = labelMatch ? labelMatch[1] : 'Altyazı';
+                  let language = langMatch ? langMatch[1] : 'tr';
+                  
+                  // Normalize language code to 3 letters or standard
+                  if (label.toLowerCase().includes('türkçe') || language.toLowerCase().startsWith('tr')) {
+                    language = 'tur';
+                  } else if (label.toLowerCase().includes('ingilizce') || label.toLowerCase().includes('english') || language.toLowerCase().startsWith('en')) {
+                    language = 'eng';
+                  }
+                  
+                  const absoluteUrl = new URL(fileVal, embedUrl).href;
+                  subtitles.push({
+                    url: absoluteUrl,
+                    label,
+                    language
+                  });
+                }
               }
+              
+              // Set primary subtitleUrl (preferably Turkish) for compatibility
+              const trSub = subtitles.find(s => s.language === 'tur');
+              if (trSub) {
+                subtitleUrl = trSub.url;
+              } else if (subtitles.length > 0) {
+                subtitleUrl = subtitles[0].url;
+              }
+              
+              console.log(`[FilmMakinesi] Extracted ${subtitles.length} subtitles.`);
             }
           } catch (subErr) {
             console.error('[FilmMakinesi] Subtitle extraction failed:', subErr.message);
@@ -211,7 +238,8 @@ export async function extractFilmMakinesi(pageUrl) {
             url: decryptedUrl,
             directUrl: decryptedUrl,
             isHls: decryptedUrl.includes('m3u8'),
-            subtitleUrl
+            subtitleUrl,
+            subtitles
           };
         }
       } catch (err) {
