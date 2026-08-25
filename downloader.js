@@ -702,10 +702,9 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
         }
       }, cookieJar);
 
-      // 3. Mux them together using FFmpeg
-      console.log("Merging audio and video via FFmpeg...");
+      console.log("Merging audio and video via FFmpeg (Dual audio mapping)...");
       await new Promise((resolve) => {
-        exec(`"${ffmpegPath}" -y -i "${tempVideoFile}" -i "${tempAudioFile}" -map 0:v -map 1:a -c:v copy -c:a copy "${outputPath}"`, (err, stdout, stderr) => {
+        exec(`"${ffmpegPath}" -y -i "${tempVideoFile}" -i "${tempAudioFile}" -map 0:v -map 0:a? -map 1:a -c:v copy -c:a copy "${outputPath}"`, (err, stdout, stderr) => {
           if (err) {
             console.error("FFmpeg merge failed. Falling back to default video stream (English):", err.message);
             try {
