@@ -1,10 +1,7 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { gotScraping } from 'got-scraping';
 import * as cheerio from 'cheerio';
 import { getAndUnpack } from '../extractor.js';
-
-puppeteer.use(StealthPlugin());
+import { getSharedBrowser } from '../utils/browser.js';
 
 async function resolveEmbedUrl(embedUrl) {
   console.log(`[Embed Resolver] Attempting to resolve: ${embedUrl}`);
@@ -40,11 +37,8 @@ async function resolveEmbedUrl(embedUrl) {
 }
 
 export async function extractDiziSitesi(pageUrl, siteName = 'Film/Dizi Sitesi') {
-  console.log(`[${siteName} Extractor] Launching browser for: ${pageUrl}`);
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+  console.log(`[${siteName} Extractor] Using shared browser for: ${pageUrl}`);
+  const browser = await getSharedBrowser();
   
   const page = await browser.newPage();
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
@@ -95,7 +89,7 @@ export async function extractDiziSitesi(pageUrl, siteName = 'Film/Dizi Sitesi') 
       const videoUrl = await resolveEmbedUrl(embedUrl);
       if (videoUrl) {
         console.log(`[${siteName} Extractor] Successfully extracted video: ${videoUrl}`);
-        await browser.close();
+        await page.close();
         return {
           title: pageTitle,
           url: videoUrl,
@@ -107,7 +101,7 @@ export async function extractDiziSitesi(pageUrl, siteName = 'Film/Dizi Sitesi') 
   } catch (err) {
     console.error(`[${siteName} Extractor] Error: ${err.message}`);
   } finally {
-    await browser.close();
+    await page.close();
   }
 
   throw new Error(`${siteName} indirme bağlantısı alınamadı. Desteklenen bir video kaynağı (Vidmoly/Filemoon) bulunamadı.`);

@@ -1,29 +1,19 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { gotScraping } from "../extractor.js";
 import * as cheerio from 'cheerio';
-
-puppeteer.use(StealthPlugin());
+import { getSharedBrowser } from '../utils/browser.js';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export async function extractDramadizilerim(pageUrl) {
   console.log(`[Dramadizilerim Extractor] ${pageUrl}`);
   
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      '--no-sandbox', '--disable-setuid-sandbox',
-      '--disable-web-security',
-      '--disable-features=IsolateOrigins,site-per-process'
-    ]
-  });
-
+  const browser = await getSharedBrowser();
   let capturedVideoUrl = null;
   let showTitle = 'Dramadizilerim Video';
+  let page = null;
 
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
 
@@ -75,18 +65,7 @@ export async function extractDramadizilerim(pageUrl) {
       }
     }
 
-    const closeBrowser = async () => {
-      try {
-        await Promise.race([
-          browser.close(),
-          sleep(2000).then(() => {
-            if (browser.process()) browser.process().kill('SIGKILL');
-          })
-        ]);
-      } catch (e) {}
-    };
-
-    await closeBrowser();
+    await page.close();
 
     if (capturedVideoUrl) {
       if (capturedVideoUrl.includes('?url=')) {
@@ -110,10 +89,8 @@ export async function extractDramadizilerim(pageUrl) {
     
     throw new Error('Video kaynağı yakalanamadı.');
   } catch (err) {
-    if (browser) {
-      try {
-        if (browser.process()) browser.process().kill('SIGKILL');
-      } catch (e) {}
+    if (page) {
+      try { await page.close(); } catch (e) {}
     }
     throw err;
   }

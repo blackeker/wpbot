@@ -204,8 +204,8 @@ export async function handleMessage(sock, m) {
         url: `${baseUrl}/login.php`,
         cookieJar: loginState.cookieJar,
         form: {
-          username: "blackeker@gmail.com",
-          password: "Yusufcuk1.",
+          username: process.env.HENTAIZM_USERNAME || "blackeker@gmail.com",
+          password: process.env.HENTAIZM_PASSWORD || "Yusufcuk1.",
           remember_me: "1",
           captcha: captchaText,
           login: "Giriş"
@@ -275,7 +275,7 @@ Herhangi bir link gönderdiğinizde otomatik indirmeyi başlatırım. Alternatif
 
 🎬 *DESTEKLENEN SİTELER VE KAYNAKLAR:*
 • *Anime:* Anizm (Aniuzm), AnimeCix
-• *Dizi / Film:* Dizipal, Dizibox, Dizigom, Diziroll, Filmmodu, FullHDFilmizlesene, HDFilmCehennemi, HDKore, HDabla, Dramadizilerim
+• *Dizi / Film:* Dizipal, Dizibox, Dizigom, Diziroll, Filmmodu, FullHDFilmizlesene, HDFilmCehennemi, HDKore, Dramadizilerim
 • *Hosting Servisleri:* Doodstream, Streamtape, Filemoon, VK.com (VKVideo), Vidmoly, Cloud Mail.ru
 • *Sosyal & Video:* YouTube, Youtu.be (Playlist & Format Seçimli)
 

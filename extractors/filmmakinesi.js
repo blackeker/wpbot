@@ -1,10 +1,7 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { gotScraping } from '../extractor.js';
+import { getSharedBrowser } from '../utils/browser.js';
+import axios from 'axios';
 import * as cheerio from 'cheerio';
 import vm from 'vm';
-
-puppeteer.use(StealthPlugin());
 
 // Unpacker logic for eval-packed JS
 function getAndUnpack(script) {
@@ -118,14 +115,11 @@ function decryptSource(html) {
 }
 
 export async function extractFilmMakinesi(pageUrl) {
-  console.log(`[FilmMakinesi] Launching browser to scrape: ${pageUrl}`);
-  let browser;
+  console.log(`[FilmMakinesi] Using shared browser to scrape: ${pageUrl}`);
+  let page;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
+    const browser = await getSharedBrowser();
+    page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     
     await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 60000 });
@@ -141,8 +135,8 @@ export async function extractFilmMakinesi(pageUrl) {
     });
 
     console.log(`[FilmMakinesi] Title: ${title}, Found ${embedUrls.length} embeds.`);
-    await browser.close();
-    browser = null;
+    await page.close();
+    page = null;
 
     if (embedUrls.length === 0) {
       throw new Error('Film Makinesi alternatif player linkleri bulunamadı.');
@@ -249,7 +243,9 @@ export async function extractFilmMakinesi(pageUrl) {
 
     throw new Error('Film Makinesi video bağlantıları çözülemedi.');
   } catch (err) {
-    if (browser) await browser.close();
+    if (page) {
+      try { await page.close(); } catch (e) {}
+    }
     throw new Error(`FilmMakinesi extraction error: ${err.message}`);
   }
 }

@@ -1,10 +1,7 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
 import * as cheerio from 'cheerio';
 import axios from 'axios';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-puppeteer.use(StealthPlugin());
+import { getSharedBrowser } from '../utils/browser.js';
 
 // ==========================================
 // HDKORE1 EXTRACTOR AND RESOLVER FUNCTIONS
@@ -79,15 +76,13 @@ export async function decryptDramaizle(encryptedHex, videoId) {
 }
 export async function extractHdkorePuppeteer(pageUrl) {
   console.log(`\n[HDKore Puppeteer Fallback] ${pageUrl}`);
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security', '--disable-features=IsolateOrigins,site-per-process', '--autoplay-policy=no-user-gesture-required']
-  });
+  let page;
   let capturedApiPayload = null;
   let capturedVideoUrl = null;
   let title = '';
   try {
-    const page = await browser.newPage();
+    const browser = await getSharedBrowser();
+    page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
     await page.setViewport({
       width: 1280,
@@ -215,7 +210,7 @@ export async function extractHdkorePuppeteer(pageUrl) {
         }
       }
     }
-    await browser.close();
+    await page.close();
     if (capturedVideoUrl) {
       return {
         title: title.replace(/\s*[-–|]\s*(İzle|izle|Türkçe|HDKore).*/i, '').trim(),
@@ -226,7 +221,9 @@ export async function extractHdkorePuppeteer(pageUrl) {
     }
     return null;
   } catch (err) {
-    await browser.close().catch(() => {});
+    if (page) {
+      try { await page.close(); } catch (e) {}
+    }
     throw err;
   }
 }

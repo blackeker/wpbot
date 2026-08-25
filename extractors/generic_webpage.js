@@ -1,20 +1,13 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { getSharedBrowser } from '../utils/browser.js';
 import path from 'path';
 import fs from 'fs';
 
-puppeteer.use(StealthPlugin());
-
 export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
-  console.log(`[${siteName} Extractor] Launching browser for: ${pageUrl}`);
-  let browser;
+  console.log(`[${siteName} Extractor] Using shared browser for: ${pageUrl}`);
+  let page;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    
-    const page = await browser.newPage();
+    const browser = await getSharedBrowser();
+    page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
     await page.setViewport({ width: 1280, height: 720 });
 
@@ -67,7 +60,7 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
 
     if (detectedVideoUrl) {
       console.log(`[${siteName} Extractor] Network request match: ${detectedVideoUrl}`);
-      await browser.close();
+      await page.close();
       return {
         title: title || 'Video',
         source: siteName,
@@ -93,7 +86,7 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
 
     if (domUrl) {
       console.log(`[${siteName} Extractor] DOM match: ${domUrl}`);
-      await browser.close();
+      await page.close();
       return {
         title: title || 'Video',
         source: siteName,
@@ -123,7 +116,7 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
         });
       });
       if (ytDlpUrl) {
-        await browser.close();
+        await page.close();
         return {
           title: title || 'Video',
           source: siteName,
@@ -138,7 +131,9 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
 
     throw new Error('Video bağlantısı çözülemedi.');
   } catch (err) {
-    if (browser) await browser.close();
+    if (page) {
+      try { await page.close(); } catch (e) {}
+    }
     throw err;
   }
 }
