@@ -333,6 +333,7 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
         const fileStream = fs.createReadStream(finalPath);
         let lastWaUpdate = 0;
         const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
+          const now = Date.now();
           if (taskObject) {
             taskObject.status = `Yükleniyor... %${percent}`;
             notifyQueueUpdate();
