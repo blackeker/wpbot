@@ -704,7 +704,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         }
 
         await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndiriliyor: *%${percent}*\n\`[${bar}]\`\n📊 ${statusLine}\n⚡ Hız: ~${lastSpeedMBs} MB/s\n⏳ Kalan Süre: ${etaStr}\n🔗 Canlı İzle: ${watchUrl}`);
-      }, result.referer || null, result.cookies || null, result.userAgent || null, result.headers || null);
+      }, result.referer || null, result.cookies || null, result.userAgent || null, result.headers || null, result.audioUrl || null);
     });
     }
   } catch (err) {

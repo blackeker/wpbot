@@ -451,10 +451,14 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
       throw new Error("No alternative video sources found on this page.");
     }
 
-    // Get movie/series title
     const title = $('h1.section-title').text().replace(/izle/i, '').trim() || 'video';
 
-    // We look for a working link by traversing alternative link options
+    let altyaziliUrl = null;
+    let dublajUrl = null;
+    let activeSourceName = '';
+    let foundSubtitles = [];
+
+    // Traverse alternative links to find both TR and ALTYAZI streams
     for (let i = 0; i < alternativeLinks.length; i++) {
       const container = $(alternativeLinks[i]);
       const langCode = container.attr('data-lang')?.toUpperCase() || '';
@@ -465,7 +469,6 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
         const videoID = btn.attr('data-video');
         if (!videoID) continue;
         try {
-          // Fetch video player details
           const apiRes = await gotScraping.get({
             url: `${mainUrl}/video/${videoID}/`,
             headers: {
@@ -477,7 +480,6 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
           const apiData = typeof apiRes.body === 'string' ? JSON.parse(apiRes.body) : apiRes.body;
           const html = apiData.data?.html || apiData.html || '';
 
-          // Find iframe data-src
           let iframeMatch = html.match(/data-src="([^"]+)"/) || html.match(/data-src=\\?"([^"]+)\\?"/);
           if (!iframeMatch) continue;
           let iframe = iframeMatch[1].replace(/\\/g, '');
@@ -488,7 +490,6 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
             iframe = sub$('iframe').attr('data-src') || iframe;
           }
 
-          // Fetch iframe page
           const iframeRes = await gotScraping.get({
             url: iframe,
             headers: {
@@ -517,17 +518,72 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
             }
           }
           if (decryptedUrl) {
-            return {
-              title,
-              source: sourceName,
-              url: decryptedUrl
-            };
+            // Extract subtitles if any are defined
+            let subtitles = [];
+            const tracksMatch = unpacked.match(/tracks\s*:\s*\[([\s\S]*?)\]/);
+            if (tracksMatch) {
+              const tracksText = tracksMatch[1];
+              const fileMatches = [...tracksText.matchAll(/file\s*:\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
+              const labelMatches = [...tracksText.matchAll(/label\s*:\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
+              for (let k = 0; k < fileMatches.length; k++) {
+                let label = labelMatches[k] || 'Türkçe';
+                subtitles.push({
+                  url: fileMatches[k],
+                  language: label.toLowerCase().includes('türk') ? 'tur' : 'eng',
+                  label: label
+                });
+              }
+            }
+
+            if (langCode === 'ALTYAZI' || langCode === 'EN') {
+              if (!altyaziliUrl) {
+                altyaziliUrl = decryptedUrl;
+                activeSourceName = sourceName;
+                if (subtitles.length > 0) foundSubtitles = subtitles;
+              }
+            } else if (langCode === 'TR') {
+              if (!dublajUrl) {
+                dublajUrl = decryptedUrl;
+                activeSourceName = sourceName;
+                if (subtitles.length > 0 && foundSubtitles.length === 0) foundSubtitles = subtitles;
+              }
+            }
+
+            // If we found both streams, we can stop searching
+            if (altyaziliUrl && dublajUrl) {
+              break;
+            }
           }
         } catch (e) {
           console.error(`Error processing source ${sourceName}:`, e.message);
         }
       }
+      if (altyaziliUrl && dublajUrl) {
+        break;
+      }
     }
+
+    if (altyaziliUrl && dublajUrl) {
+      console.log(`[HDfilmcehennemi] Dual streams resolved successfully! Video (Altyazılı): ${altyaziliUrl}, Audio (Dublaj): ${dublajUrl}`);
+      return {
+        title,
+        source: activeSourceName + " DUAL",
+        url: altyaziliUrl,
+        audioUrl: dublajUrl,
+        subtitles: foundSubtitles
+      };
+    }
+
+    const finalUrl = altyaziliUrl || dublajUrl;
+    if (finalUrl) {
+      return {
+        title,
+        source: activeSourceName,
+        url: finalUrl,
+        subtitles: foundSubtitles
+      };
+    }
+
     throw new Error("Could not extract any valid video URLs from available sources.");
   } catch (err) {
     throw new Error(`Extraction failed: ${err.message}`);

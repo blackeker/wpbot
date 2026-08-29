@@ -433,7 +433,7 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
   });
 }
 
-export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, arg7, arg8) {
+export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, arg7, arg8, audioPlaylistUrlOverride = null) {
   let signal = null;
   let progressCallback = null;
   let refererOverride = null;
@@ -623,7 +623,7 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
     }
 
     let targetPlaylistUrl = m3u8Url;
-    let audioPlaylistUrl = null;
+    let audioPlaylistUrl = audioPlaylistUrlOverride || null;
 
     // Check if it's a master playlist
     if (content.includes('#EXT-X-STREAM-INF')) {
