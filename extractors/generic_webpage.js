@@ -60,7 +60,6 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
 
     if (detectedVideoUrl) {
       console.log(`[${siteName} Extractor] Network request match: ${detectedVideoUrl}`);
-      await page.close();
       return {
         title: title || 'Video',
         source: siteName,
@@ -86,7 +85,6 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
 
     if (domUrl) {
       console.log(`[${siteName} Extractor] DOM match: ${domUrl}`);
-      await page.close();
       return {
         title: title || 'Video',
         source: siteName,
@@ -116,7 +114,6 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
         });
       });
       if (ytDlpUrl) {
-        await page.close();
         return {
           title: title || 'Video',
           source: siteName,
@@ -131,9 +128,10 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
 
     throw new Error('Video bağlantısı çözülemedi.');
   } catch (err) {
+    throw err;
+  } finally {
     if (page) {
       try { await page.close(); } catch (e) {}
     }
-    throw err;
   }
 }

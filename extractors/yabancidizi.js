@@ -38,13 +38,13 @@ async function resolveEmbedUrl(embedUrl) {
 
 export async function extractYabancidizi(pageUrl) {
   console.log(`[YabanciDizi Extractor] Using shared browser for: ${pageUrl}`);
-  const browser = await getSharedBrowser();
-  
-  const page = await browser.newPage();
-  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
-  await page.setViewport({ width: 1280, height: 720 });
-
+  let page;
   try {
+    const browser = await getSharedBrowser();
+    page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1280, height: 720 });
+
     console.log("[YabanciDizi Extractor] Navigating to page...");
     await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 45000 });
 
@@ -85,7 +85,6 @@ export async function extractYabancidizi(pageUrl) {
       const videoUrl = await resolveEmbedUrl(embedUrl);
       if (videoUrl) {
         console.log(`[YabanciDizi Extractor] Successfully extracted video: ${videoUrl}`);
-        await page.close();
         return {
           title: pageTitle,
           url: videoUrl,
@@ -97,7 +96,9 @@ export async function extractYabancidizi(pageUrl) {
   } catch (err) {
     console.error(`[YabanciDizi Extractor] Error: ${err.message}`);
   } finally {
-    await page.close();
+    if (page) {
+      try { await page.close(); } catch (e) {}
+    }
   }
 
   throw new Error('YabancıDizi indirme bağlantısı alınamadı. Desteklenen bir video kaynağı (Vidmoly/Filemoon) bulunamadı.');

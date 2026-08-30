@@ -65,8 +65,6 @@ export async function extractDramadizilerim(pageUrl) {
       }
     }
 
-    await page.close();
-
     if (capturedVideoUrl) {
       if (capturedVideoUrl.includes('?url=')) {
         try {
@@ -89,10 +87,11 @@ export async function extractDramadizilerim(pageUrl) {
     
     throw new Error('Video kaynağı yakalanamadı.');
   } catch (err) {
+    throw err;
+  } finally {
     if (page) {
       try { await page.close(); } catch (e) {}
     }
-    throw err;
   }
 }
 

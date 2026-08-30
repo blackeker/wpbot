@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { gotScraping } from 'got-scraping';
 import { Cookie } from 'tough-cookie';
+import { fileLogger } from './utils/logger.js';
 
 export const sessionPath = process.env.SESSION_PATH || './auth_info_session';
 export const configPath = path.join(sessionPath, 'config.json');
@@ -209,6 +210,13 @@ function handleLogIntercept(type, args) {
   
   if (logEmitter) {
     try { logEmitter(logEntry); } catch (e) {}
+  }
+
+  try {
+    const loggerFunc = fileLogger[type === 'error' ? 'error' : type === 'warn' ? 'warn' : 'info'];
+    loggerFunc.call(fileLogger, text);
+  } catch (e) {
+    // Silent catch
   }
 
   if (devLogFilePath) {
@@ -478,3 +486,26 @@ export function restoreSession() {
   }
   return false;
 }
+
+export function validateEnv() {
+  const phone = process.env.WHATSAPP_PHONE_NUMBER;
+  if (phone && !/^\d+$/.test(phone)) {
+    console.warn(`[VALIDATION] WHATSAPP_PHONE_NUMBER '${phone}' sadece rakamlardan oluşmalıdır.`);
+  }
+  const port = process.env.PORT;
+  if (port && isNaN(Number(port))) {
+    console.warn(`[VALIDATION] PORT '${port}' geçerli bir sayı olmalıdır.`);
+  }
+  const maxAge = process.env.DOWNLOAD_MAX_AGE_HOURS;
+  if (maxAge && isNaN(Number(maxAge))) {
+    console.warn(`[VALIDATION] DOWNLOAD_MAX_AGE_HOURS '${maxAge}' geçerli bir sayı olmalıdır.`);
+  }
+  const maxCache = process.env.MAX_DOWNLOADS_CACHE_GB;
+  if (maxCache && isNaN(Number(maxCache))) {
+    console.warn(`[VALIDATION] MAX_DOWNLOADS_CACHE_GB '${maxCache}' geçerli bir sayı olmalıdır.`);
+  }
+}
+
+// Run validation
+validateEnv();
+

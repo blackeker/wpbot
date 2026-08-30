@@ -2,8 +2,35 @@ import { botSocketRef, sessionPath, readConfig } from './config.js';
 import { executeDownloadPipeline } from './pipelines.js';
 import fs from 'fs';
 import path from 'path';
+import Database from 'better-sqlite3';
 
-const queueFilePath = path.join(sessionPath, 'queue.json');
+const dbPath = path.join(sessionPath, 'queue.db');
+const db = new Database(dbPath);
+
+// Initialize DB schema
+db.exec(`
+  CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    url TEXT,
+    recipientJid TEXT,
+    title TEXT,
+    status TEXT,
+    format TEXT,
+    priority INTEGER,
+    addedTime TEXT
+  );
+  
+  CREATE TABLE IF NOT EXISTS active_tasks (
+    id TEXT PRIMARY KEY,
+    url TEXT,
+    recipientJid TEXT,
+    title TEXT,
+    status TEXT,
+    format TEXT,
+    priority INTEGER,
+    addedTime TEXT
+  );
+`);
 
 export let downloadQueue = [];
 export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...] } }
@@ -24,83 +51,119 @@ export const queueState = {
   isPaused: false
 };
 
-// JSON Dosyasına Kaydet
+// SQLite Kaydet
 function saveQueueToFile() {
   try {
-    const dataToSave = {
-      downloadQueue: downloadQueue.map(t => ({
-        id: t.id,
-        url: t.url,
-        recipientJid: t.recipientJid,
-        title: t.title,
-        status: t.status,
-        format: t.format,
-        priority: t.priority,
-        addedTime: t.addedTime
-      })),
-      activeTasks: activeTasksList.map(t => ({
-        id: t.id,
-        url: t.url,
-        recipientJid: t.recipientJid,
-        title: t.title,
-        status: 'queued', // restore active tasks as queued on next boot
-        format: t.format,
-        priority: t.priority,
-        addedTime: t.addedTime
-      })),
-      taskIdCounter
-    };
-    fs.writeFileSync(queueFilePath, JSON.stringify(dataToSave, null, 2), 'utf8');
+    const deleteTasks = db.prepare('DELETE FROM tasks');
+    const deleteActive = db.prepare('DELETE FROM active_tasks');
+    
+    const insertTask = db.prepare(`
+      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const insertActive = db.prepare(`
+      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const transaction = db.transaction(() => {
+      deleteTasks.run();
+      deleteActive.run();
+
+      for (const t of downloadQueue) {
+        insertTask.run(
+          t.id,
+          t.url,
+          t.recipientJid,
+          t.title,
+          t.status,
+          t.format || null,
+          t.priority ? 1 : 0,
+          new Date(t.addedTime).toISOString()
+        );
+      }
+
+      for (const t of activeTasksList) {
+        insertActive.run(
+          t.id,
+          t.url,
+          t.recipientJid,
+          t.title,
+          'queued', // restore active tasks as queued on next boot
+          t.format || null,
+          t.priority ? 1 : 0,
+          new Date(t.addedTime).toISOString()
+        );
+      }
+    });
+
+    transaction();
   } catch (err) {
-    console.error('Kuyruk kaydedilemedi:', err.message);
+    console.error('Kuyruk veri tabanına kaydedilemedi:', err.message);
   }
 }
 
-// JSON Dosyasından Yükle
+// SQLite Yükle
 function loadQueueFromFile() {
   try {
-    if (fs.existsSync(queueFilePath)) {
-      const data = JSON.parse(fs.readFileSync(queueFilePath, 'utf8'));
-      const loadedQueue = [];
-
-      // Restore active tasks first so they resume first
-      if (data.activeTasks && Array.isArray(data.activeTasks)) {
-        data.activeTasks.forEach(t => {
-          loadedQueue.push({
-            ...t,
-            addedTime: new Date(t.addedTime),
-            isCancelled: false,
-            startTime: null,
-            endTime: null,
-            speed: null,
-            sizeMB: null
-          });
-        });
-      }
-
-      if (data.downloadQueue && Array.isArray(data.downloadQueue)) {
-        data.downloadQueue.forEach(t => {
-          loadedQueue.push({
-            ...t,
-            addedTime: new Date(t.addedTime),
-            isCancelled: false,
-            startTime: null,
-            endTime: null,
-            speed: null,
-            sizeMB: null
-          });
-        });
-      }
-
-      downloadQueue = loadedQueue;
-
-      if (data.taskIdCounter) {
-        taskIdCounter = data.taskIdCounter;
-      }
-      console.log(`[QUEUE] Diskten ${downloadQueue.length} adet bekleyen/yarıda kalmış görev geri yüklendi.`);
+    const loadedQueue = [];
+    
+    // Load active tasks first so they resume first
+    const activeRows = db.prepare('SELECT * FROM active_tasks').all();
+    for (const r of activeRows) {
+      loadedQueue.push({
+        id: r.id,
+        url: r.url,
+        recipientJid: r.recipientJid,
+        title: r.title,
+        status: r.status,
+        format: r.format,
+        priority: Boolean(r.priority),
+        addedTime: new Date(r.addedTime),
+        isCancelled: false,
+        startTime: null,
+        endTime: null,
+        speed: null,
+        sizeMB: null
+      });
     }
+
+    // Load queued tasks
+    const queueRows = db.prepare('SELECT * FROM tasks').all();
+    for (const r of queueRows) {
+      loadedQueue.push({
+        id: r.id,
+        url: r.url,
+        recipientJid: r.recipientJid,
+        title: r.title,
+        status: r.status,
+        format: r.format,
+        priority: Boolean(r.priority),
+        addedTime: new Date(r.addedTime),
+        isCancelled: false,
+        startTime: null,
+        endTime: null,
+        speed: null,
+        sizeMB: null
+      });
+    }
+
+    downloadQueue = loadedQueue;
+
+    // Find the max id to set taskIdCounter
+    let maxId = 0;
+    for (const t of downloadQueue) {
+      const numId = parseInt(t.id, 10);
+      if (!isNaN(numId) && numId > maxId) {
+        maxId = numId;
+      }
+    }
+    taskIdCounter = maxId + 1;
+
+    console.log(`[QUEUE] SQLite veri tabanından ${downloadQueue.length} adet bekleyen/yarıda kalmış görev geri yüklendi.`);
   } catch (err) {
-    console.error('Kuyruk yüklenemedi:', err.message);
+    console.error('Kuyruk veri tabanından yüklenemedi:', err.message);
   }
 }
 
@@ -129,10 +192,17 @@ export function addDownloadTask(url, recipientJid, title, format = null, priorit
     throw new Error("Bu link zaten indirme kuyrugunda veya su an indiriliyor.");
   }
 
+  let sanitizedJid = recipientJid;
+  if (sanitizedJid && typeof sanitizedJid === 'string' && !sanitizedJid.includes('@')) {
+    if (/^\d+$/.test(sanitizedJid)) {
+      sanitizedJid = `${sanitizedJid}@s.whatsapp.net`;
+    }
+  }
+
   const task = {
     id: String(taskIdCounter++),
     url,
-    recipientJid,
+    recipientJid: sanitizedJid,
     title,
     status: 'queued',
     isCancelled: false,

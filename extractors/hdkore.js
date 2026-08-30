@@ -210,7 +210,6 @@ export async function extractHdkorePuppeteer(pageUrl) {
         }
       }
     }
-    await page.close();
     if (capturedVideoUrl) {
       return {
         title: title.replace(/\s*[-–|]\s*(İzle|izle|Türkçe|HDKore).*/i, '').trim(),
@@ -221,10 +220,11 @@ export async function extractHdkorePuppeteer(pageUrl) {
     }
     return null;
   } catch (err) {
+    throw err;
+  } finally {
     if (page) {
       try { await page.close(); } catch (e) {}
     }
-    throw err;
   }
 }
 export async function extractHdkore(pageUrl) {

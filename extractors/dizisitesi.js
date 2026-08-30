@@ -38,13 +38,13 @@ async function resolveEmbedUrl(embedUrl) {
 
 export async function extractDiziSitesi(pageUrl, siteName = 'Film/Dizi Sitesi') {
   console.log(`[${siteName} Extractor] Using shared browser for: ${pageUrl}`);
-  const browser = await getSharedBrowser();
-  
-  const page = await browser.newPage();
-  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
-  await page.setViewport({ width: 1280, height: 720 });
-
+  let page;
   try {
+    const browser = await getSharedBrowser();
+    page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1280, height: 720 });
+
     console.log(`[${siteName} Extractor] Navigating to page...`);
     await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 45000 });
 
@@ -89,7 +89,6 @@ export async function extractDiziSitesi(pageUrl, siteName = 'Film/Dizi Sitesi') 
       const videoUrl = await resolveEmbedUrl(embedUrl);
       if (videoUrl) {
         console.log(`[${siteName} Extractor] Successfully extracted video: ${videoUrl}`);
-        await page.close();
         return {
           title: pageTitle,
           url: videoUrl,
@@ -101,7 +100,9 @@ export async function extractDiziSitesi(pageUrl, siteName = 'Film/Dizi Sitesi') 
   } catch (err) {
     console.error(`[${siteName} Extractor] Error: ${err.message}`);
   } finally {
-    await page.close();
+    if (page) {
+      try { await page.close(); } catch (e) {}
+    }
   }
 
   throw new Error(`${siteName} indirme bağlantısı alınamadı. Desteklenen bir video kaynağı (Vidmoly/Filemoon) bulunamadı.`);

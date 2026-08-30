@@ -277,9 +277,9 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
     }
   }
 
-  // Handle direct links (MP4, MKV, WebM, AVI, APK, ZIP, RAR, 7Z, PDF, EXE, etc.)
+  // Handle direct links (MP4, M3U8, MP3, MKV, WebM, AVI, APK, ZIP, RAR, 7Z, PDF, EXE, etc.)
   const urlLower = targetUrl.toLowerCase().split('?')[0];
-  if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mkv') || urlLower.endsWith('.webm') || urlLower.endsWith('.avi') || urlLower.endsWith('.apk') || urlLower.endsWith('.zip') || urlLower.endsWith('.rar') || urlLower.endsWith('.7z') || urlLower.endsWith('.pdf') || urlLower.endsWith('.exe')) {
+  if (urlLower.endsWith('.mp4') || urlLower.endsWith('.m3u8') || urlLower.endsWith('.mp3') || urlLower.endsWith('.mkv') || urlLower.endsWith('.webm') || urlLower.endsWith('.avi') || urlLower.endsWith('.apk') || urlLower.endsWith('.zip') || urlLower.endsWith('.rar') || urlLower.endsWith('.7z') || urlLower.endsWith('.pdf') || urlLower.endsWith('.exe')) {
     const fileName = path.basename(urlLower);
     const decodedTitle = decodeURIComponent(fileName).trim();
     return {
