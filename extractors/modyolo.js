@@ -4,56 +4,83 @@ import * as cheerio from 'cheerio';
 export async function extractModyolo(pageUrl) {
   console.log(`[Modyolo Extractor] Extracting URL: ${pageUrl}`);
   try {
-    // 1. Fetch main page HTML
-    const mainRes = await gotScraping.get({
-      url: pageUrl,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-      }
-    });
-    
-    let $ = cheerio.load(mainRes.body);
-    const title = $('title').text().replace('Download', '').trim();
-    
-    // Find download button link containing "/download/"
     let downloadHref = null;
-    $('a').each((_, el) => {
-      const href = $(el).attr('href');
-      if (href && href.includes('/download/')) {
-        downloadHref = href;
-      }
-    });
-    
-    if (!downloadHref) {
-      throw new Error('İndirme sayfası bağlantısı bulunamadı.');
+    let finalSubpageHref = null;
+    let title = 'Modyolo File';
+
+    // Auto-detect URL stage
+    const endsWithNumber = pageUrl.match(/\/download\/.+\/\d+$/);
+    const isDownloadPage = pageUrl.includes('/download/') && !endsWithNumber;
+
+    if (endsWithNumber) {
+      finalSubpageHref = pageUrl;
+      // Fetch title fallback from final page
+      const mainRes = await gotScraping.get({
+        url: pageUrl,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+      });
+      const $ = cheerio.load(mainRes.body);
+      title = $('title').text().replace('Download', '').trim();
+    } else if (isDownloadPage) {
+      downloadHref = pageUrl;
     }
-    
-    console.log(`[Modyolo Extractor] Intermediate download URL: ${downloadHref}`);
+
+    // 1. Fetch main page HTML
+    if (!downloadHref && !finalSubpageHref) {
+      const mainRes = await gotScraping.get({
+        url: pageUrl,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+      });
+      
+      let $ = cheerio.load(mainRes.body);
+      title = $('title').text().replace('Download', '').trim();
+      
+      $('a').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && href.includes('/download/')) {
+          downloadHref = href;
+        }
+      });
+      
+      if (!downloadHref) {
+        throw new Error('İndirme sayfası bağlantısı bulunamadı.');
+      }
+      
+      console.log(`[Modyolo Extractor] Intermediate download URL: ${downloadHref}`);
+    }
     
     // 2. Fetch intermediate download page
-    const intermediateRes = await gotScraping.get({
-      url: downloadHref,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-      }
-    });
-    
-    $ = cheerio.load(intermediateRes.body);
-    let finalSubpageHref = null;
-    $('a').each((_, el) => {
-      const href = $(el).attr('href');
-      if (href && href.match(/\/download\/.+\/\d+$/)) {
-        if (!finalSubpageHref || href.endsWith('/1')) {
-          finalSubpageHref = href;
-        }
-      }
-    });
-    
     if (!finalSubpageHref) {
-      throw new Error('Alt indirme sayfası bağlantısı bulunamadı.');
+      const intermediateRes = await gotScraping.get({
+        url: downloadHref,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+      });
+      
+      const $ = cheerio.load(intermediateRes.body);
+      if (title === 'Modyolo File') {
+        title = $('title').text().replace('Download', '').trim();
+      }
+      $('a').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && href.match(/\/download\/.+\/\d+$/)) {
+          if (!finalSubpageHref || href.endsWith('/1')) {
+            finalSubpageHref = href;
+          }
+        }
+      });
+      
+      if (!finalSubpageHref) {
+        throw new Error('Alt indirme sayfası bağlantısı bulunamadı.');
+      }
+      
+      console.log(`[Modyolo Extractor] Final subpage URL: ${finalSubpageHref}`);
     }
-    
-    console.log(`[Modyolo Extractor] Final subpage URL: ${finalSubpageHref}`);
     
     // 3. Post to WordPress admin-ajax using final subpage as referer
     const ajaxUrl = 'https://modyolo.com/wp-admin/admin-ajax.php';
