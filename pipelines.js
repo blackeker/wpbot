@@ -324,11 +324,13 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           }));
         }
         await progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n✅ Tüm parçalar başarıyla gönderildi!\n\n🔗 *Canlı İzleme (VDS):*\n${watchUrl}`);
-        // Depo grubuna her parçayı gönder
+        // Depo grubuna her parçayı gönder ve diskten temizle
         for (let i = 0; i < splitFiles.length; i++) {
           const partPath = path.join(downloadsDir, splitFiles[i]);
           await sendToDepot(partPath, splitFiles[i], finalMime, title, recipientJid);
+          try { if (fs.existsSync(partPath)) fs.unlinkSync(partPath); } catch {}
         }
+        try { if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath); } catch {}
       } else {
         const fileStream = fs.createReadStream(finalPath);
         let lastWaUpdate = 0;
@@ -352,8 +354,9 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           fileName: finalSafeTitle
         });
         await progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n✅ Başarıyla Gönderildi! (${finalSizeStr})\n\n🔗 *Canlı İzleme (VDS):*\n${watchUrl}`);
-        // Depo grubuna gönder
+        // Depo grubuna gönder ve diskten temizle
         await sendToDepot(finalPath, finalSafeTitle, finalMime, title, recipientJid);
+        try { if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath); } catch {}
       }
     } catch (err) {
       console.error(`WhatsApp gönderme hatası (${title}):`, err.message);
@@ -519,6 +522,7 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
             await progressUpdateCallback(summary);
 
             await sendToDepot(finalFilePath, finalTitle, mimeType, finalTitle, recipientJid);
+            try { if (fs.existsSync(finalFilePath)) fs.unlinkSync(finalFilePath); } catch {}
           } catch (err) {
             console.error(`WhatsApp gönderme hatası (${finalTitle}):`, err.message);
             progressUpdateCallback(`❌ *Gönderim Hatası*\n━━━━━━━━━━━━━━━━━━━━\nDosya WhatsApp'a yüklenirken bir hata oluştu: ${err.message}`).catch(() => {});
@@ -982,11 +986,13 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         }
         const summary = `${icon} *${finalTitle}*\n\n✅ *Tüm Parçalar Tamamlandı!*\n📦 Toplam Boyut: ${finalSizeStr}\n⏱️ Süre: ${totalDuration}\n\n🔗 *İndirme Linki (VDS):*\n${watchUrl.replace(fileExt, finalFileExt)}`;
         await progressUpdateCallback(summary);
-        // Depo grubuna her parçayı gönder
+        // Depo grubuna her parçayı gönder ve diskten temizle
         for (let i = 0; i < splitFiles.length; i++) {
           const partPath = path.join(downloadsDir, splitFiles[i]);
           await sendToDepot(partPath, splitFiles[i], finalMimeType, finalTitle, recipientJid);
+          try { if (fs.existsSync(partPath)) fs.unlinkSync(partPath); } catch {}
         }
+        try { if (fs.existsSync(finalFilePath)) fs.unlinkSync(finalFilePath); } catch {}
       } else {
         const fileStream = fs.createReadStream(finalFilePath);
         let lastWaUpdate = 0;
@@ -1011,8 +1017,9 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         const summary = `${icon} *${finalTitle}*\n\n✅ *Tamamlandı!*\n📦 Boyut: ${finalSizeStr}\n⏱️ Süre: ${totalDuration}\n\n🔗 *İndirme Linki (VDS):*\n${watchUrl.replace(fileExt, finalFileExt)}`;
         await progressUpdateCallback(summary);
         console.log('✅ Dosya gönderildi');
-        // Depo grubuna gönder
+        // Depo grubuna gönder ve diskten temizle
         await sendToDepot(finalFilePath, `${safeTitle}${finalFileExt}`, finalMimeType, finalTitle, recipientJid);
+        try { if (fs.existsSync(finalFilePath)) fs.unlinkSync(finalFilePath); } catch {}
       }
 
       if (taskObject) { taskObject.endTime = Date.now(); }
