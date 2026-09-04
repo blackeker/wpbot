@@ -93,7 +93,10 @@ const DEFAULT_CONFIG = {
   ]
 };
 
+let cachedConfig = null;
+
 export function readConfig() {
+  if (cachedConfig) return cachedConfig;
   let config = { ...DEFAULT_CONFIG };
   if (fs.existsSync(configPath)) {
     try {
@@ -113,12 +116,14 @@ export function readConfig() {
   if (config.maxDownloadsCacheGB) {
     process.env.MAX_DOWNLOADS_CACHE_GB = String(config.maxDownloadsCacheGB);
   }
+  cachedConfig = config;
   return config;
 }
 
 export function writeConfig(data) {
   const current = readConfig();
   const updated = { ...current, ...data };
+  cachedConfig = updated;
   fs.writeFileSync(configPath, JSON.stringify(updated, null, 2), 'utf8');
   
   // Update process.env variables immediately

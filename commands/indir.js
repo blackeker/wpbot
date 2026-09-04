@@ -361,39 +361,36 @@ export default {
         const activeProxy = getProxyUrl();
         const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
         const ytDlpCmd = getYtDlpCommand();
-        exec(`"${ytDlpCmd}" ${proxyArg} -F --no-playlist "${singleUrl}"`, async (err, stdout) => {
-          if (err) {
-            await sock.sendMessage(from, { text: `❌ Format analizi başarısız oldu: ${err.message}` });
-            return;
-          }
-          
-          const lines = stdout.split('\n');
-          const availableFormats = [];
-          const targets = [
-            { height: 1080, label: '1080p (FHD)' },
-            { height: 720, label: '720p (HD)' },
-            { height: 480, label: '480p (SD)' },
-            { height: 360, label: '360p (Mobil)' }
-          ];
 
-          for (const target of targets) {
-            const matchedLine = lines.find(l => {
-              return l.includes(`${target.height}p`) || new RegExp(`x${target.height}\\b`).test(l);
-            });
+        exec(`"${ytDlpCmd}" ${proxyArg} -J --no-playlist "${singleUrl}"`, { maxBuffer: 10 * 1024 * 1024 }, async (err, stdout) => {
+          let ytTitle = 'YouTube Video';
+          let availableFormats = [];
 
-            if (matchedLine) {
-              const partsLine = matchedLine.trim().split(/\s+/);
-              const formatId = partsLine[0];
-              let sizeStr = 'Bilinmiyor';
-              const sizeMatch = matchedLine.match(/(\d+(?:\.\d+)?\s*[GMK]iB)/i);
-              if (sizeMatch) sizeStr = sizeMatch[1];
-              
-              availableFormats.push({
-                format_id: formatId,
-                label: `${target.label} [${sizeStr}]`,
-                height: target.height
-              });
-            }
+          if (!err && stdout) {
+            try {
+              const info = JSON.parse(stdout);
+              ytTitle = info.title || 'YouTube Video';
+              const formats = info.formats || [];
+              const targets = [
+                { height: 1080, label: '1080p (FHD)' },
+                { height: 720, label: '720p (HD)' },
+                { height: 480, label: '480p (SD)' },
+                { height: 360, label: '360p (Mobil)' }
+              ];
+
+              for (const target of targets) {
+                const matched = formats.find(f => f.height === target.height && f.vcodec !== 'none');
+                if (matched) {
+                  const bytes = matched.filesize || matched.filesize_approx || 0;
+                  const sizeStr = bytes > 0 ? ctx.formatBytes(bytes) : 'Bilinmiyor';
+                  availableFormats.push({
+                    format_id: matched.format_id,
+                    label: `${target.label} [${sizeStr}]`,
+                    height: target.height
+                  });
+                }
+              }
+            } catch (e) {}
           }
 
           if (availableFormats.length === 0) {
@@ -409,15 +406,6 @@ export default {
             label: '🎵 Sadece Ses (MP3 olarak indir)',
             height: -1
           });
-
-          let ytTitle = 'YouTube Video';
-          try {
-            ytTitle = await new Promise((res) => {
-              const activeProxy = getProxyUrl();
-              const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
-              exec(`"${ytDlpCmd}" ${proxyArg} --get-title --no-playlist "${singleUrl}"`, (e, o) => res(e ? 'YouTube Video' : o.trim()));
-            });
-          } catch {}
 
           pendingSelections[from] = {
             url: singleUrl,

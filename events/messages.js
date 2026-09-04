@@ -104,6 +104,10 @@ export async function handleMessage(sock, m) {
   const isSupportedLink = (isLink && (SUPPORTED_DOMAINS.some(d => text.includes(d)) || text.includes('itch.io') || text.includes('9mod.com'))) || isDirectFileLink;
   const isTorrentUrl = text.startsWith('magnet:') || text.toLowerCase().includes('.torrent');
 
+  if (text.startsWith('!') || isSupportedLink || isTorrentUrl || isLink) {
+    sock.sendPresenceUpdate('composing', from).catch(() => {});
+  }
+
   // 0. Pending Quality Selection Handler
   if (pendingSelections[from]) {
     const selection = pendingSelections[from];
