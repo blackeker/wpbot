@@ -22,6 +22,7 @@ function shouldUseProxy(url) {
   if (!url) return false;
   const lowerUrl = String(url).toLowerCase();
   return lowerUrl.includes('pornhub.com') ||
+         lowerUrl.includes('phncdn.com') ||
          lowerUrl.includes('turkifsahub.com') ||
          lowerUrl.includes('turkifsalar') ||
          lowerUrl.includes('turkporno');
@@ -123,7 +124,7 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
       '-reconnect_delay_max', '5'
     ];
     
-    if (activeProxy) {
+    if (activeProxy && shouldUseProxy(playlistUrl)) {
       args.push('-http_proxy', activeProxy);
     }
     
