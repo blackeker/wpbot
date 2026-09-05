@@ -45,12 +45,34 @@ export function getCachedResult(url) {
 
 export function saveToCache(url, result) {
   try {
+    if (!result || !result.url) return;
+
+    // Don't cache ephemeral stream URLs with short-lived tokens
+    const isEphemeral = /[?&](e|token|expire|hash|h)=/i.test(result.url) || 
+                        result.url.includes('phncdn.com') || 
+                        result.url.includes('.m3u8');
+    if (isEphemeral) {
+      console.log(`[Cache] Skipping cache for ephemeral stream URL: ${url}`);
+      return;
+    }
+
     const cache = readCacheFile();
     cache[url] = {
       timestamp: Date.now(),
       result
     };
     writeCacheFile(cache);
+  } catch (e) {}
+}
+
+export function deleteFromCache(url) {
+  try {
+    const cache = readCacheFile();
+    if (cache[url]) {
+      delete cache[url];
+      writeCacheFile(cache);
+      console.log(`[Cache] Invalidated cache entry for: ${url}`);
+    }
   } catch (e) {}
 }
 

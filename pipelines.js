@@ -8,7 +8,7 @@ import { downloadM3u8 } from './downloader.js';
 import { notifyQueueUpdate } from './queue.js';
 import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig, getProxyUrl } from './config.js';
 import WebTorrent from 'webtorrent';
-import { getCachedResult, saveToCache } from './cache.js';
+import { getCachedResult, saveToCache, deleteFromCache } from './cache.js';
 
 function replaceTurkishChars(str) {
   if (!str) return '';
@@ -657,7 +657,8 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
       await withRetry(async () => {
         // Sıfırla: retry sırasında lastUpdateTime eski kalmasın
         lastUpdateTime = 0;
-        await downloadM3u8(result.url, actualFilePath, signal, async (completed, total) => {
+        try {
+          await downloadM3u8(result.url, actualFilePath, signal, async (completed, total) => {
         const now = Date.now();
         const isBytes = total > 1000; // 1000'den büyükse bytes bazlı (direkt indirme)
         const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
@@ -719,6 +720,19 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
 
         await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndiriliyor: *%${percent}*\n\`[${bar}]\`\n📊 ${statusLine}\n⚡ Hız: ~${lastSpeedMBs} MB/s\n⏳ Kalan Süre: ${etaStr}\n🔗 Canlı İzle: ${watchUrl}`);
       }, result.referer || null, result.cookies || null, result.userAgent || null, result.headers || null, result.audioUrl || null);
+        } catch (dlErr) {
+          deleteFromCache(targetUrl);
+          if (dlErr.message !== 'İndirme iptal edildi.') {
+            console.warn(`[Pipeline] Download attempt failed (${dlErr.message}), clearing cache and re-extracting fresh URL for: ${targetUrl}`);
+            try {
+              const freshRes = await extractVideoUrl(targetUrl, recipientJid);
+              if (freshRes && freshRes.url) {
+                result = freshRes;
+              }
+            } catch (reExtractErr) {}
+          }
+          throw dlErr;
+        }
     });
     }
   } catch (err) {
