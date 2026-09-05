@@ -319,11 +319,12 @@ app.get('/api/extract/:site', async (req, res) => {
 
 // Local API: trigger a download task (accessible publicly)
 app.post('/api/indir', (req, res) => {
-  const { url, jid } = req.body;
+  const { url, jid, title, fileName, caption } = req.body;
   if (!url || !jid) return res.status(400).json({ error: 'url ve jid gerekli.' });
 
   try {
-    const task = addDownloadTask(url, jid, url);
+    const customTitle = title || fileName || url;
+    const task = addDownloadTask(url, jid, customTitle, null, false, caption || null);
     res.json({ ok: true, taskId: task.id, message: 'Görev kuyruğa eklendi.' });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -740,7 +741,8 @@ app.post('/api/indir-multiple', (req, res) => {
   let skippedCount = 0;
   for (const ep of episodes) {
     try {
-      addDownloadTask(ep.url, jid, ep.name);
+      const customTitle = ep.title || ep.fileName || ep.name || ep.url;
+      addDownloadTask(ep.url, jid, customTitle, null, false, ep.caption || null);
       addedCount++;
     } catch (e) {
       skippedCount++;

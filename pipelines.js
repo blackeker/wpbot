@@ -580,8 +580,9 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
       throw err;
     }
   }
-  console.log('Extraction success:', result);
-  if (taskObject && taskObject.url === targetUrl) {
+  if (taskObject && taskObject.title && taskObject.title !== targetUrl) {
+    result.title = taskObject.title;
+  } else if (taskObject && taskObject.url === targetUrl) {
     taskObject.title = result.title;
   }
 
@@ -1014,7 +1015,8 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           fileName: `${safeTitle}${finalFileExt}`
         }));
 
-        const summary = `${icon} *${finalTitle}*\n\n✅ *Tamamlandı!*\n📦 Boyut: ${finalSizeStr}\n⏱️ Süre: ${totalDuration}\n\n🔗 *İndirme Linki (VDS):*\n${watchUrl.replace(fileExt, finalFileExt)}`;
+        const customCaptionHeader = (taskObject && taskObject.caption) ? `${taskObject.caption}\n━━━━━━━━━━━━━━━━━━━━` : `${icon} *${finalTitle}*`;
+        const summary = `${customCaptionHeader}\n\n✅ *Tamamlandı!*\n📦 Boyut: ${finalSizeStr}\n⏱️ Süre: ${totalDuration}\n\n🔗 *İndirme Linki (VDS):*\n${watchUrl.replace(fileExt, finalFileExt)}`;
         await progressUpdateCallback(summary);
         console.log('✅ Dosya gönderildi');
         // Depo grubuna gönder ve diskten temizle

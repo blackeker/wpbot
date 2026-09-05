@@ -186,7 +186,7 @@ export const activeTask = {
   }
 };
 
-export function addDownloadTask(url, recipientJid, title, format = null, priority = false) {
+export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null) {
   const isDuplicate = downloadQueue.some(t => t.url === url) || activeTasksList.some(t => t.url === url);
   if (isDuplicate) {
     throw new Error("Bu link zaten indirme kuyrugunda veya su an indiriliyor.");
@@ -208,6 +208,7 @@ export function addDownloadTask(url, recipientJid, title, format = null, priorit
     isCancelled: false,
     format,
     priority,
+    caption: caption || null,
     addedTime: new Date(),
     startTime: null,
     endTime: null,
