@@ -248,44 +248,10 @@ export async function handleMessage(sock, m) {
   ].includes(ltext);
 
   if (isMenuRequest) {
-    const menuText =
-`🤖 *İndirme Botu Gelişmiş Komut Paneli*
-
-Herhangi bir link gönderdiğinizde otomatik indirmeyi başlatırım. Alternatif olarak aşağıdaki komutları kullanabilirsiniz:
-
-📥 *İNDİRME VE KUYRUK KOMUTLARI:*
-• *!indir <link>* veya direkt link → İndirmeyi başlatır.
-• *kuyruk* veya *!kuyruk* → Sıradaki ve aktif görevleri listeler.
-• *iptal* veya *!iptal* → Aktif olarak inen görevi iptal eder.
-• *dur* / *durdur* → İndirme kuyruğunu duraklatır.
-• *devam* → Duraklatılmış kuyruğu devam ettirir.
-
-📊 *SİSTEM VE DURUM KOMUTLARI:*
-• *durum* veya *!durum* → Botun aktiflik ve bağlantı durumunu gösterir.
-• *geçmiş* veya *!geçmiş* → Tamamlanan son 10 indirmeyi listeler.
-• *disk* veya *!disk* → Sunucu disk doluluk oranını gösterir.
-• *hız* veya *!hız* → Aktif indirme hızını raporlar.
-• *hatalar* veya *!hatalar* → Son oluşan hataları listeler.
-• *güncelle* → Bot dosyalarını en son sürüme günceller.
-
-⚙️ *YÖNETİCİ VE GELİŞMİŞ KOMUTLAR:*
-• *!tekrargönder <görevNo>* → İndirilmiş dosyayı WhatsApp'a tekrar atar.
-• *!çöz <durumKodu> <kod>* → Captcha doğrulamasını çözer.
-• *!çerez <veri>* → Çerez ayarlarını günceller.
-• *!komutekle <tetikleyici> <cevap>* → Bota özel komut ekler.
-• *!komutsil <tetikleyici>* → Eklenen özel komutu siler.
-• *!pingurl <link>* → Sunucudan o linke erişim testi yapar.
-• *!botkontrol* → Botun çalışma durumunu test eder.
-
-🎬 *DESTEKLENEN SİTELER VE KAYNAKLAR:*
-• *Anime:* Anizm (Aniuzm), AnimeCix
-• *Dizi / Film:* Dizipal, Dizibox, Dizigom, Diziroll, Filmmodu, FullHDFilmizlesene, HDFilmCehennemi, HDKore, Dramadizilerim
-• *Hosting Servisleri:* Doodstream, Streamtape, Filemoon, VK.com (VKVideo), Vidmoly, Cloud Mail.ru
-• *Sosyal & Video:* YouTube, Youtu.be (Playlist & Format Seçimli)
-
-────────────────────
-_Sadece linki atın, gerisini ben hallederim!_ ✨`;
-    await sock.sendMessage(from, { text: menuText });
+    const yardimCmd = commands.get('yardim');
+    if (yardimCmd) {
+      await yardimCmd.execute(sock, msg, from, [], { text: textMessage, sender });
+    }
     return;
   }
 
