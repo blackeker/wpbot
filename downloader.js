@@ -259,17 +259,22 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
               const writer = fs.createWriteStream(partPath);
               res.data.pipe(writer);
 
+              let lastProgressReportTime = 0;
               res.data.on('data', (chunk) => {
                 const currentVal = downloadedMap.get(i) || 0;
                 downloadedMap.set(i, currentVal + chunk.length);
 
-                let totalDownloaded = 0;
-                for (let val of downloadedMap.values()) {
-                  totalDownloaded += val;
-                }
+                const now = Date.now();
+                if (now - lastProgressReportTime > 500) {
+                  lastProgressReportTime = now;
+                  let totalDownloaded = 0;
+                  for (let val of downloadedMap.values()) {
+                    totalDownloaded += val;
+                  }
 
-                if (progressCallback) {
-                  progressCallback(totalDownloaded, totalBytes);
+                  if (progressCallback) {
+                    progressCallback(totalDownloaded, totalBytes);
+                  }
                 }
               });
 

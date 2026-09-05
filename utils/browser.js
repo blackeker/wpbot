@@ -38,6 +38,23 @@ export async function getSharedBrowser() {
   return browserLaunchPromise;
 }
 
+export async function getSharedPage() {
+  const browser = await getSharedBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      const resourceType = req.resourceType();
+      if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+        req.abort().catch(() => {});
+      } else {
+        req.continue().catch(() => {});
+      }
+    });
+  } catch (e) {}
+  return page;
+}
+
 export async function closeSharedBrowser() {
   if (sharedBrowser) {
     console.log('[Browser Manager] Closing shared Puppeteer browser...');

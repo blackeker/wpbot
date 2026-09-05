@@ -10,6 +10,14 @@ export const downloadsDir = path.resolve('./downloads');
 export const historyPath = path.join(sessionPath, 'history.json');
 export const errorLogPath = path.join(sessionPath, 'errors.json');
 export const sentMessageIds = new Set();
+export function addSentMessageId(id) {
+  if (!id) return;
+  sentMessageIds.add(id);
+  if (sentMessageIds.size > 2000) {
+    const firstKey = sentMessageIds.values().next().value;
+    sentMessageIds.delete(firstKey);
+  }
+}
 
 // Ensure directories exist
 if (!fs.existsSync(downloadsDir)) {

@@ -14,7 +14,8 @@ import {
   cleanOldDownloads,
   restoreSession,
   getYtDlpCommand,
-  sentMessageIds
+  sentMessageIds,
+  addSentMessageId
 } from './config.js';
 
 import { startServer, startCaptchaPoller } from './server.js';
@@ -98,7 +99,7 @@ async function startBot() {
   sock.sendMessage = async (...args) => {
     const result = await originalSendMessage(...args);
     if (result && result.key && result.key.id) {
-      sentMessageIds.add(result.key.id);
+      addSentMessageId(result.key.id);
     }
     return result;
   };
