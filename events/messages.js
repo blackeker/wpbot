@@ -250,7 +250,7 @@ export async function handleMessage(sock, m) {
   if (isMenuRequest) {
     const yardimCmd = commands.get('yardim');
     if (yardimCmd) {
-      await yardimCmd.execute(sock, msg, from, [], { text, sender });
+      await yardimCmd.execute(sock, msg, from, [], { text });
     }
     return;
   }
