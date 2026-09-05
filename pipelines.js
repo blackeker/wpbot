@@ -580,9 +580,15 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
       throw err;
     }
   }
-  if (taskObject && taskObject.title && taskObject.title !== targetUrl) {
+  // Set title: If taskObject title is generic (e.g. 'Video Çözümleniyor...'), replace it with result.title
+  const isGenericTitle = !taskObject?.title || 
+    taskObject.title === targetUrl || 
+    taskObject.title.startsWith('Video Çözümleniyor') || 
+    taskObject.title.startsWith('İndiriliyor');
+
+  if (!isGenericTitle && taskObject?.title) {
     result.title = taskObject.title;
-  } else if (taskObject && taskObject.url === targetUrl) {
+  } else if (taskObject && result?.title) {
     taskObject.title = result.title;
   }
 
@@ -746,22 +752,29 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         const sub = subtitlesList[i];
         try {
           await progressUpdateCallback(`✍️ Altyazı dosyası indiriliyor (${i + 1}/${subtitlesList.length}): ${sub.label}...`);
+          
+          let refHeader = sub.referer || result.referer || targetUrl;
+          let originHeader;
+          try { if (refHeader) originHeader = new URL(refHeader).origin; } catch (e) {}
+
           const subRes = await gotScrapingModule.gotScraping({
             url: sub.url,
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              ...(refHeader ? { 'Referer': refHeader } : {}),
+              ...(originHeader ? { 'Origin': originHeader } : {})
             }
           });
           
           let subContent = subRes.body;
-          if (subContent.trim().startsWith('WEBVTT') || sub.url.includes('.vtt')) {
-            subContent = subContent
-              .replace(/^\ufeff?WEBVTT[^\n]*\n/i, '')
-              .replace(/(\d{2}:\d{2}:\d{2})\.(\d{3})/g, '$1,$2')
-              .replace(/<[^>]+>/g, '');
+          if (!subContent || subContent.trim().startsWith('<')) {
+            throw new Error(`Geçersiz altyazı verisi alındı (HTML/Cloudflare engeli).`);
           }
+
+          const isVtt = subContent.trim().startsWith('WEBVTT') || sub.url.includes('.vtt');
+          const ext = isVtt ? '.vtt' : '.srt';
           
-          const tempSubPath = path.join(downloadsDir, `temp_sub_${i}_${Date.now()}.srt`);
+          const tempSubPath = path.join(downloadsDir, `temp_sub_${i}_${Date.now()}${ext}`);
           fs.writeFileSync(tempSubPath, subContent, 'utf8');
           tempSubPaths.push(tempSubPath);
           preparedSubs.push(sub);
@@ -783,7 +796,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           await progressUpdateCallback(`✍️ Altyazı videoya kalıcı olarak gömülüyor (Hardsub: ${subToBurn.label})... Bu işlem sunucunun işlemci gücüne göre birkaç dakika sürebilir.`);
           
           const relativeSubPath = path.relative(process.cwd(), subToBurnPath).replace(/\\/g, '/');
-          const ffmpegCmd = `"${ffmpegPath}" -y -i "${actualFilePath}" -vf "subtitles=${relativeSubPath}" -c:v libx264 -preset ultrafast -c:a copy "${subbedTempPath}"`;
+          const ffmpegCmd = `"${ffmpegPath}" -y -i "${actualFilePath}" -vf "subtitles='${relativeSubPath}'" -c:v libx264 -preset ultrafast -c:a copy "${subbedTempPath}"`;
           console.log(`[Subtitles] Running hardsub command: ${ffmpegCmd}`);
           
           await new Promise((resolve, reject) => {
@@ -1009,10 +1022,11 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         });
         fileStream.pipe(progressStream);
 
+        const waFileName = `${cleanTitle.replace(/[\\/:*?"<>|]/g, '_')}${finalFileExt}`;
         await withRetry(() => queueMediaSend(recipientJid, {
           document: { stream: progressStream },
           mimetype: finalMimeType,
-          fileName: `${safeTitle}${finalFileExt}`
+          fileName: waFileName
         }));
 
         const customCaptionHeader = (taskObject && taskObject.caption) ? `${taskObject.caption}\n━━━━━━━━━━━━━━━━━━━━` : `${icon} *${finalTitle}*`;
