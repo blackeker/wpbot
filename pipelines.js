@@ -547,6 +547,9 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
 
 // Core Download Pipeline (Reusable for WhatsApp and Dashboard)
 export async function executeDownloadPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject = null) {
+  if (targetUrl && typeof targetUrl === 'string') {
+    targetUrl = targetUrl.trim().split(/[\r\n]+/)[0].trim();
+  }
   console.log(`Starting extraction for target: ${targetUrl}`);
 
   if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");

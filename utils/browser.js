@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { execSync } from 'child_process';
 import puppeteer from 'puppeteer';
 
 let sharedBrowser = null;
@@ -14,7 +15,10 @@ function findChromeExecutable() {
     '/usr/bin/google-chrome',
     '/usr/bin/chromium-browser',
     '/usr/bin/chromium',
-    '/snap/bin/chromium'
+    '/snap/bin/chromium',
+    '/usr/bin/chrome',
+    '/usr/local/bin/chrome',
+    '/usr/local/bin/chromium'
   ];
 
   for (const p of possiblePaths) {
@@ -54,12 +58,25 @@ export async function getSharedBrowser() {
     try {
       sharedBrowser = await puppeteer.launch(launchOptions);
     } catch (launchErr) {
+      console.warn(`[Browser Manager] Primary launch failed (${launchErr.message})...`);
       if (launchOptions.executablePath) {
-        console.warn('[Browser Manager] System executable launch failed, retrying default launch...', launchErr.message);
         delete launchOptions.executablePath;
+      }
+      try {
         sharedBrowser = await puppeteer.launch(launchOptions);
-      } else {
-        throw launchErr;
+      } catch (err2) {
+        if (err2.message.includes('Could not find Chrome') || err2.message.includes('executable')) {
+          console.log('[Browser Manager] Installing Chrome binary via npx puppeteer browsers install chrome...');
+          try {
+            execSync('npx puppeteer browsers install chrome', { stdio: 'inherit' });
+            sharedBrowser = await puppeteer.launch(launchOptions);
+          } catch (installErr) {
+            console.error('[Browser Manager] Chrome auto-install failed:', installErr.message);
+            throw err2;
+          }
+        } else {
+          throw err2;
+        }
       }
     }
 

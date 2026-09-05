@@ -3,6 +3,9 @@ import { gotScraping } from '../extractor.js';
 import * as cheerio from 'cheerio';
 
 export async function extractDizipal(pageUrl) {
+  if (pageUrl && typeof pageUrl === 'string') {
+    pageUrl = pageUrl.trim().split(/[\r\n]+/)[0].trim();
+  }
   console.log(`[Dizipal Extractor] Resolving Dizipal page: ${pageUrl}`);
   
   // ── 1. Hızlı HTTP Çözümleme (Chrome / Puppeteer gerektirmez, 100ms) ──
