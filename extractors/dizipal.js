@@ -1,73 +1,126 @@
+import { getSharedPage } from '../utils/browser.js';
 import { gotScraping } from '../extractor.js';
 import * as cheerio from 'cheerio';
 
 export async function extractDizipal(pageUrl) {
+  console.log(`[Dizipal Extractor] Resolving Dizipal page: ${pageUrl}`);
+  let page;
   try {
-    const response = await gotScraping({
-      url: pageUrl,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    page = await getSharedPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1280, height: 720 });
+
+    let embedUrl = null;
+    let directStreamUrl = null;
+
+    // Listen to network responses to catch the player embed URL or stream URL instantly
+    page.on('response', async res => {
+      const u = res.url();
+      if (u.includes('.m3u8') || u.includes('.mp4')) {
+        if (!directStreamUrl) directStreamUrl = u;
+      } else if (u.includes('/ajax') || u.includes('/player') || u.includes('/video/')) {
+        try {
+          const body = await res.text();
+          if (body.includes('"v":')) {
+            const json = JSON.parse(body);
+            if (json.config && json.config.v) {
+              embedUrl = json.config.v;
+            }
+          }
+        } catch (e) {}
       }
     });
 
-    const $ = cheerio.load(response.body);
-    const title = $('title').text().replace(/ - Dizipal.*/, '').trim() || 'Dizipal_Video';
+    console.log(`[Dizipal Extractor] Navigating with Puppeteer...`);
+    await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 35000 });
 
-    let iframeSrc = $('iframe').attr('src');
-    if (!iframeSrc) {
-      $('iframe').each((_, el) => {
-        const src = $(el).attr('src') || $(el).attr('data-src');
-        if (src) iframeSrc = src;
+    // Extract page title
+    const title = await page.evaluate(() => {
+      const h1 = document.querySelector('h1');
+      return h1 ? h1.innerText.replace(/izle/i, '').trim() : document.title.replace(/ - Dizipal.*/, '').trim();
+    });
+
+    // If direct stream URL was intercepted by Puppeteer
+    if (directStreamUrl) {
+      console.log(`[Dizipal Extractor] Direct stream intercepted: ${directStreamUrl}`);
+      return {
+        title: title || 'Dizipal Video',
+        url: directStreamUrl,
+        source: 'Dizipal'
+      };
+    }
+
+    // If embedUrl was not captured via AJAX, search DOM iframes
+    if (!embedUrl) {
+      embedUrl = await page.evaluate(() => {
+        const iframe = document.querySelector('iframe');
+        return iframe ? (iframe.src || iframe.getAttribute('data-src')) : null;
       });
     }
 
-    if (!iframeSrc) {
-      throw new Error('Dizipal player iFrame bulunamadı.');
+    console.log(`[Dizipal Extractor] Resolved embed player URL: ${embedUrl}`);
+    if (!embedUrl) {
+      throw new Error("Dizipal oyuncu bağlantısı alınamadı.");
     }
 
-    if (iframeSrc.startsWith('//')) {
-      iframeSrc = 'https:' + iframeSrc;
-    }
-
-    // Process player iframe
-    const playerRes = await gotScraping({
-      url: iframeSrc,
+    // Fetch the embed player page to extract M3U8 and Subtitles
+    const embedRes = await gotScraping.get({
+      url: embedUrl,
       headers: {
-        'Referer': pageUrl,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'Referer': page.url(),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
       }
     });
 
-    const playerBody = playerRes.body;
-    const m3u8Match = playerBody.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/);
+    const embedBody = embedRes.body;
+    let m3u8Url = null;
+    let subtitles = [];
+
+    // Match M3U8 playlist URL
+    const m3u8Match = embedBody.match(/var\s+M3U8\s*=\s*["']([^"']+\.m3u8[^"']*)["']/) ||
+                      embedBody.match(/file\s*:\s*["']([^"']+\.m3u8[^"']*)["']/) ||
+                      embedBody.match(/(https?:\/\/[^"'\s]+\.m3u8[^"'\s]*)/);
 
     if (m3u8Match) {
+      m3u8Url = m3u8Match[1] || m3u8Match[0];
+    }
+
+    // Match Subtitles (VTT)
+    const subMatch = embedBody.match(/subtitle\s*:\s*["']([^"']+)["']/);
+    if (subMatch) {
+      const subStr = subMatch[1];
+      const parts = subStr.split(',');
+      for (const p of parts) {
+        const m = p.match(/\[([^\]]+)\](https?:\/\/[^\s,]+)/);
+        if (m) {
+          const langLabel = m[1];
+          const subUrl = m[2];
+          subtitles.push({
+            url: subUrl,
+            language: (langLabel.toLowerCase().includes('türk') || langLabel.toLowerCase().includes('turkish')) ? 'tur' : 'eng',
+            label: langLabel
+          });
+        }
+      }
+    }
+
+    if (m3u8Url) {
+      console.log(`[Dizipal Extractor] Extraction successful! Stream: ${m3u8Url}`);
       return {
-        title,
-        source: 'dizipal',
-        url: m3u8Match[0],
-        directUrl: m3u8Match[0],
-        isHls: true
+        title: title || 'Dizipal Video',
+        url: m3u8Url,
+        referer: embedUrl,
+        subtitles,
+        source: 'Dizipal'
       };
     }
 
-    const mp4Match = playerBody.match(/https?:\/\/[^"'\s]+\.mp4[^"'\s]*/);
-    if (mp4Match) {
-      return {
-        title,
-        source: 'dizipal',
-        url: mp4Match[0],
-        directUrl: mp4Match[0]
-      };
-    }
+    throw new Error("Dizipal M3U8 video akışı bulunamadı.");
 
-    return {
-      title,
-      source: 'dizipal',
-      url: iframeSrc,
-      directUrl: iframeSrc
-    };
   } catch (err) {
-    throw new Error(`Dizipal extraction error: ${err.message}`);
+    console.error(`[Dizipal Extractor] Error: ${err.message}`);
+    throw err;
+  } finally {
+    if (page) await page.close().catch(() => {});
   }
 }
