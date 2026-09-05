@@ -1,4 +1,8 @@
 import fs from 'fs';
+import puppeteer from 'puppeteer';
+
+let sharedBrowser = null;
+let browserLaunchPromise = null;
 
 function findChromeExecutable() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {

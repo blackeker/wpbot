@@ -150,6 +150,39 @@ export default {
           return;
         }
       }
+
+      if (urls[0].includes('dizipal') && urls[1].includes('dizipal')) {
+        const match1 = urls[0].match(/\/bolum\/(.+?)-(\d+)-sezon-(\d+)-bolum\/?$/i);
+        const match2 = urls[1].match(/\/bolum\/(.+?)-(\d+)-sezon-(\d+)-bolum\/?$/i);
+
+        if (match1 && match2 && match1[1] === match2[1] && match1[2] === match2[2]) {
+          const slug = match1[1];
+          const season = match1[2];
+          const startEp = Math.min(parseInt(match1[3], 10), parseInt(match2[3], 10));
+          const endEp = Math.max(parseInt(match1[3], 10), parseInt(match2[3], 10));
+          const origin = new URL(urls[0]).origin;
+
+          await sock.sendMessage(from, { text: `🎬 *Dizipal Dizi Aralığı Algılandı!*\nSezon: ${season}\nBölümler: ${startEp} ile ${endEp} arası sıraya ekleniyor...` });
+
+          let addedCount = 0;
+          let skipCount = 0;
+          for (let ep = startEp; ep <= endEp; ep++) {
+            const epUrl = `${origin}/bolum/${slug}-${season}-sezon-${ep}-bolum`;
+            try {
+              addDownloadTask(epUrl, from, `Sezon ${season} Bölüm ${ep}`, null, priority);
+              addedCount++;
+            } catch (e) {
+              skipCount++;
+            }
+          }
+
+          let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
+          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
+          return;
+        }
+      }
     }
 
     // ─── Çoklu Bağımsız Link (2+) ───
