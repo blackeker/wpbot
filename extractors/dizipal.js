@@ -4,6 +4,97 @@ import * as cheerio from 'cheerio';
 
 export async function extractDizipal(pageUrl) {
   console.log(`[Dizipal Extractor] Resolving Dizipal page: ${pageUrl}`);
+  
+  // ── 1. Hızlı HTTP Çözümleme (Chrome / Puppeteer gerektirmez, 100ms) ──
+  try {
+    const res = await gotScraping.get({
+      url: pageUrl,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+      }
+    });
+
+    const $ = cheerio.load(res.body);
+    const title = $('h1').text().replace(/izle/i, '').trim() || $('title').text().replace(/ - Dizipal.*/, '').trim() || 'Dizipal Video';
+
+    let embedUrl = null;
+
+    // Check for Base64 encoded cfg parameter in HTML
+    const cfgMatch = res.body.match(/cfg\s*[:=]\s*["']?([^"'\s&>]+)["']?/i);
+    if (cfgMatch) {
+      try {
+        const decoded = Buffer.from(cfgMatch[1], 'base64').toString('utf8');
+        const json = JSON.parse(decoded);
+        if (json.v) {
+          embedUrl = json.v;
+        }
+      } catch (e) {}
+    }
+
+    // Check for direct iframe in HTML
+    if (!embedUrl) {
+      $('iframe').each((_, el) => {
+        const src = $(el).attr('src') || $(el).attr('data-src');
+        if (src && src.startsWith('http')) embedUrl = src;
+      });
+    }
+
+    if (embedUrl) {
+      console.log(`[Dizipal Extractor - HTTP Fast Path] Resolved embed player URL: ${embedUrl}`);
+      const embedRes = await gotScraping.get({
+        url: embedUrl,
+        headers: {
+          'Referer': res.url,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        }
+      });
+
+      const embedBody = embedRes.body;
+      let m3u8Url = null;
+      let subtitles = [];
+
+      const m3u8Match = embedBody.match(/var\s+M3U8\s*=\s*["']([^"']+\.m3u8[^"']*)["']/) ||
+                        embedBody.match(/file\s*:\s*["']([^"']+\.m3u8[^"']*)["']/) ||
+                        embedBody.match(/(https?:\/\/[^"'\s]+\.m3u8[^"'\s]*)/);
+
+      if (m3u8Match) {
+        m3u8Url = m3u8Match[1] || m3u8Match[0];
+      }
+
+      const subMatch = embedBody.match(/subtitle\s*:\s*["']([^"']+)["']/);
+      if (subMatch) {
+        const subStr = subMatch[1];
+        const parts = subStr.split(',');
+        for (const p of parts) {
+          const m = p.match(/\[([^\]]+)\](https?:\/\/[^\s,]+)/);
+          if (m) {
+            const langLabel = m[1];
+            const subUrl = m[2];
+            subtitles.push({
+              url: subUrl,
+              language: (langLabel.toLowerCase().includes('türk') || langLabel.toLowerCase().includes('turkish')) ? 'tur' : 'eng',
+              label: langLabel
+            });
+          }
+        }
+      }
+
+      if (m3u8Url) {
+        console.log(`[Dizipal Extractor - HTTP Fast Path] Success! Stream: ${m3u8Url}`);
+        return {
+          title,
+          url: m3u8Url,
+          referer: embedUrl,
+          subtitles,
+          source: 'Dizipal'
+        };
+      }
+    }
+  } catch (httpErr) {
+    console.warn(`[Dizipal Extractor - HTTP Fast Path] Skipped/Failed (${httpErr.message}), falling back to Puppeteer...`);
+  }
+
+  // ── 2. Puppeteer İle Gelişmiş Çözümleme (Fallback) ──
   let page;
   try {
     page = await getSharedPage();

@@ -1,10 +1,26 @@
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import fs from 'fs';
 
-puppeteer.use(StealthPlugin());
+function findChromeExecutable() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
 
-let sharedBrowser = null;
-let browserLaunchPromise = null;
+  const possiblePaths = [
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/snap/bin/chromium'
+  ];
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+
+  return undefined;
+}
 
 export async function getSharedBrowser() {
   if (sharedBrowser) return sharedBrowser;
@@ -15,7 +31,8 @@ export async function getSharedBrowser() {
 
   browserLaunchPromise = (async () => {
     console.log('[Browser Manager] Launching shared Puppeteer browser instance...');
-    sharedBrowser = await puppeteer.launch({
+    const executablePath = findChromeExecutable();
+    const launchOptions = {
       headless: true,
       args: [
         '--no-sandbox',
@@ -24,7 +41,23 @@ export async function getSharedBrowser() {
         '--disable-dev-shm-usage',
         '--disable-gpu'
       ]
-    });
+    };
+    if (executablePath) {
+      console.log(`[Browser Manager] Using system Chrome executable: ${executablePath}`);
+      launchOptions.executablePath = executablePath;
+    }
+
+    try {
+      sharedBrowser = await puppeteer.launch(launchOptions);
+    } catch (launchErr) {
+      if (launchOptions.executablePath) {
+        console.warn('[Browser Manager] System executable launch failed, retrying default launch...', launchErr.message);
+        delete launchOptions.executablePath;
+        sharedBrowser = await puppeteer.launch(launchOptions);
+      } else {
+        throw launchErr;
+      }
+    }
 
     sharedBrowser.on('disconnected', () => {
       console.warn('[Browser Manager] Shared browser disconnected. Resetting references...');
