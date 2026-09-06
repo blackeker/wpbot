@@ -1,6 +1,7 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
 import * as cheerio from 'cheerio';
 import axios from 'axios';
+import crypto from 'crypto';
 import { getSharedBrowser } from '../utils/browser.js';
 
 // ==========================================
@@ -13,11 +14,17 @@ export async function getHdkoreSeasonEpisodes(seasonUrl) {
     const res = await gotScraping.get({
       url: seasonUrl,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/121 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36'
       }
     });
     const $ = cheerio.load(res.body);
-    const showTitle = $('h1').first().text().trim() || $('title').text().trim();
+    let showTitle = $('h1').first().text().trim() || $('title').text().trim();
+    showTitle = showTitle.replace(/\s*[-–|]\s*(İzle|izle|Türkçe|HDKore|Watch).*/i, '').trim();
+
+    // Check if the page has #toggle-api with total-eps
+    const toggleApi = $('#toggle-api');
+    let totalEps = parseInt(toggleApi.attr('data-total-eps') || '0', 10);
+
     const episodes = [];
     const seen = new Set();
     $('a[href*="/bolum/"]').each((i, el) => {
@@ -34,6 +41,42 @@ export async function getHdkoreSeasonEpisodes(seasonUrl) {
         }
       }
     });
+
+    // If totalEps not found on dizi page but we have an episode link, inspect the first episode page
+    if (!totalEps && episodes.length > 0) {
+      try {
+        const firstEpRes = await gotScraping.get({
+          url: episodes[0].url,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36'
+          }
+        });
+        const $ep = cheerio.load(firstEpRes.body);
+        const epToggle = $ep('#toggle-api');
+        if (epToggle.length) {
+          totalEps = parseInt(epToggle.attr('data-total-eps') || '0', 10);
+        }
+      } catch (e) {}
+    }
+
+    // If totalEps is greater than 1 and either we only found 1 link or totalEps > episodes.length
+    if (totalEps > 1 && (episodes.length <= 1 || totalEps > episodes.length)) {
+      let baseBolumUrl = episodes.length > 0 ? episodes[0].url : seasonUrl.replace('/dizi/', '/bolum/');
+      baseBolumUrl = baseBolumUrl.split('?')[0].split('#')[0];
+
+      const apiEpisodes = [];
+      for (let i = 1; i <= totalEps; i++) {
+        apiEpisodes.push({
+          url: `${baseBolumUrl}?ep=${i}`,
+          name: `${i}. Bölüm`
+        });
+      }
+      return {
+        seriesName: showTitle,
+        episodes: apiEpisodes
+      };
+    }
+
     return {
       seriesName: showTitle,
       episodes
@@ -89,6 +132,12 @@ export async function extractHdkorePuppeteer(pageUrl) {
       height: 800
     });
     await page.evaluateOnNewDocument(() => {
+      try {
+        delete Object.getPrototypeOf(navigator).webdriver;
+        // @ts-ignore
+        navigator.webdriver = false;
+      } catch (e) {}
+      window.chrome = { runtime: {} };
       window.__localHooks = [];
       window.__localVideoSrc = null;
       try {
@@ -229,7 +278,22 @@ export async function extractHdkorePuppeteer(pageUrl) {
 }
 export async function extractHdkore(pageUrl) {
   try {
-    const host = new URL(pageUrl).origin;
+    const urlObj = new URL(pageUrl);
+    const host = urlObj.origin;
+
+    // Parse episode number from query params or slug
+    let epNum = 1;
+    if (urlObj.searchParams.get('ep')) {
+      epNum = parseInt(urlObj.searchParams.get('ep'), 10) || 1;
+    } else if (urlObj.searchParams.get('bolum')) {
+      epNum = parseInt(urlObj.searchParams.get('bolum'), 10) || 1;
+    } else {
+      const matchSlug = urlObj.pathname.match(/[-_](\d+)[-_]bolum/i) || urlObj.pathname.match(/bolum[-_](\d+)/i);
+      if (matchSlug) {
+        epNum = parseInt(matchSlug[1], 10) || 1;
+      }
+    }
+
     const res = await gotScraping.get({
       url: pageUrl,
       headers: {
@@ -240,7 +304,69 @@ export async function extractHdkore(pageUrl) {
     let showTitle = $('h1').first().text().trim() || $('title').text().trim();
     showTitle = showTitle.replace(/\s*[-–|]\s*(İzle|izle|Türkçe|HDKore|Watch).*/i, '').trim();
 
-    // Find dramaizle player iframe ID
+    // 1. Check if HDKore API Player (#toggle-api) is present
+    const toggleApi = $('#toggle-api');
+    if (toggleApi.length) {
+      const entId = toggleApi.attr('data-entertainment-id');
+      let pageToken = toggleApi.attr('data-api-pt') || '';
+      if (!pageToken) {
+        const ptMatch = res.body.match(/data-api-pt="([^"]+)"/) || res.body.match(/_pageToken\s*=\s*"([^"]+)"/);
+        if (ptMatch) pageToken = ptMatch[1];
+      }
+
+      if (entId && pageToken) {
+        try {
+          const apiUrl = `${host}/api/api-player/episode-url/${entId}/${epNum}?pt=${encodeURIComponent(pageToken)}`;
+          let apiRes = await axios.get(apiUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+              'Referer': pageUrl
+            },
+            timeout: 15000
+          });
+
+          // Check if pageToken expired or needs refresh
+          if (apiRes.data && (apiRes.data.code === 'token_expired' || apiRes.data.code === 'token_required' || apiRes.data.error)) {
+            const refreshUrl = `${host}/api/api-player/refresh-token/${entId}?pt=${encodeURIComponent(pageToken)}`;
+            const refreshRes = await axios.get(refreshUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+                'Referer': pageUrl
+              },
+              timeout: 10000
+            }).catch(() => null);
+
+            if (refreshRes?.data?.page_token) {
+              pageToken = refreshRes.data.page_token;
+              const retryUrl = `${host}/api/api-player/episode-url/${entId}/${epNum}?pt=${encodeURIComponent(pageToken)}`;
+              apiRes = await axios.get(retryUrl, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+                  'Referer': pageUrl
+                },
+                timeout: 15000
+              });
+            }
+          }
+
+          if (apiRes.data && apiRes.data.video_url) {
+            console.log(`[HDKore Extractor] Successfully resolved Ep ${epNum} via API Player`);
+            const epTitle = showTitle.includes(`${epNum}. Bölüm`) ? showTitle : `${showTitle} - ${epNum}. Bölüm`;
+            return {
+              title: epTitle,
+              source: `HDKore (${apiRes.data.platform || 'API Player'})`,
+              url: apiRes.data.video_url,
+              referer: pageUrl,
+              subtitleUrl: apiRes.data.subtitle_url || null
+            };
+          }
+        } catch (apiErr) {
+          console.warn(`[HDKore Extractor] API Player fetch failed: ${apiErr.message}`);
+        }
+      }
+    }
+
+    // 2. Direct Dramaizle API check
     let iframeUrl = $('#embed-native-iframe').attr('src');
     let videoId = null;
     if (iframeUrl && iframeUrl.includes('dramaizle.site')) {
@@ -256,40 +382,42 @@ export async function extractHdkore(pageUrl) {
     }
     if (videoId) {
       console.log(`[HDKore Extractor] Found videoId: ${videoId}`);
-      const infoUrl = `https://dramaizle.site/api/v1/info?id=${videoId}`;
-      const infoRes = await axios.get(infoUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-          'Referer': 'https://hdkore1.com/'
-        }
-      });
-      if (infoRes.data) {
-        const hex = infoRes.data.trim();
-        const key = Buffer.from('kiemtienmua911ca');
-        const iv = Buffer.from('1234567890oiuytr');
-        try {
-          const ct = Buffer.from(hex, 'hex');
-          const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
-          decipher.setAutoPadding(true);
-          const decryptedText = Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8').replace(/\x00/g, '').trim();
-          const parsed = JSON.parse(decryptedText);
-          console.log('[HDKore Extractor] Decrypted payload keys:', Object.keys(parsed));
-          const streamUrl = parsed.file || parsed.url || parsed.hls || parsed.mp4 || parsed.stream;
-          if (streamUrl) {
-            return {
-              title: showTitle,
-              source: 'HDKore (Dramaizle API)',
-              url: streamUrl,
-              referer: 'https://dramaizle.site/'
-            };
+      try {
+        const videoApiUrl = `https://dramaizle.site/api/v1/video?id=${videoId}&w=1920&h=1080&r=hdkore1.com`;
+        const videoRes = await axios.get(videoApiUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+            'Referer': `https://dramaizle.site/#${videoId}`
+          },
+          timeout: 15000
+        });
+        if (videoRes.data) {
+          const hex = typeof videoRes.data === 'string' ? videoRes.data.trim() : '';
+          if (hex) {
+            const key = Buffer.from('kiemtienmua911ca');
+            const iv = Buffer.from('1234567890oiuytr');
+            const ct = Buffer.from(hex, 'hex');
+            const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
+            decipher.setAutoPadding(true);
+            const decryptedText = Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8').replace(/\x00/g, '').trim();
+            const parsed = JSON.parse(decryptedText);
+            const streamUrl = parsed.file || parsed.url || parsed.hls || parsed.mp4 || parsed.stream || (parsed.cf && parsed.cf[0]?.src);
+            if (streamUrl) {
+              return {
+                title: showTitle,
+                source: 'HDKore (Dramaizle API)',
+                url: streamUrl,
+                referer: 'https://dramaizle.site/'
+              };
+            }
           }
-        } catch (e) {
-          console.error('[HDKore Extractor Decrypt Error]:', e.message);
         }
+      } catch (e) {
+        console.warn('[HDKore Extractor] Dramaizle direct video API failed:', e.message);
       }
     }
 
-    // Fallback if direct API decryption fails or videoId not found
+    // 3. Fallback if direct API decryption fails or videoId not found
     console.log('[HDKore Extractor] Direct API failed, trying Puppeteer fallback...');
     const pptrResult = await extractHdkorePuppeteer(pageUrl);
     if (pptrResult) return pptrResult;

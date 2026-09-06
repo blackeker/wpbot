@@ -17,7 +17,8 @@ db.exec(`
     status TEXT,
     format TEXT,
     priority INTEGER,
-    addedTime TEXT
+    addedTime TEXT,
+    episodeBatch TEXT
   );
   
   CREATE TABLE IF NOT EXISTS active_tasks (
@@ -28,9 +29,13 @@ db.exec(`
     status TEXT,
     format TEXT,
     priority INTEGER,
-    addedTime TEXT
+    addedTime TEXT,
+    episodeBatch TEXT
   );
 `);
+
+try { db.exec("ALTER TABLE tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE active_tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
 
 export let downloadQueue = [];
 export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...] } }
@@ -58,13 +63,13 @@ function saveQueueToFile() {
     const deleteActive = db.prepare('DELETE FROM active_tasks');
     
     const insertTask = db.prepare(`
-      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertActive = db.prepare(`
-      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = db.transaction(() => {
@@ -80,7 +85,8 @@ function saveQueueToFile() {
           t.status,
           t.format || null,
           t.priority ? 1 : 0,
-          new Date(t.addedTime).toISOString()
+          new Date(t.addedTime).toISOString(),
+          t.episodeBatch ? JSON.stringify(t.episodeBatch) : null
         );
       }
 
@@ -93,7 +99,8 @@ function saveQueueToFile() {
           'queued', // restore active tasks as queued on next boot
           t.format || null,
           t.priority ? 1 : 0,
-          new Date(t.addedTime).toISOString()
+          new Date(t.addedTime).toISOString(),
+          t.episodeBatch ? JSON.stringify(t.episodeBatch) : null
         );
       }
     });
@@ -112,6 +119,10 @@ function loadQueueFromFile() {
     // Load active tasks first so they resume first
     const activeRows = db.prepare('SELECT * FROM active_tasks').all();
     for (const r of activeRows) {
+      let epBatch = null;
+      if (r.episodeBatch) {
+        try { epBatch = JSON.parse(r.episodeBatch); } catch (e) {}
+      }
       loadedQueue.push({
         id: r.id,
         url: r.url,
@@ -121,6 +132,7 @@ function loadQueueFromFile() {
         format: r.format,
         priority: Boolean(r.priority),
         addedTime: new Date(r.addedTime),
+        episodeBatch: epBatch,
         isCancelled: false,
         startTime: null,
         endTime: null,
@@ -132,6 +144,10 @@ function loadQueueFromFile() {
     // Load queued tasks
     const queueRows = db.prepare('SELECT * FROM tasks').all();
     for (const r of queueRows) {
+      let epBatch = null;
+      if (r.episodeBatch) {
+        try { epBatch = JSON.parse(r.episodeBatch); } catch (e) {}
+      }
       loadedQueue.push({
         id: r.id,
         url: r.url,
@@ -141,6 +157,7 @@ function loadQueueFromFile() {
         format: r.format,
         priority: Boolean(r.priority),
         addedTime: new Date(r.addedTime),
+        episodeBatch: epBatch,
         isCancelled: false,
         startTime: null,
         endTime: null,
@@ -186,7 +203,7 @@ export const activeTask = {
   }
 };
 
-export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null) {
+export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null, episodeBatch = null) {
   const isDuplicate = downloadQueue.some(t => t.url === url) || activeTasksList.some(t => t.url === url);
   if (isDuplicate) {
     throw new Error("Bu link zaten indirme kuyrugunda veya su an indiriliyor.");
@@ -209,6 +226,7 @@ export function addDownloadTask(url, recipientJid, title, format = null, priorit
     format,
     priority,
     caption: caption || null,
+    episodeBatch: episodeBatch || null,
     addedTime: new Date(),
     startTime: null,
     endTime: null,
@@ -351,8 +369,12 @@ export async function processQueue() {
 
       console.log(`Starting queue task: ${task.title} (${task.url})`);
       let statusMsgKey = null;
+      const isBatch = task.episodeBatch && Array.isArray(task.episodeBatch) && task.episodeBatch.length > 1;
+      const startText = isBatch
+        ? `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\n📦 ${task.episodeBatch.length} bölümlük paket indiriliyor ve tek video olarak birleştiriliyor...`
+        : `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\nVideo çözümleniyor ve indirme başlatılıyor...`;
       try {
-        const statusMsg = await sock.sendMessage(from, { text: `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\nVideo çözümleniyor ve indirme başlatılıyor...` });
+        const statusMsg = await sock.sendMessage(from, { text: startText });
         statusMsgKey = statusMsg?.key;
         task.statusMsgKey = statusMsgKey;
       } catch (e) {

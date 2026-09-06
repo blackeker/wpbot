@@ -144,6 +144,66 @@ export async function handleMessage(sock, m) {
       
       if (selectedEpisodes.length > 0) {
         delete pendingSelections[from];
+
+        const batchSize = selection.mergeBatchSize || 1;
+        const shouldBatchMerge = batchSize > 1 && selectedEpisodes.length > 1;
+
+        if (shouldBatchMerge) {
+          const chunks = [];
+          for (let i = 0; i < selectedEpisodes.length; i += batchSize) {
+            chunks.push(selectedEpisodes.slice(i, i + batchSize));
+          }
+
+          await sock.sendMessage(from, {
+            text: `🎬 *${selection.seriesName}* - *${label}*\n` +
+                  `📦 Toplam *${selectedEpisodes.length}* bölüm *${chunks.length}* paket (${batchSize}'arlı birleştirme) halinde sıraya ekleniyor...`
+          });
+
+          const getEpNum = (ep, idx) => {
+            if (ep.episode && !isNaN(parseInt(ep.episode, 10))) return parseInt(ep.episode, 10);
+            const m = ep.name?.match(/(\d+)\s*\.?\s*bölüm/i) || ep.name?.match(/bölüm\s*(\d+)/i);
+            if (m) return parseInt(m[1], 10);
+            try {
+              const u = new URL(ep.url);
+              const p = u.searchParams.get('ep') || u.searchParams.get('e');
+              if (p && !isNaN(parseInt(p, 10))) return parseInt(p, 10);
+            } catch (e) {}
+            return idx + 1;
+          };
+
+          let addedCount = 0;
+          let skipCount = 0;
+
+          for (const chunk of chunks) {
+            const firstEp = chunk[0];
+            const lastEp = chunk[chunk.length - 1];
+
+            const startNum = getEpNum(firstEp, selectedEpisodes.indexOf(firstEp));
+            const endNum = getEpNum(lastEp, selectedEpisodes.indexOf(lastEp));
+
+            const batchTitle = startNum === endNum
+              ? `${selection.seriesName} - Bölüm ${startNum}`
+              : `${selection.seriesName} - Bölüm ${startNum}-${endNum}`;
+
+            const batchUrl = `${firstEp.url}#batch=${startNum}-${endNum}`;
+
+            try {
+              addDownloadTask(batchUrl, from, batchTitle, null, selection.priority, null, chunk);
+              addedCount++;
+            } catch (e) {
+              skipCount++;
+            }
+          }
+
+          let replyMsg = `✅ Toplam *${addedCount}* paket (${selectedEpisodes.length} bölüm) başarıyla sıraya eklendi.`;
+          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer paket atlandı.`;
+          if (selection.priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+          replyMsg += `\n\n_Her paket 10 bölümü tek parça video olarak birleştirip gönderecektir._`;
+          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
+          return;
+        }
+
         await sock.sendMessage(from, { text: `🎬 *${selection.seriesName}* - *${label}* sıraya ekleniyor...\n📦 Toplam *${selectedEpisodes.length}* bölüm sıraya ekleniyor...` });
         
         let addedCount = 0;

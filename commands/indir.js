@@ -183,6 +183,139 @@ export default {
           return;
         }
       }
+
+      // HDKore 2 link aralığı
+      if (urls[0].includes('hdkore') && urls[1].includes('hdkore')) {
+        const getHdkoreEp = (u) => {
+          try {
+            const parsed = new URL(u);
+            if (parsed.searchParams.get('ep')) return parseInt(parsed.searchParams.get('ep'), 10);
+            const m = parsed.pathname.match(/[-_](\d+)[-_]bolum/i) || parsed.pathname.match(/bolum[-_](\d+)/i);
+            if (m) return parseInt(m[1], 10);
+          } catch (e) {}
+          return null;
+        };
+
+        const ep1 = getHdkoreEp(urls[0]);
+        const ep2 = getHdkoreEp(urls[1]);
+
+        if (ep1 && ep2) {
+          const startEp = Math.min(ep1, ep2);
+          const endEp = Math.max(ep1, ep2);
+          const baseUrl = urls[0].split('?')[0].replace(/[-_]\d+[-_]bolum.*/i, '');
+
+          await sock.sendMessage(from, { text: `🎬 *HDKore Dizi Aralığı Algılandı!*\nBölümler: ${startEp} ile ${endEp} arası 10'arlı paketler halinde sıraya ekleniyor...` });
+
+          const allEps = [];
+          for (let ep = startEp; ep <= endEp; ep++) {
+            allEps.push({
+              url: `${baseUrl}?ep=${ep}`,
+              name: `${ep}. Bölüm`,
+              episode: ep
+            });
+          }
+
+          const chunks = [];
+          for (let i = 0; i < allEps.length; i += 10) {
+            chunks.push(allEps.slice(i, i + 10));
+          }
+
+          let addedCount = 0;
+          let skipCount = 0;
+
+          for (const chunk of chunks) {
+            const sNum = chunk[0].episode;
+            const eNum = chunk[chunk.length - 1].episode;
+            const bTitle = sNum === eNum ? `HDKore - Bölüm ${sNum}` : `HDKore - Bölüm ${sNum}-${eNum}`;
+            const bUrl = `${chunk[0].url}#batch=${sNum}-${eNum}`;
+
+            try {
+              if (chunk.length > 1) {
+                addDownloadTask(bUrl, from, bTitle, null, priority, null, chunk);
+              } else {
+                addDownloadTask(chunk[0].url, from, bTitle, null, priority);
+              }
+              addedCount++;
+            } catch (e) {
+              skipCount++;
+            }
+          }
+
+          let replyMsg = `✅ Toplam *${addedCount}* paket (${allEps.length} bölüm) başarıyla sıraya eklendi.`;
+          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer paket atlandı.`;
+          replyMsg += `\n\n_Her paket 10 bölümü tek parça video olarak birleştirip gönderecektir._`;
+          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
+          return;
+        }
+      }
+
+      // DramaDizilerim 2 link aralığı
+      if (urls[0].includes('dramadizilerim') && urls[1].includes('dramadizilerim')) {
+        const getDramaEp = (u) => {
+          try {
+            const parsed = new URL(u);
+            const e = parsed.searchParams.get('e');
+            const s = parsed.searchParams.get('s') || '1';
+            if (e) return { s: parseInt(s, 10), e: parseInt(e, 10) };
+          } catch (e) {}
+          return null;
+        };
+
+        const info1 = getDramaEp(urls[0]);
+        const info2 = getDramaEp(urls[1]);
+
+        if (info1 && info2 && info1.s === info2.s) {
+          const season = info1.s;
+          const startEp = Math.min(info1.e, info2.e);
+          const endEp = Math.max(info1.e, info2.e);
+          const baseUrl = urls[0].split('?')[0];
+
+          await sock.sendMessage(from, { text: `🎬 *DramaDizilerim Dizi Aralığı Algılandı!*\nSezon: ${season}, Bölümler: ${startEp} ile ${endEp} arası 10'arlı paketler halinde sıraya ekleniyor...` });
+
+          const allEps = [];
+          for (let ep = startEp; ep <= endEp; ep++) {
+            allEps.push({
+              url: `${baseUrl}?s=${season}&e=${ep}`,
+              name: `Sezon ${season} Bölüm ${ep}`,
+              episode: ep
+            });
+          }
+
+          const chunks = [];
+          for (let i = 0; i < allEps.length; i += 10) {
+            chunks.push(allEps.slice(i, i + 10));
+          }
+
+          let addedCount = 0;
+          let skipCount = 0;
+
+          for (const chunk of chunks) {
+            const sNum = chunk[0].episode;
+            const eNum = chunk[chunk.length - 1].episode;
+            const bTitle = sNum === eNum ? `DramaDizilerim - Bölüm ${sNum}` : `DramaDizilerim - Bölüm ${sNum}-${eNum}`;
+            const bUrl = `${chunk[0].url}#batch=${sNum}-${eNum}`;
+
+            try {
+              if (chunk.length > 1) {
+                addDownloadTask(bUrl, from, bTitle, null, priority, null, chunk);
+              } else {
+                addDownloadTask(chunk[0].url, from, bTitle, null, priority);
+              }
+              addedCount++;
+            } catch (e) {
+              skipCount++;
+            }
+          }
+
+          let replyMsg = `✅ Toplam *${addedCount}* paket (${allEps.length} bölüm) başarıyla sıraya eklendi.`;
+          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer paket atlandı.`;
+          replyMsg += `\n\n_Her paket 10 bölümü tek parça video olarak birleştirip gönderecektir._`;
+          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
+          return;
+        }
+      }
     }
 
     // ─── Çoklu Bağımsız Link (2+) ───
@@ -315,36 +448,47 @@ export default {
     }
 
     // HDKore Dizi kontrolü
-    const isHdkoreSeries = singleUrl.includes('hdkore') && singleUrl.includes('/dizi/') && !/\/bolum\//i.test(singleUrl);
+    const isHdkoreSeriesCandidate = singleUrl.includes('hdkore') && (
+      (singleUrl.includes('/dizi/') && !/\/bolum\//i.test(singleUrl)) ||
+      (singleUrl.includes('/bolum/') && !/-\d+-bolum/i.test(singleUrl) && !/[?&]ep=/i.test(singleUrl))
+    );
 
-    if (isHdkoreSeries) {
+    if (isHdkoreSeriesCandidate) {
       const { getHdkoreSeasonEpisodes } = await import('../extractor.js');
       await sock.sendMessage(from, { text: '🔍 HDKore yayınlanan dizi bölümleri taranıyor...' });
       try {
         const { seriesName, episodes } = await getHdkoreSeasonEpisodes(singleUrl);
 
-        if (episodes.length === 0) {
-          await sock.sendMessage(from, { text: '❌ Bu dizide hiçbir bölüm bulunamadı.' });
+        if (!episodes || episodes.length === 0) {
+          if (singleUrl.includes('/dizi/')) {
+            await sock.sendMessage(from, { text: '❌ Bu dizide hiçbir bölüm bulunamadı.' });
+            return;
+          }
+        } else if (episodes.length > 1 || singleUrl.includes('/dizi/')) {
+          pendingSelections[from] = {
+            type: 'series',
+            source: 'hdkore',
+            mergeBatchSize: 10,
+            seriesName: seriesName,
+            episodes: episodes,
+            priority: priority
+          };
+
+          let seasonPrompt = `🎬 *${seriesName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* bölüm bulundu.\n\n` +
+            `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
+            `1️⃣ *Tüm Sezonu İndir* (Hepsini indirmek için: *hepsi* veya *1* yazın)\n` +
+            `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *1-50* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
+            `ℹ️ _Bölümler 10'arlı paketler halinde birleştirilerek tek parça video olarak indirilecektir._\n` +
+            `❌ İptal etmek için *iptal* yazın.`;
+          await sock.sendMessage(from, { text: seasonPrompt });
           return;
         }
-
-        pendingSelections[from] = {
-          type: 'series',
-          seriesName: seriesName,
-          episodes: episodes,
-          priority: priority
-        };
-
-        let seasonPrompt = `🎬 *${seriesName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* bölüm bulundu.\n\n` +
-          `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
-          `1️⃣ *Tüm Sezonu İndir* (Hepsini indirmek için: *hepsi* veya *1* yazın)\n` +
-          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *5-15* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
-          `❌ İptal etmek için *iptal* yazın.`;
-        await sock.sendMessage(from, { text: seasonPrompt });
       } catch (err) {
-        await sock.sendMessage(from, { text: `❌ Dizi bölümleri alınırken hata oluştu: ${err.message}` });
+        if (singleUrl.includes('/dizi/')) {
+          await sock.sendMessage(from, { text: `❌ Dizi bölümleri alınırken hata oluştu: ${err.message}` });
+          return;
+        }
       }
-      return;
     }
 
     // Dramadizilerim Dizi/Sezon kontrolü
@@ -369,6 +513,8 @@ export default {
 
         pendingSelections[from] = {
           type: 'series',
+          source: 'dramadizilerim',
+          mergeBatchSize: 10,
           seriesName: seriesName,
           episodes: episodes,
           priority: priority
@@ -377,7 +523,8 @@ export default {
         let seasonPrompt = `🎬 *${seriesName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* bölüm bulundu.\n\n` +
           `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
           `1️⃣ *Tüm Sezonu İndir* (Hepsini indirmek için: *hepsi* veya *1* yazın)\n` +
-          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *5-15* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
+          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *1-50* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
+          `ℹ️ _Bölümler 10'arlı paketler halinde birleştirilerek tek parça video olarak indirilecektir._\n` +
           `❌ İptal etmek için *iptal* yazın.`;
         await sock.sendMessage(from, { text: seasonPrompt });
       } catch (err) {

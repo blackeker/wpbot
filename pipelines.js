@@ -545,6 +545,264 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
   });
 }
 
+// Batch Download Pipeline (Downloads & Merges Multiple Episodes into One Video)
+export async function executeBatchDownloadPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject) {
+  const pipelineStart = Date.now();
+  const batch = taskObject.episodeBatch;
+  const totalEps = batch.length;
+  const batchTempDir = path.join(downloadsDir, `batch_${taskObject.id || Date.now()}_${Date.now()}`);
+  if (!fs.existsSync(batchTempDir)) fs.mkdirSync(batchTempDir, { recursive: true });
+
+  const safeTitle = replaceTurkishChars(taskObject.title).replace(/[^a-zA-Z0-9]/g, '_');
+  const finalMergedPath = path.join(downloadsDir, `${safeTitle}.mp4`);
+  const downloadedParts = [];
+
+  try {
+    await progressUpdateCallback(
+      `🎬 *${taskObject.title}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 *${totalEps}* bölümlük paket indirmesi başlatılıyor...\n` +
+      `_Bölümler tek tek indirilip tek bir video olarak birleştirilecektir._`
+    );
+
+    for (let i = 0; i < totalEps; i++) {
+      if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
+      const ep = batch[i];
+      const epNumStr = String(i + 1).padStart(3, '0');
+      const epFilePath = path.join(batchTempDir, `part_${epNumStr}.mp4`);
+
+      const epBar = getProgressBar(Math.round((i / totalEps) * 100));
+      await progressUpdateCallback(
+        `🎬 *${taskObject.title}*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 Paket İndiriliyor: *${i + 1}/${totalEps} Bölüm*\n` +
+        `\`[${epBar}]\`\n` +
+        `▶️ Başlatılan: *${ep.name}*`
+      );
+
+      try {
+        let epResult = getCachedResult(ep.url);
+        if (!epResult) {
+          epResult = await withRetry(() => extractVideoUrl(ep.url, recipientJid));
+          saveToCache(ep.url, epResult);
+        }
+
+        if (epResult.filePath && fs.existsSync(epResult.filePath)) {
+          fs.copyFileSync(epResult.filePath, epFilePath);
+        } else {
+          let lastEpPercent = -1;
+          let lastEpUpdateTime = 0;
+          const epDownloadStart = Date.now();
+
+          await withRetry(async () => {
+            lastEpUpdateTime = 0;
+            await downloadM3u8(
+              epResult.url,
+              epFilePath,
+              signal,
+              async (completed, total) => {
+                const now = Date.now();
+                const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+                const timePassed = now - lastEpUpdateTime > 4000;
+                if (!timePassed && percent !== 100 && percent === lastEpPercent) return;
+                lastEpPercent = percent;
+                lastEpUpdateTime = now;
+
+                const overallPercent = Math.min(99, Math.round(((i + (percent / 100)) / totalEps) * 100));
+                const overallBar = getProgressBar(overallPercent);
+                const elapsedSec = (now - epDownloadStart) / 1000;
+                const speedBps = elapsedSec > 0 ? completed / elapsedSec : 0;
+                const speedMBs = (speedBps / 1024 / 1024).toFixed(2);
+
+                if (taskObject) {
+                  taskObject.status = `Bölüm ${i + 1}/${totalEps} (%${percent}) - Paket: %${overallPercent}`;
+                  taskObject.speed = speedMBs;
+                  notifyQueueUpdate();
+                }
+
+                await progressUpdateCallback(
+                  `🎬 *${taskObject.title}*\n` +
+                  `━━━━━━━━━━━━━━━━━━━━\n` +
+                  `📦 Paket İlerleyişi: *%${overallPercent}* (Bölüm ${i + 1}/${totalEps})\n` +
+                  `\`[${overallBar}]\`\n` +
+                  `▶️ İndirilen: *${ep.name}* (%${percent})\n` +
+                  `⚡ Anlık Hız: ~${speedMBs} MB/s`
+                );
+              },
+              epResult.referer || null,
+              epResult.cookies || null,
+              epResult.userAgent || null,
+              epResult.headers || null,
+              epResult.audioUrl || null
+            );
+          });
+        }
+
+        if (fs.existsSync(epFilePath) && fs.statSync(epFilePath).size > 1000) {
+          downloadedParts.push(epFilePath);
+        }
+      } catch (epErr) {
+        console.warn(`[Batch Pipeline] Episode ${ep.name} (${ep.url}) failed: ${epErr.message}`);
+        if (epErr.message === 'İndirme iptal edildi.') throw epErr;
+        await progressUpdateCallback(`⚠️ *${ep.name}* atlandı: ${epErr.message}\nSonraki bölüme geçiliyor...`).catch(() => {});
+      }
+    }
+
+    if (downloadedParts.length === 0) {
+      throw new Error("Seçilen bölümlerin hiçbiri indirilemedi.");
+    }
+
+    if (downloadedParts.length === 1) {
+      fs.copyFileSync(downloadedParts[0], finalMergedPath);
+    } else {
+      await progressUpdateCallback(
+        `🎬 *${taskObject.title}*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `🔄 *${downloadedParts.length}* bölüm tek video halinde birleştiriliyor (FFmpeg Concat)...`
+      );
+
+      const concatListFile = path.join(batchTempDir, 'concat_list.txt');
+      const concatLines = downloadedParts.map(p => `file '${path.resolve(p)}'`).join('\n');
+      fs.writeFileSync(concatListFile, concatLines, 'utf8');
+
+      let copySuccess = false;
+      try {
+        const copyCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${concatListFile}" -c copy -movflags +faststart "${finalMergedPath}"`;
+        console.log(`[Batch Concat] Trying copy merge: ${copyCmd}`);
+        await new Promise((resolve, reject) => {
+          exec(copyCmd, { timeout: 180000 }, (err, stdout, stderr) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        if (fs.existsSync(finalMergedPath) && fs.statSync(finalMergedPath).size > 10000) {
+          copySuccess = true;
+          console.log(`[Batch Concat] Copy merge successful!`);
+        }
+      } catch (copyErr) {
+        console.warn(`[Batch Concat] Stream copy failed (${copyErr.message}), falling back to re-encode.`);
+      }
+
+      if (!copySuccess) {
+        const encodeCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${concatListFile}" -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k -movflags +faststart "${finalMergedPath}"`;
+        console.log(`[Batch Concat] Running re-encode merge: ${encodeCmd}`);
+        await new Promise((resolve, reject) => {
+          exec(encodeCmd, { timeout: 600000 }, (err, stdout, stderr) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
+    }
+
+    try {
+      fs.rmSync(batchTempDir, { recursive: true, force: true });
+    } catch (e) {}
+
+  } catch (err) {
+    try {
+      if (fs.existsSync(batchTempDir)) fs.rmSync(batchTempDir, { recursive: true, force: true });
+    } catch (e) {}
+    try {
+      if (fs.existsSync(finalMergedPath)) fs.unlinkSync(finalMergedPath);
+    } catch (e) {}
+    if (err.message !== 'İndirme iptal edildi.') {
+      addErrorLog({ title: taskObject?.title || targetUrl, url: targetUrl, error: err.message });
+    }
+    throw err;
+  }
+
+  if (!fs.existsSync(finalMergedPath) || fs.statSync(finalMergedPath).size < 1000) {
+    throw new Error("Birleştirilen video dosyası oluşturulamadı.");
+  }
+
+  const finalSize = fs.statSync(finalMergedPath).size;
+  const finalSizeStr = formatBytes(finalSize);
+  const vdsIp = process.env.VDS_IP || '111.235.150.157';
+  const watchUrl = `http://${vdsIp}:7860/downloads/${encodeURIComponent(safeTitle)}.mp4`;
+  const totalDuration = formatDuration(Date.now() - pipelineStart);
+
+  const sendTaskObj = {
+    id: taskObject ? taskObject.id : 'wa_' + Date.now(),
+    title: taskObject.title,
+    status: 'WhatsApp\'a yükleniyor...',
+    size: finalSizeStr
+  };
+  botState.sendingTasks.push(sendTaskObj);
+
+  (async () => {
+    try {
+      await progressUpdateCallback(
+        `🎬 *${taskObject.title}*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `🚀 WhatsApp'a gönderiliyor...\n` +
+        `📦 Boyut: ${finalSizeStr} (${downloadedParts.length} Bölüm Birleştirildi)`
+      );
+
+      const fileStream = fs.createReadStream(finalMergedPath);
+      let lastWaUpdate = 0;
+      const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
+        sendTaskObj.status = `WhatsApp'a yükleniyor... %${percent}`;
+        notifyQueueUpdate();
+        const now = Date.now();
+        if (now - lastWaUpdate > 5000) {
+          lastWaUpdate = now;
+          const bar = getProgressBar(percent);
+          progressUpdateCallback(
+            `🎬 *${taskObject.title}*\n` +
+            `━━━━━━━━━━━━━━━━━━━━\n` +
+            `🚀 WhatsApp'a yükleniyor: *%${percent}*\n` +
+            `\`[${bar}]\`\n` +
+            `📦 Boyut: ${finalSizeStr} (${downloadedParts.length} Bölüm)`
+          ).catch(() => {});
+        }
+      });
+      fileStream.pipe(progressStream);
+
+      const waFileName = `${taskObject.title.replace(/[\\/:*?"<>|]/g, '_')}.mp4`;
+      await withRetry(() => queueMediaSend(recipientJid, {
+        document: { stream: progressStream },
+        mimetype: 'video/mp4',
+        fileName: waFileName
+      }));
+
+      const summary = 
+        `🎬 *${taskObject.title}*\n\n` +
+        `✅ *Birleştirme ve İndirme Tamamlandı!*\n` +
+        `🎞️ Birleştirilen: *${downloadedParts.length} Bölüm*\n` +
+        `📦 Boyut: ${finalSizeStr}\n` +
+        `⏱️ Toplam Süre: ${totalDuration}\n\n` +
+        `🔗 *İndirme Linki (VDS):*\n${watchUrl}`;
+
+      await progressUpdateCallback(summary);
+      console.log(`✅ Batch video gönderildi: ${taskObject.title}`);
+
+      await sendToDepot(finalMergedPath, `${safeTitle}.mp4`, 'video/mp4', taskObject.title, recipientJid);
+
+      try { if (fs.existsSync(finalMergedPath)) fs.unlinkSync(finalMergedPath); } catch {}
+
+      if (taskObject) { taskObject.endTime = Date.now(); }
+      addHistory({
+        title: taskObject.title,
+        url: targetUrl,
+        sizeMB: (finalSize / 1024 / 1024).toFixed(2),
+        duration: totalDuration,
+        watchUrl: watchUrl,
+        fileName: `${safeTitle}.mp4`,
+        recipientJid
+      });
+    } catch (err) {
+      console.error(`WhatsApp gönderme hatası (${taskObject.title}):`, err.message);
+      addErrorLog({ title: taskObject.title, url: targetUrl, error: err.message });
+      progressUpdateCallback(`❌ *Gönderim Hatası*\n━━━━━━━━━━━━━━━━━━━━\nDosya WhatsApp'a yüklenirken bir hata oluştu: ${err.message}`).catch(() => {});
+    } finally {
+      botState.sendingTasks = botState.sendingTasks.filter(t => t.id !== sendTaskObj.id);
+    }
+  })();
+
+  return;
+}
+
 // Core Download Pipeline (Reusable for WhatsApp and Dashboard)
 export async function executeDownloadPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject = null) {
   if (targetUrl && typeof targetUrl === 'string') {
@@ -553,6 +811,10 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   console.log(`Starting extraction for target: ${targetUrl}`);
 
   if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
+
+  if (taskObject?.episodeBatch && Array.isArray(taskObject.episodeBatch) && taskObject.episodeBatch.length > 1) {
+    return await executeBatchDownloadPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject);
+  }
 
   const pipelineStart = Date.now();
 
