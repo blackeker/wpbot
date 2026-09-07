@@ -25,6 +25,7 @@ function shouldUseProxy(url) {
   const lowerUrl = String(url).toLowerCase();
   return lowerUrl.includes('pornhub.com') ||
          lowerUrl.includes('phncdn.com') ||
+         lowerUrl.includes('hentaizm') ||
          lowerUrl.includes('turkifsahub.com') ||
          lowerUrl.includes('turkifsalar') ||
          lowerUrl.includes('turkporno');
