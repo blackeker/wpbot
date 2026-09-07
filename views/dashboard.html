@@ -2,7 +2,10 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#06050b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>HDWP Enterprise Dashboard 2.0 - WhatsApp & VDS Medya Komuta Konsolu</title>
   
   <!-- Google Fonts: Outfit & JetBrains Mono -->
@@ -571,12 +574,310 @@
     .toast-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
     .toast-msg { font-size: 0.85rem; color: var(--text-secondary); }
 
-    /* RESPONSIVE */
-    @media (max-width: 1024px) {
-      .workspace-grid { grid-template-columns: 1fr; }
-      .app-sidebar { width: 70px; padding: 20px 8px; }
-      .brand-title, .brand-subtitle, .nav-item span, .server-status-pill span { display: none; }
-      .app-main { margin-left: 70px; padding: 20px; }
+    /* QUICK PRESET CHIPS */
+    .quick-chips-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .quick-chips-scroll::-webkit-scrollbar { display: none; }
+    .quick-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    .quick-chip:hover, .quick-chip:active {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--accent-primary);
+      color: #fff;
+    }
+
+    /* MOBILE HAMBURGER BUTTON & SIDEBAR DRAWER */
+    .mobile-menu-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-glass-input);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-size: 1.3rem;
+      cursor: pointer;
+      outline: none;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .mobile-menu-btn:active {
+      background: rgba(255, 255, 255, 0.12);
+      transform: scale(0.95);
+    }
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 9998;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .sidebar-backdrop.active {
+      display: block;
+      opacity: 1;
+    }
+    .sidebar-close-btn {
+      display: none;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-size: 1.1rem;
+      cursor: pointer;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+    .sidebar-close-btn:active {
+      background: rgba(244, 63, 94, 0.2);
+      border-color: var(--accent-rose);
+      transform: scale(0.92);
+    }
+
+    /* MOBILE BOTTOM NAVIGATION BAR */
+    .mobile-bottom-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: rgba(10, 8, 20, 0.95);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border-top: 1px solid var(--border-subtle);
+      z-index: 9990;
+      padding-bottom: max(env(safe-area-inset-bottom), 4px);
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6);
+      align-items: center;
+      justify-content: space-around;
+    }
+    .bottom-nav-btn {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 6px 0;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .bottom-nav-icon {
+      font-size: 1.25rem;
+      margin-bottom: 2px;
+      position: relative;
+    }
+    .bottom-nav-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .bottom-nav-btn.active {
+      color: var(--accent-primary);
+    }
+    .bottom-nav-btn.active .bottom-nav-icon {
+      transform: translateY(-2px);
+      filter: drop-shadow(0 0 8px var(--glow-primary));
+    }
+    .bottom-badge {
+      position: absolute;
+      top: -4px;
+      right: -8px;
+      background: var(--accent-rose);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,0.5);
+    }
+
+    /* RESPONSIVE BREAKPOINTS */
+    @media (max-width: 900px) {
+      body {
+        overflow-x: hidden;
+      }
+      .mobile-menu-btn {
+        display: flex;
+      }
+      .sidebar-close-btn {
+        display: flex;
+      }
+      .mobile-bottom-bar {
+        display: flex;
+      }
+      
+      /* Sidebar becomes off-canvas drawer */
+      .app-sidebar {
+        width: 290px !important;
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        height: 100vh !important;
+        z-index: 9999 !important;
+        transform: translateX(-100%) !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: none;
+        padding: 20px 14px !important;
+        overflow-y: auto;
+      }
+      .app-sidebar.open {
+        transform: translateX(0) !important;
+        box-shadow: 0 0 60px rgba(0, 0, 0, 0.95) !important;
+      }
+      .brand-title, .brand-subtitle, .nav-item span, .server-status-pill span {
+        display: inline-block !important;
+      }
+
+      /* Main content full width with space for bottom navigation bar */
+      .app-main {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding: 14px 14px 92px 14px !important;
+      }
+
+      /* Top Navbar adjustments */
+      .top-navbar {
+        margin-bottom: 18px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .page-title-group h1 {
+        font-size: 1.35rem;
+      }
+      .page-title-group p {
+        font-size: 0.8rem;
+      }
+      .top-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .top-actions .btn-primary {
+        flex: 1;
+      }
+
+      /* Layout Grids */
+      .workspace-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+      }
+      
+      /* Metric Cards: 2x2 grid on phones */
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+        margin-bottom: 18px !important;
+      }
+      .metric-card {
+        padding: 14px 14px;
+        border-radius: var(--radius-md);
+      }
+      .metric-value {
+        font-size: 1.3rem;
+      }
+      .metric-label {
+        font-size: 0.75rem;
+      }
+
+      /* Touch targets for mobile */
+      .glass-input, select.glass-input {
+        font-size: 16px !important; /* Prevents auto-zoom on iOS */
+        min-height: 48px;
+      }
+      .btn-primary, .btn-secondary, .btn-danger {
+        min-height: 46px;
+        padding: 10px 16px;
+      }
+
+      /* Series Wizard on Mobile */
+      .episode-grid {
+        grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)) !important;
+        gap: 6px !important;
+        max-height: 240px;
+      }
+      .episode-pill {
+        padding: 6px 8px;
+        font-size: 0.75rem;
+        justify-content: center;
+      }
+
+      /* Media Vault on Mobile */
+      #media-files-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+      }
+
+      /* Live Chart */
+      .chart-container {
+        height: 180px;
+      }
+
+      /* Video Modal Mobile */
+      #video-player-modal > div {
+        width: 95% !important;
+        padding: 14px 12px !important;
+      }
+      #modal-plyr-video {
+        max-height: 55vh !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .metrics-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+      }
+      .metric-card {
+        padding: 10px 12px;
+      }
+      .metric-value {
+        font-size: 1.15rem;
+      }
+      .metric-header {
+        margin-bottom: 6px;
+      }
+      .page-title-group h1 {
+        font-size: 1.2rem;
+      }
     }
 
     .tab-view { display: none; }
@@ -624,12 +925,15 @@
        ============================================================================== -->
   <aside class="app-sidebar">
     <div>
-      <div class="brand-header">
-        <div class="brand-logo">🎬</div>
-        <div>
-          <div class="brand-title">HDWP BOT</div>
-          <div class="brand-subtitle">ENTERPRISE 2.0</div>
+      <div class="brand-header" style="display:flex; align-items:center; justify-content:space-between; width:100%;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="brand-logo">🎬</div>
+          <div>
+            <div class="brand-title">HDWP BOT</div>
+            <div class="brand-subtitle">ENTERPRISE 2.0</div>
+          </div>
         </div>
+        <button type="button" class="sidebar-close-btn" onclick="toggleMobileSidebar(false)" title="Kapat">✕</button>
       </div>
 
       <nav class="nav-menu">
@@ -694,17 +998,20 @@
     
     <!-- TOP NAVBAR -->
     <header class="top-navbar">
-      <div class="page-title-group">
-        <h1 id="page-heading">Komuta Konsolu & Telemetri</h1>
-        <p id="page-subheading">Sunucu kaynakları, aktif indirmeler ve WhatsApp durumu anlık izleniyor.</p>
+      <div style="display:flex; align-items:center; gap:12px; width:100%;">
+        <button type="button" class="mobile-menu-btn" onclick="toggleMobileSidebar(true)" title="Menüyü Aç">☰</button>
+        <div class="page-title-group" style="flex:1; min-width:0;">
+          <h1 id="page-heading">Komuta Konsolu & Telemetri</h1>
+          <p id="page-subheading">Sunucu kaynakları, aktif indirmeler ve WhatsApp durumu anlık izleniyor.</p>
+        </div>
       </div>
 
       <div class="top-actions">
-        <div style="background:var(--bg-glass-input); border:1px solid var(--border-subtle); padding:8px 16px; border-radius:var(--radius-md); font-size:0.85rem; display:flex; align-items:center; gap:8px;">
-          <span style="color:var(--text-muted);">VDS IP:</span>
+        <div style="background:var(--bg-glass-input); border:1px solid var(--border-subtle); padding:8px 14px; border-radius:var(--radius-md); font-size:0.82rem; display:flex; align-items:center; gap:6px;">
+          <span style="color:var(--text-muted);">VDS:</span>
           <span style="font-family:monospace; color:var(--accent-cyan); font-weight:700;" id="top-vds-ip">127.0.0.1</span>
         </div>
-        <button class="btn-primary" onclick="switchNavTab('overview')" style="width:auto; padding:10px 20px;">
+        <button class="btn-primary" onclick="switchNavTab('overview')" style="width:auto; padding:10px 18px; font-size:0.85rem;">
           <span>⚡ Hızlı İndirici</span>
         </button>
       </div>
@@ -778,6 +1085,15 @@
           </div>
 
           <form id="quick-download-form" onsubmit="handleQuickDownload(event)">
+            <div class="quick-chips-scroll">
+              <span class="quick-chip" onclick="setQuickUrl('https://animecix.net/dizi/')">🎬 Animecix</span>
+              <span class="quick-chip" onclick="setQuickUrl('https://www.hdfilmcehennemi.nl/')">🍿 HDFilm</span>
+              <span class="quick-chip" onclick="setQuickUrl('https://hdkore1.com/dizi/')">🇰🇷 HDKore</span>
+              <span class="quick-chip" onclick="setQuickUrl('https://dramadizilerim.com/izle/')">🎭 DramaDizi</span>
+              <span class="quick-chip" onclick="setQuickUrl('https://www.youtube.com/watch?v=')">▶️ YouTube</span>
+              <span class="quick-chip" onclick="setQuickUrl('https://dizipal')">🎥 Dizipal</span>
+            </div>
+
             <div class="form-group">
               <label class="form-label" for="input-quick-url">Medya Bağlantısı (URL)</label>
               <input type="url" id="input-quick-url" class="glass-input" placeholder="https://dizipal.com/... veya https://youtube.com/..." required>
@@ -798,7 +1114,7 @@
               </div>
             </div>
 
-            <button type="submit" id="btn-quick-submit" class="btn-primary">
+            <button type="submit" id="btn-quick-submit" class="btn-primary" style="width:100%;">
               <span>İndirmeyi Başlat 📥</span>
             </button>
           </form>
@@ -823,8 +1139,8 @@
               <span>Canlı İndirme & Kuyruk Monitörü</span>
             </div>
             <div style="display:flex; gap:8px;">
-              <button class="btn-secondary" onclick="pauseQueueToggle()" id="btn-pause-queue">⏸️ Duraklat</button>
-              <button class="btn-danger" onclick="clearQueueAction()">🗑️ Temizle</button>
+              <button class="btn-secondary" onclick="pauseQueueToggle()" id="btn-pause-queue" style="padding:6px 12px; font-size:0.8rem;">⏸️ Duraklat</button>
+              <button class="btn-danger" onclick="clearQueueAction()" style="padding:6px 12px; font-size:0.8rem;">🗑️ Temizle</button>
             </div>
           </div>
 
@@ -860,23 +1176,35 @@
             <span>🎬</span>
             <span>Evrensel Dizi & Sezon Toplu İndirme Sihirbazı</span>
           </div>
-          <span style="color:var(--accent-cyan); font-weight:600; font-size:0.85rem;">Dizipal, Dizibox, Anizm, Animecix vb.</span>
+          <span style="color:var(--accent-cyan); font-weight:600; font-size:0.85rem;">Animecix, HDFilm, HDKore vb.</span>
         </div>
 
-        <div style="display:flex; gap:12px; margin-bottom:20px;">
-          <input type="url" id="series-wizard-url" class="glass-input" placeholder="Dizi veya Sezon Linki Yapıştırın (Örn: https://dizipal.com/dizi/...)" style="flex:1;">
-          <button class="btn-primary" id="series-wizard-fetch-btn" onclick="fetchSeriesEpisodes()" style="width:auto; padding:0 28px;">
-            <span>Bölümleri Getir 🔍</span>
-          </button>
+        <div class="quick-chips-scroll" style="margin-bottom:14px;">
+          <span class="quick-chip" onclick="setSeriesUrl('https://animecix.net/dizi/')">🎬 Animecix</span>
+          <span class="quick-chip" onclick="setSeriesUrl('https://www.hdfilmcehennemi.nl/dizi/')">🍿 HDFilmcehennemi</span>
+          <span class="quick-chip" onclick="setSeriesUrl('https://hdkore1.com/dizi/')">🇰🇷 HDKore</span>
+          <span class="quick-chip" onclick="setSeriesUrl('https://dramadizilerim.com/dizi/')">🎭 DramaDizi</span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <input type="url" id="series-wizard-url" class="glass-input" placeholder="Dizi veya Sezon Linki Yapıştırın (Örn: https://animecix.net/dizi/...)" style="flex:1; min-width:240px;">
+            <button class="btn-primary" id="series-wizard-fetch-btn" onclick="fetchSeriesEpisodes()" style="min-width:140px; padding:0 24px;">
+              <span>Bölümleri Getir 🔍</span>
+            </button>
+          </div>
         </div>
 
         <!-- Adım 2: Bölüm Seçim Paneli (Dinamik Açılır) -->
         <div id="series-step2-panel" style="display:none; border-top:1px solid var(--border-subtle); padding-top:20px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-            <h3 id="series-detected-title" style="font-size:1.2rem; font-weight:800; color:var(--text-main);">Dizi Adı</h3>
-            <div style="display:flex; align-items:center; gap:12px;">
-              <button class="btn-secondary" onclick="toggleSelectAllEpisodes(true)">Tümünü Seç</button>
-              <button class="btn-secondary" onclick="toggleSelectAllEpisodes(false)">Seçimi Kaldır</button>
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <h3 id="series-detected-title" style="font-size:1.15rem; font-weight:800; color:var(--text-main);">Dizi Adı</h3>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:0.75rem;" onclick="toggleSelectAllEpisodes(true)">Tümü</button>
+              <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:0.75rem;" onclick="selectRangeEpisodes(1, 10)">1-10</button>
+              <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:0.75rem;" onclick="selectRangeEpisodes(11, 20)">11-20</button>
+              <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:0.75rem;" onclick="selectRangeEpisodes(21, 30)">21-30</button>
+              <button type="button" class="btn-secondary" style="padding:6px 12px; font-size:0.75rem;" onclick="toggleSelectAllEpisodes(false)">Kaldır</button>
             </div>
           </div>
 
@@ -884,13 +1212,20 @@
             <!-- Bölüm kutucukları buraya basılır -->
           </div>
 
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px;">
+          <div style="display:flex; align-items:center; gap:10px; margin: 14px 0; background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:10px; border:1px solid var(--border-subtle);">
+            <input type="checkbox" id="series-batch-merge-check" style="width:18px; height:18px; accent-color:var(--accent-primary); cursor:pointer;">
+            <label for="series-batch-merge-check" style="font-size:0.85rem; font-weight:600; cursor:pointer;">
+              📦 10'arlı paketler halinde birleştirerek indir (Kısa dizi / Micro-drama için)
+            </label>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-top:14px;">
             <div>
               <label class="form-label">Gönderilecek WhatsApp Numarası</label>
               <input type="text" id="series-target-phone" class="glass-input" value="905052761405">
             </div>
             <div style="display:flex; align-items:flex-end;">
-              <button class="btn-primary" id="series-bulk-download-btn" onclick="downloadSelectedSeriesEpisodes()">
+              <button class="btn-primary" id="series-bulk-download-btn" onclick="downloadSelectedSeriesEpisodes()" style="width:100%;">
                 <span>Seçilen Bölümleri Toplu İndir 📥</span>
               </button>
             </div>
@@ -1322,6 +1657,15 @@
       const activeLink = Array.from(document.querySelectorAll('.nav-item')).find(el => el.getAttribute('onclick')?.includes(tabName));
       if (activeLink) activeLink.classList.add('active');
 
+      // Update mobile bottom bar active button
+      document.querySelectorAll('.bottom-nav-btn').forEach(btn => {
+        if (btn.getAttribute('data-tab') === tabName) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
       const targetView = document.getElementById(`view-${tabName}`);
       if (targetView) targetView.style.display = 'block';
 
@@ -1330,6 +1674,7 @@
         'series-wizard': { title: 'Dizi & Sezon Sihirbazı', sub: 'Tüm sezonu tek tıkla tara, seç ve sırayla indir.' },
         'media-vault': { title: 'Medya Kasası & Disk Explorer', sub: 'Sunucudaki videoları izle, bilgisayarına indir veya sil.' },
         'whatsapp-station': { title: 'WhatsApp Komuta İstasyonu', sub: 'QR kod, Pairing kodu, oturum yedekleme ve sıfırlama merkezi.' },
+        'queue-manager': { title: 'Görev Kuyruğu & Monitör', sub: 'Bekleyen indirmeler, öncelik sıralaması ve paralel işlem limitleri.' },
         'settings-station': { title: 'Sistem & Proxy Yapılandırması', sub: 'LRU kota limitleri, bildirim webhookları ve proxy havuzu.' },
         'commands-station': { title: 'Özel Komutlar', sub: 'WhatsApp botuna özel dinamik şablon komutları düzenleyin.' },
         'cron-station': { title: 'Cron Zamanlayıcı Stüdyosu', sub: 'Zamanlanmış otomatik arka plan görevlerini yapılandırın.' },
@@ -1347,6 +1692,10 @@
       if (tabName === 'settings-station' || tabName === 'queue-manager') loadSettingsAction();
       if (tabName === 'commands-station') loadCommandsAction();
       if (tabName === 'cron-station') loadCronAction();
+
+      // Close mobile drawer if open and scroll to top
+      toggleMobileSidebar(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // Toast Alert
@@ -1451,7 +1800,22 @@
       const activeContainer = document.getElementById('active-task-container');
       const queueContainer = document.getElementById('queue-task-list');
       
-      document.getElementById('metric-queue-val').innerText = `${data.queue ? data.queue.length : 0} Görev`;
+      const queueCount = data.queue ? data.queue.length : 0;
+      const activeCount = data.activeTasks ? data.activeTasks.length : 0;
+      const totalCount = queueCount + activeCount;
+
+      document.getElementById('metric-queue-val').innerText = `${queueCount} Görev`;
+
+      // Update mobile bottom bar badge
+      const queueBadge = document.getElementById('bottom-queue-badge');
+      if (queueBadge) {
+        if (totalCount > 0) {
+          queueBadge.innerText = totalCount > 99 ? '99+' : totalCount;
+          queueBadge.style.display = 'block';
+        } else {
+          queueBadge.style.display = 'none';
+        }
+      }
 
       if (data.activeTasks && data.activeTasks.length > 0) {
         activeContainer.innerHTML = data.activeTasks.map(t => `
@@ -1813,6 +2177,9 @@
       let cleanPhone = phone.replace(/[^0-9]/g, '');
       if (!cleanPhone.endsWith('@s.whatsapp.net')) cleanPhone += '@s.whatsapp.net';
 
+      const isBatchMerge = document.getElementById('series-batch-merge-check')?.checked || false;
+      const detectedSeriesName = document.getElementById('series-detected-title')?.innerText || '';
+
       const btn = document.getElementById('series-bulk-download-btn');
       btn.disabled = true;
       btn.innerText = 'Ekleniyor...';
@@ -1821,7 +2188,12 @@
         const res = await fetch('/api/indir-multiple', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ episodes: selected, jid: cleanPhone })
+          body: JSON.stringify({ 
+            episodes: selected, 
+            jid: cleanPhone,
+            batchMerge: isBatchMerge,
+            seriesName: detectedSeriesName
+          })
         });
         const data = await res.json();
         if (data.success) {
@@ -2452,6 +2824,45 @@
       });
     }
 
+    // Mobile Helper Functions
+    function toggleMobileSidebar(open) {
+      const sidebar = document.querySelector('.app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (open) {
+        sidebar.classList.add('open');
+        backdrop.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      } else {
+        sidebar.classList.remove('open');
+        backdrop.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+    }
+
+    function setQuickUrl(val) {
+      const inp = document.getElementById('input-quick-url');
+      if (inp) {
+        inp.value = val;
+        inp.focus();
+      }
+    }
+
+    function setSeriesUrl(val) {
+      const inp = document.getElementById('series-wizard-url');
+      if (inp) {
+        inp.value = val;
+        inp.focus();
+      }
+    }
+
+    function selectRangeEpisodes(start, end) {
+      const checks = document.querySelectorAll('.series-ep-check');
+      checks.forEach((cb, idx) => {
+        const num = idx + 1;
+        cb.checked = (num >= start && num <= end);
+      });
+    }
+
     // Initialize Page on Load
     window.addEventListener('DOMContentLoaded', () => {
       initWebSocket();
@@ -2459,5 +2870,35 @@
       loadSettingsAction(); // fetch IP and retention for top navbar
     });
   </script>
+
+  <!-- MOBILE BOTTOM NAVIGATION BAR -->
+  <nav class="mobile-bottom-bar" id="mobile-bottom-bar">
+    <button type="button" class="bottom-nav-btn active" data-tab="overview" onclick="switchNavTab('overview')">
+      <span class="bottom-nav-icon">📊</span>
+      <span class="bottom-nav-label">Özet</span>
+    </button>
+    <button type="button" class="bottom-nav-btn" data-tab="series-wizard" onclick="switchNavTab('series-wizard')">
+      <span class="bottom-nav-icon">🎬</span>
+      <span class="bottom-nav-label">Dizi</span>
+    </button>
+    <button type="button" class="bottom-nav-btn" data-tab="queue-manager" onclick="switchNavTab('queue-manager')">
+      <span class="bottom-nav-icon" style="position:relative;">
+        📋
+        <span class="bottom-badge" id="bottom-queue-badge" style="display:none;">0</span>
+      </span>
+      <span class="bottom-nav-label">Kuyruk</span>
+    </button>
+    <button type="button" class="bottom-nav-btn" data-tab="media-vault" onclick="switchNavTab('media-vault')">
+      <span class="bottom-nav-icon">🍿</span>
+      <span class="bottom-nav-label">Kasa</span>
+    </button>
+    <button type="button" class="bottom-nav-btn" onclick="toggleMobileSidebar(true)">
+      <span class="bottom-nav-icon">☰</span>
+      <span class="bottom-nav-label">Menü</span>
+    </button>
+  </nav>
+
+  <!-- SIDEBAR BACKDROP OVERLAY -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleMobileSidebar(false)"></div>
 </body>
 </html>

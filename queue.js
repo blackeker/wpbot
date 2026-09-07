@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import Database from 'better-sqlite3';
 
-const dbPath = path.join(sessionPath, 'queue.db');
+const dbPath = path.join(sessionPath, process.env.QUEUE_DB_NAME || 'queue.db');
 const db = new Database(dbPath);
 
 // Initialize DB schema

@@ -1,8 +1,18 @@
 import fs from 'fs';
 import { Transform } from 'stream';
 import path from 'path';
-import { exec } from 'child_process';
-import ffmpegPath from 'ffmpeg-static';
+import { exec, execSync } from 'child_process';
+import ffmpegStaticPath from 'ffmpeg-static';
+
+let ffmpegPath = ffmpegStaticPath;
+try {
+  const sysFfmpeg = execSync('which ffmpeg 2>/dev/null || true').toString().trim();
+  if (sysFfmpeg && fs.existsSync(sysFfmpeg)) {
+    ffmpegPath = sysFfmpeg;
+  }
+} catch (e) {
+  ffmpegPath = ffmpegStaticPath;
+}
 import { extractVideoUrl } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
 import { notifyQueueUpdate } from './queue.js';
@@ -25,6 +35,25 @@ function replaceTurkishChars(str) {
     .replace(/ö/g, 'o')
     .replace(/Ç/g, 'C')
     .replace(/ç/g, 'c');
+}
+
+function getMediaStreamInfo(filePath) {
+  try {
+    const raw = execSync(`ffprobe -v error -show_entries stream=codec_type,codec_name,width,height,sample_rate,channels -of json "${filePath}"`, { timeout: 10000 }).toString();
+    const data = JSON.parse(raw);
+    const video = data.streams?.find(s => s.codec_type === 'video');
+    const audio = data.streams?.find(s => s.codec_type === 'audio');
+    return {
+      vCodec: video?.codec_name || '',
+      width: Number(video?.width) || 0,
+      height: Number(video?.height) || 0,
+      aCodec: audio?.codec_name || '',
+      sampleRate: audio?.sample_rate ? String(audio.sample_rate) : '',
+      channels: Number(audio?.channels) || 0
+    };
+  } catch (e) {
+    return null;
+  }
 }
 
 // ─── Retry Yardımcısı ───
@@ -332,7 +361,11 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
         }
         try { if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath); } catch {}
       } else {
+        if (!fs.existsSync(finalPath)) {
+          throw new Error(`İndirilen dosya bulunamadı: ${finalPath}`);
+        }
         const fileStream = fs.createReadStream(finalPath);
+        fileStream.on('error', (err) => console.error('[YouTube Stream Error]:', err.message));
         let lastWaUpdate = 0;
         const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
           const now = Date.now();
@@ -364,7 +397,8 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
     }
   })();
 
-  // Gönderim arka planda devam ederken indirme aşaması bittiği için sonraki göreve geçilsin
+  // Gönderim tamamlanana kadar bekle
+  await sendPromise;
   return;
 }
 
@@ -529,9 +563,7 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
           } finally {
             botState.sendingTasks = botState.sendingTasks.filter(t => t.id !== sendTaskObj.id);
           }
-        })();
-
-        resolve();
+        })().then(resolve).catch(reject);
       });
 
       torrent.on('error', (err) => {
@@ -658,40 +690,130 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
       await progressUpdateCallback(
         `🎬 *${taskObject.title}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🔄 *${downloadedParts.length}* bölüm tek video halinde birleştiriliyor (FFmpeg Concat)...`
+        `🔄 *${downloadedParts.length}* bölüm tek video halinde birleştiriliyor...`
       );
 
-      const concatListFile = path.join(batchTempDir, 'concat_list.txt');
-      const concatLines = downloadedParts.map(p => `file '${path.resolve(p)}'`).join('\n');
-      fs.writeFileSync(concatListFile, concatLines, 'utf8');
+      const partInfos = downloadedParts.map(p => getMediaStreamInfo(p));
+      const firstPartInfo = partInfos[0];
+      const allStreamsCompatible = partInfos.length === downloadedParts.length &&
+        partInfos.every(info => 
+          info &&
+          info.vCodec === 'h264' &&
+          info.width > 0 &&
+          firstPartInfo &&
+          info.width === firstPartInfo.width &&
+          info.height === firstPartInfo.height &&
+          info.aCodec === 'aac' &&
+          info.sampleRate === firstPartInfo.sampleRate &&
+          info.channels === firstPartInfo.channels
+        );
 
-      let copySuccess = false;
-      try {
-        const copyCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${concatListFile}" -c copy -movflags +faststart "${finalMergedPath}"`;
-        console.log(`[Batch Concat] Trying copy merge: ${copyCmd}`);
-        await new Promise((resolve, reject) => {
-          exec(copyCmd, { timeout: 180000 }, (err, stdout, stderr) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-        if (fs.existsSync(finalMergedPath) && fs.statSync(finalMergedPath).size > 10000) {
-          copySuccess = true;
-          console.log(`[Batch Concat] Copy merge successful!`);
+      let mergeSuccess = false;
+
+      // Adım 1: Eğer tüm parçaların akış parametreleri (çözünürlük, codec, ses frekansı) tam eşleşiyorsa kayıpsız Intermediate TS Concat dene
+      if (allStreamsCompatible) {
+        try {
+          console.log(`[Batch Merge] Parametreler uyumlu. Kayıpsız Intermediate TS Concat deneniyor (${downloadedParts.length} parça)...`);
+          const tsParts = [];
+          for (let idx = 0; idx < downloadedParts.length; idx++) {
+            const mp4Part = downloadedParts[idx];
+            const tsPart = path.join(batchTempDir, `conv_${String(idx + 1).padStart(3, '0')}.ts`);
+            await new Promise((resolve, reject) => {
+              exec(`"${ffmpegPath}" -y -i "${mp4Part}" -c copy -bsf:v h264_mp4toannexb -f mpegts "${tsPart}"`, { timeout: 60000 }, (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+            if (fs.existsSync(tsPart) && fs.statSync(tsPart).size > 1000) {
+              tsParts.push(tsPart);
+            } else {
+              throw new Error(`TS dönüştürme başarısız: parça ${idx + 1}`);
+            }
+          }
+
+          if (tsParts.length === downloadedParts.length) {
+            const tsListFile = path.join(batchTempDir, 'ts_concat_list.txt');
+            const tsLines = tsParts.map(p => `file '${path.resolve(p)}'`).join('\n');
+            fs.writeFileSync(tsListFile, tsLines, 'utf8');
+
+            const tsMergeCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${tsListFile}" -c copy -bsf:a aac_adtstoasc -movflags +faststart "${finalMergedPath}"`;
+            await new Promise((resolve, reject) => {
+              exec(tsMergeCmd, { timeout: 180000 }, (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+
+            // Dosya ve akış doğrulaması: Son saniyelerine kadar decode hatası olmamalı
+            if (fs.existsSync(finalMergedPath) && fs.statSync(finalMergedPath).size > 50000) {
+              try {
+                execSync(`"${ffmpegPath}" -v error -sseof -3 -i "${finalMergedPath}" -f null -`, { timeout: 10000 });
+                mergeSuccess = true;
+                console.log(`[Batch Merge] ✅ Kayıpsız TS Concat başarılı ve doğrulandı!`);
+              } catch (probeErr) {
+                console.warn(`[Batch Merge] TS çıktısında decode hatası saptandı, yeniden senkronize edilerek kodlanacak:`, probeErr.message);
+                try { fs.unlinkSync(finalMergedPath); } catch (e) {}
+              }
+            }
+          }
+        } catch (tsErr) {
+          console.warn(`[Batch Merge] Kayıpsız TS Concat başarısız (${tsErr.message}), garantili filtreli birleştirmeye geçiliyor.`);
+          try { if (fs.existsSync(finalMergedPath)) fs.unlinkSync(finalMergedPath); } catch (e) {}
         }
-      } catch (copyErr) {
-        console.warn(`[Batch Concat] Stream copy failed (${copyErr.message}), falling back to re-encode.`);
+      } else {
+        console.log(`[Batch Merge] Parçaların çözünürlük veya ses parametreleri farklı (${downloadedParts.length} parça). Bozulmayı önlemek için garantili filtreli birleştirme uygulanıyor.`);
       }
 
-      if (!copySuccess) {
-        const encodeCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${concatListFile}" -c:v libx264 -preset veryfast -crf 23 -c:a aac -b:a 128k -movflags +faststart "${finalMergedPath}"`;
-        console.log(`[Batch Concat] Running re-encode merge: ${encodeCmd}`);
-        await new Promise((resolve, reject) => {
-          exec(encodeCmd, { timeout: 600000 }, (err, stdout, stderr) => {
-            if (err) reject(err);
-            else resolve();
+      // Adım 2: Parametreler farklıysa veya TS concat başarısız olursa -> %100 Garantili Senkronize Filter Complex Concat
+      if (!mergeSuccess) {
+        await progressUpdateCallback(
+          `🎬 *${taskObject.title}*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `⚙️ Video ve ses akışları senkronize edilerek birleştiriliyor (Filtreli Mod)...`
+        );
+
+        console.log(`[Batch Merge] Filter Complex Concat başlatılıyor (${downloadedParts.length} parça)`);
+        const inputs = downloadedParts.map(p => `-i "${path.resolve(p)}"`).join(' ');
+
+        const targetW = (firstPartInfo?.width > 0) ? (firstPartInfo.width % 2 === 0 ? firstPartInfo.width : firstPartInfo.width + 1) : 720;
+        const targetH = (firstPartInfo?.height > 0) ? (firstPartInfo.height % 2 === 0 ? firstPartInfo.height : firstPartInfo.height + 1) : 1280;
+
+        // Her parçanın videosunu targetW x targetH boyutuna orantılı ölçekle, pad ekle, SAR=1 yap.
+        // Her parçanın sesini 44100Hz stereo formatına normalize et. Bu sayede hiçbir donma/yeşil ekran/ses kayması yaşanmaz!
+        const filterPads = [];
+        const concatInputs = [];
+        for (let idx = 0; idx < downloadedParts.length; idx++) {
+          filterPads.push(`[${idx}:v]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1[v${idx}]`);
+          filterPads.push(`[${idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a${idx}]`);
+          concatInputs.push(`[v${idx}][a${idx}]`);
+        }
+        filterPads.push(`${concatInputs.join('')}concat=n=${downloadedParts.length}:v=1:a=1[outv][outa]`);
+        const filterComplexStr = filterPads.join(';');
+
+        const filterCmd = `"${ffmpegPath}" -y ${inputs} -filter_complex "${filterComplexStr}" -map "[outv]" -map "[outa]" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -ar 44100 -movflags +faststart "${finalMergedPath}"`;
+
+        try {
+          await new Promise((resolve, reject) => {
+            exec(filterCmd, { timeout: 600000 }, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
           });
-        });
+          if (fs.existsSync(finalMergedPath) && fs.statSync(finalMergedPath).size > 10000) {
+            mergeSuccess = true;
+            console.log(`[Batch Merge] ✅ Filter Complex Concat başarılı!`);
+          }
+        } catch (filterErr) {
+          console.warn(`[Batch Merge] Filter complex ölçekli deneme başarısız (${filterErr.message}), basit concat filtresi deneniyor...`);
+          const simpleFilter = downloadedParts.map((_, i) => `[${i}:v][${i}:a]`).join('') + `concat=n=${downloadedParts.length}:v=1:a=1[v][a]`;
+          const simpleCmd = `"${ffmpegPath}" -y ${inputs} -filter_complex "${simpleFilter}" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -ar 44100 -movflags +faststart "${finalMergedPath}"`;
+          await new Promise((resolve, reject) => {
+            exec(simpleCmd, { timeout: 600000 }, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+        }
       }
     }
 
@@ -730,7 +852,7 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
   };
   botState.sendingTasks.push(sendTaskObj);
 
-  (async () => {
+  await (async () => {
     try {
       await progressUpdateCallback(
         `🎬 *${taskObject.title}*\n` +
@@ -1152,7 +1274,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
 
   const MAX_WA_SIZE = 1.8 * 1024 * 1024 * 1024; // 1.8 GB Limit
 
-  (async () => {
+  await (async () => {
     const sendTaskObj = {
       id: taskObject ? taskObject.id : 'wa_' + Date.now(),
       title: result.title,
@@ -1287,7 +1409,11 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         }
         try { if (fs.existsSync(finalFilePath)) fs.unlinkSync(finalFilePath); } catch {}
       } else {
+        if (!fs.existsSync(finalFilePath)) {
+          throw new Error(`İndirilen dosya bulunamadı: ${finalFilePath}`);
+        }
         const fileStream = fs.createReadStream(finalFilePath);
+        fileStream.on('error', (err) => console.error('[Pipeline Stream Error]:', err.message));
         let lastWaUpdate = 0;
         const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
           sendTaskObj.status = `WhatsApp'a yükleniyor... %${percent}`;

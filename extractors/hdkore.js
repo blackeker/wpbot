@@ -316,7 +316,7 @@ export async function extractHdkore(pageUrl) {
 
       if (entId && pageToken) {
         try {
-          const apiUrl = `${host}/api/api-player/episode-url/${entId}/${epNum}?pt=${encodeURIComponent(pageToken)}`;
+          const apiUrl = `${host}/api/api-player/episode-url/${entId}/${epNum}?pt=${encodeURIComponent(pageToken)}&force=1`;
           let apiRes = await axios.get(apiUrl, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
@@ -338,7 +338,7 @@ export async function extractHdkore(pageUrl) {
 
             if (refreshRes?.data?.page_token) {
               pageToken = refreshRes.data.page_token;
-              const retryUrl = `${host}/api/api-player/episode-url/${entId}/${epNum}?pt=${encodeURIComponent(pageToken)}`;
+              const retryUrl = `${host}/api/api-player/episode-url/${entId}/${epNum}?pt=${encodeURIComponent(pageToken)}&force=1`;
               apiRes = await axios.get(retryUrl, {
                 headers: {
                   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',

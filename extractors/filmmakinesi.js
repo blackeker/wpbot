@@ -1,4 +1,5 @@
 import { getSharedBrowser } from '../utils/browser.js';
+import { gotScraping } from '../extractor.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import vm from 'vm';

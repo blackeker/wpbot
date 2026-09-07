@@ -8,8 +8,10 @@ import ffmpegStaticPath from 'ffmpeg-static';
 
 let ffmpegPath = ffmpegStaticPath;
 try {
-  execSync('ffmpeg -version', { stdio: 'ignore' });
-  ffmpegPath = 'ffmpeg';
+  const sysFfmpeg = execSync('which ffmpeg 2>/dev/null || true').toString().trim();
+  if (sysFfmpeg && fs.existsSync(sysFfmpeg)) {
+    ffmpegPath = sysFfmpeg;
+  }
 } catch (e) {
   ffmpegPath = ffmpegStaticPath;
 }

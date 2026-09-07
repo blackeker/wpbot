@@ -1,0 +1,479 @@
+[
+  {
+    "name": "YouTube",
+    "type": "Video",
+    "domain": "youtube.com",
+    "testUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "DramaDizilerim",
+    "type": "Dizi",
+    "domain": "dramadizilerim.com",
+    "testUrl": "https://dramadizilerim.com/izle/dileklerin-efendisi?s=1&e=1",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Animecix / Ecchicix",
+    "type": "Anime",
+    "domain": "ecchicix.com",
+    "testUrl": "https://ecchicix.com/titles/7350/season/1/episode/5",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "HDFilmcehennemi",
+    "type": "Film",
+    "domain": "www.hdfilmcehennemi.nl",
+    "testUrl": "https://www.hdfilmcehennemi.nl",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Dizipal",
+    "type": "Dizi/Film",
+    "domain": "dizipal.com",
+    "testUrl": "https://dizipal.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "FilmMakinesi",
+    "type": "Film",
+    "domain": "filmmakinesi.to",
+    "testUrl": "https://filmmakinesi.to",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "FilmModu",
+    "type": "Film",
+    "domain": "filmmodu.org",
+    "testUrl": "https://filmmodu.org",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "FullHDFilmIzlesene",
+    "type": "Film",
+    "domain": "fullhdfilmizlesene.pw",
+    "testUrl": "https://fullhdfilmizlesene.pw",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "SezonlukDizi",
+    "type": "Dizi",
+    "domain": "sezonlukdizi.org",
+    "testUrl": "https://sezonlukdizi.org",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "YabanciDizi",
+    "type": "Dizi",
+    "domain": "yabancidizi.co",
+    "testUrl": "https://yabancidizi.co",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "DiziGom",
+    "type": "Dizi",
+    "domain": "dizigom1.pw",
+    "testUrl": "https://dizigom1.pw",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "DiziBox",
+    "type": "Dizi",
+    "domain": "dizibox.tv",
+    "testUrl": "https://dizibox.tv",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Koreanturk",
+    "type": "Dizi",
+    "domain": "koreanturk.com",
+    "testUrl": "https://koreanturk.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "HDKore",
+    "type": "Dizi",
+    "domain": "hdkore1.com",
+    "testUrl": "https://hdkore1.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "TikTok",
+    "type": "Sosyal Medya",
+    "domain": "tiktok.com",
+    "testUrl": "https://www.tiktok.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Instagram",
+    "type": "Sosyal Medya",
+    "domain": "instagram.com",
+    "testUrl": "https://www.instagram.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Pixeldrain",
+    "type": "Bulut",
+    "domain": "pixeldrain.com",
+    "testUrl": "https://pixeldrain.com/u/sample",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Mediafire",
+    "type": "Bulut",
+    "domain": "mediafire.com",
+    "testUrl": "https://www.mediafire.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Mega.nz",
+    "type": "Bulut",
+    "domain": "mega.nz",
+    "testUrl": "https://mega.nz",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Google Drive",
+    "type": "Bulut",
+    "domain": "drive.google.com",
+    "testUrl": "https://drive.google.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Yandex Disk",
+    "type": "Bulut",
+    "domain": "disk.yandex.com.tr",
+    "testUrl": "https://disk.yandex.com.tr",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Dropbox",
+    "type": "Bulut",
+    "domain": "dropbox.com",
+    "testUrl": "https://www.dropbox.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "WeTransfer",
+    "type": "Bulut",
+    "domain": "wetransfer.com",
+    "testUrl": "https://wetransfer.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Terabox",
+    "type": "Bulut",
+    "domain": "terabox.com",
+    "testUrl": "https://www.terabox.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Cloud Mail.ru",
+    "type": "Bulut",
+    "domain": "cloud.mail.ru",
+    "testUrl": "https://cloud.mail.ru",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Itch.io",
+    "type": "Oyun/Dosya",
+    "domain": "itch.io",
+    "testUrl": "https://itch.io",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "APKPure",
+    "type": "APK",
+    "domain": "apkpure.net",
+    "testUrl": "https://apkpure.net",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "APKMirror",
+    "type": "APK",
+    "domain": "apkmirror.com",
+    "testUrl": "https://www.apkmirror.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "HappyMod",
+    "type": "APK",
+    "domain": "happymod.com",
+    "testUrl": "https://www.happymod.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "LiteAPKs",
+    "type": "APK",
+    "domain": "liteapks.com",
+    "testUrl": "https://liteapks.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "ModYolo",
+    "type": "APK",
+    "domain": "modyolo.com",
+    "testUrl": "https://modyolo.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "9Mod",
+    "type": "APK",
+    "domain": "9mod.com",
+    "testUrl": "https://9mod.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "MangaDenizi",
+    "type": "Manga",
+    "domain": "mangadenizi.com",
+    "testUrl": "https://mangadenizi.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "MangaTR",
+    "type": "Manga",
+    "domain": "mangatr.net",
+    "testUrl": "https://mangatr.net",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "WebtoonTR",
+    "type": "Webtoon",
+    "domain": "webtoontr.com",
+    "testUrl": "https://webtoontr.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "AsuraScans",
+    "type": "Manga",
+    "domain": "asuracomic.net",
+    "testUrl": "https://asuracomic.net",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "MerlinScans",
+    "type": "Manga",
+    "domain": "merlinscans.org",
+    "testUrl": "https://merlinscans.org",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Hentaizm",
+    "type": "18+",
+    "domain": "hentaizm2.com",
+    "testUrl": "https://hentaizm2.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Doeda",
+    "type": "18+",
+    "domain": "doeda.com",
+    "testUrl": "https://doeda.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Pornhub",
+    "type": "18+",
+    "domain": "pornhub.com",
+    "testUrl": "https://www.pornhub.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "XHamster",
+    "type": "18+",
+    "domain": "xhamster.com",
+    "testUrl": "https://xhamster.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "TurkPorno",
+    "type": "18+",
+    "domain": "turkporno.com",
+    "testUrl": "https://turkporno.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "TurkIfsaHub",
+    "type": "18+",
+    "domain": "turkifsahub.com",
+    "testUrl": "https://turkifsahub.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "TurkIfsalar",
+    "type": "18+",
+    "domain": "turkifsalar.site",
+    "testUrl": "https://turkifsalar.site",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "HDAbla",
+    "type": "18+",
+    "domain": "hdabla.net",
+    "testUrl": "https://hdabla.net",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "JavGuru",
+    "type": "18+",
+    "domain": "jav.guru",
+    "testUrl": "https://jav.guru",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Rule34Video",
+    "type": "18+",
+    "domain": "rule34video.com",
+    "testUrl": "https://rule34video.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "KoreanPornMovie",
+    "type": "18+",
+    "domain": "koreanpornmovie.com",
+    "testUrl": "https://koreanpornmovie.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Kalite18",
+    "type": "18+",
+    "domain": "kalite18.com",
+    "testUrl": "https://kalite18.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Kopeda",
+    "type": "18+",
+    "domain": "kopeda.com",
+    "testUrl": "https://kopeda.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Maheir",
+    "type": "18+",
+    "domain": "maheir.com",
+    "testUrl": "https://maheir.com",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "Doğrudan Web Medya (MP4/M3U8)",
+    "type": "Doğrudan",
+    "domain": "cdn",
+    "testUrl": "https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_GOT_REQUEST_ERROR"
+  },
+  {
+    "name": "WebTorrent / Magnet",
+    "type": "Torrent",
+    "domain": "bittorrent",
+    "testUrl": "magnet:?xt=urn:btih:test",
+    "status": "ERROR",
+    "httpCode": null,
+    "detail": "ERR_UNSUPPORTED_PROTOCOL"
+  }
+]

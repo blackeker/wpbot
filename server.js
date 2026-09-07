@@ -46,7 +46,7 @@ import {
   setQueueUpdateCallback
 } from './queue.js';
 
-import { executeDownloadPipeline } from './pipelines.js';
+import { executeDownloadPipeline, queueMediaSend } from './pipelines.js';
 import { getAnimecixSeasonEpisodes, getHdfilmcehennemiSeasonEpisodes, getHdkoreSeasonEpisodes, extractVideoUrl } from './extractor.js';
 
 const app = express();
@@ -345,6 +345,25 @@ app.post('/api/kuyruk-devam', (req, res) => {
   resumeQueue();
   res.json({ ok: true, message: 'Kuyruk devam ediyor.' });
 });
+
+async function getUniversalSeasonEpisodes(url) {
+  if (url.includes('animecix')) {
+    return await getAnimecixSeasonEpisodes(url);
+  }
+  if (url.includes('hdfilmcehennemi')) {
+    return await getHdfilmcehennemiSeasonEpisodes(url);
+  }
+  if (url.includes('hdkore')) {
+    return await getHdkoreSeasonEpisodes(url);
+  }
+  if (url.includes('dramadizilerim')) {
+    const { getDramadizilerimSeasonEpisodes } = await import('./extractors/dramadizilerim.js');
+    if (getDramadizilerimSeasonEpisodes) {
+      return await getDramadizilerimSeasonEpisodes(url);
+    }
+  }
+  throw new Error('Desteklenmeyen platform. Animecix, HDfilmcehennemi veya HDKore dizi/sezon bağlantısı girin.');
+}
 
 app.get('/api/fetch-episodes', async (req, res) => {
   const { url } = req.query;
@@ -732,13 +751,38 @@ app.post('/api/errors/clear', (req, res) => {
 });
 
 app.post('/api/indir-multiple', (req, res) => {
-  const { episodes, jid } = req.body;
+  const { episodes, jid, batchMerge, seriesName } = req.body;
   if (!episodes || !Array.isArray(episodes) || !jid) {
     return res.status(400).json({ error: 'episodes ve jid gerekli.' });
   }
 
   let addedCount = 0;
   let skippedCount = 0;
+
+  if (batchMerge) {
+    const batchSize = 10;
+    const chunks = [];
+    for (let i = 0; i < episodes.length; i += batchSize) {
+      chunks.push(episodes.slice(i, i + batchSize));
+    }
+    for (const chunk of chunks) {
+      try {
+        const firstEp = chunk[0];
+        const lastEp = chunk[chunk.length - 1];
+        const startNum = firstEp.number || 1;
+        const endNum = lastEp.number || chunk.length;
+        const name = seriesName || firstEp.seriesName || 'Dizi Paketi';
+        const batchTitle = startNum === endNum ? `${name} - Bölüm ${startNum}` : `${name} - Bölüm ${startNum}-${endNum}`;
+        const batchUrl = `${firstEp.url}#batch=${startNum}-${endNum}`;
+        addDownloadTask(batchUrl, jid, batchTitle, null, false, null, chunk);
+        addedCount++;
+      } catch (e) {
+        skippedCount++;
+      }
+    }
+    return res.json({ success: true, addedCount, skippedCount, message: `${addedCount} paket kuyruğa eklendi.` });
+  }
+
   for (const ep of episodes) {
     try {
       const customTitle = ep.title || ep.fileName || ep.name || ep.url;
@@ -799,6 +843,52 @@ app.post('/api/notify-captcha', async (req, res) => {
     }
   } catch (err) {
     console.error('Error sending captcha notification to WhatsApp:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Internal WhatsApp Relay for Test / Worker Instances
+app.post('/api/internal/send-text', async (req, res) => {
+  const { recipientJid, text, editKey } = req.body;
+  if (!botSocketRef.current) return res.status(503).json({ error: 'WhatsApp bağlı değil' });
+  try {
+    let result;
+    if (editKey) {
+      result = await botSocketRef.current.sendMessage(recipientJid, { text, edit: editKey });
+    } else {
+      result = await botSocketRef.current.sendMessage(recipientJid, { text });
+    }
+    res.json({ ok: true, key: result?.key });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/internal/send-media', async (req, res) => {
+  const { recipientJid, filePath, caption, mimetype, fileName, asDocument } = req.body;
+  if (!botSocketRef.current) return res.status(503).json({ error: 'WhatsApp bağlı değil' });
+  if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'Dosya bulunamadı' });
+
+  try {
+    const fileStats = fs.statSync(filePath);
+    const resolvedFileName = fileName || path.basename(filePath);
+    const resolvedMimetype = mimetype || (resolvedFileName.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream');
+
+    const messageContent = asDocument || fileStats.size > 100 * 1024 * 1024 ? {
+      document: { stream: fs.createReadStream(filePath) },
+      mimetype: resolvedMimetype,
+      fileName: resolvedFileName,
+      caption: caption || undefined
+    } : {
+      video: { stream: fs.createReadStream(filePath) },
+      mimetype: resolvedMimetype,
+      fileName: resolvedFileName,
+      caption: caption || undefined
+    };
+
+    const result = await queueMediaSend(recipientJid, messageContent);
+    res.json({ ok: true, key: result?.key });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

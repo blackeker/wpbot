@@ -129,14 +129,47 @@ export default {
           const endEp = Math.max(parseInt(match1[2], 10), parseInt(match2[2], 10));
           const baseUrl = urls[0].split(`/season/${season}/`)[0];
 
-          await sock.sendMessage(from, { text: `🎬 *Animecix Dizi Aralığı Algılandı!*\nSezon: ${season}\nBölümler: ${startEp} ile ${endEp} arası sıraya ekleniyor...` });
+          let animeName = '';
+          try {
+            const host = new URL(urls[0]).origin;
+            const parts = baseUrl.split('/');
+            const titlesIdx = parts.indexOf('titles');
+            let titleId = null;
+            if (titlesIdx !== -1) {
+              titleId = parts[titlesIdx + 1];
+            } else {
+              const diziMatch = urls[0].match(/\/dizi\/([^/]+)/);
+              if (diziMatch) {
+                const { resolveAnimecixSlug } = await import('../extractor.js');
+                titleId = await resolveAnimecixSlug(diziMatch[1], host);
+              }
+            }
+            if (titleId) {
+              const { gotScraping } = await import('../extractor.js');
+              const res = await gotScraping.get(`${host}/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${season}&page=1&perPage=1`, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36',
+                  'X-Requested-With': 'com.kraptor.AnimeciX',
+                  'X-App-Version': '1.0.5',
+                  'x-e-h': "7Y2ozlO+QysR5w9Q6Tupmtvl9jJp7ThFH8SB+Lo7NvZjgjqRSqOgcT2v4ISM9sP10LmnlYI8WQ==.xrlyOBFS5BHjQ2Lk",
+                  'X-App-Hash': "b849e8a9f6cceff267251a73644faacc801ad726cc8f22a9c323c56a203f5446"
+                },
+                timeout: 5000
+              });
+              const d = JSON.parse(res.body);
+              animeName = d?.data?.title?.name || d?.title?.name || '';
+            }
+          } catch (e) {}
+
+          const titlePrefix = animeName ? `${animeName} - ` : '';
+          await sock.sendMessage(from, { text: `🎬 *${animeName || 'Animecix'} Dizi Aralığı Algılandı!*\nSezon: ${season}\nBölümler: ${startEp} ile ${endEp} arası sıraya ekleniyor...` });
 
           let addedCount = 0;
           let skipCount = 0;
           for (let ep = startEp; ep <= endEp; ep++) {
             const epUrl = `${baseUrl}/season/${season}/episode/${ep}`;
             try {
-              addDownloadTask(epUrl, from, `Sezon ${season} Bölüm ${ep}`, null, priority);
+              addDownloadTask(epUrl, from, `${titlePrefix}Sezon ${season} Bölüm ${ep}`, null, priority);
               addedCount++;
             } catch (e) {
               skipCount++;

@@ -113,7 +113,7 @@ export async function extractAnimecix(pageUrl) {
     };
 
     // ── Başlığı Title Detail API'den çek (anime adı + bölüm adı) ──
-    let title = `Animecix_${titleId}_S${season}_E${episode}`;
+    let title = `Animecix - Sezon ${season} Bölüm ${episode}`;
     try {
       const titleApiUrl = `${host}/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${season}&page=1&perPage=100`;
       const titleRes = await axios.get(titleApiUrl, {
@@ -123,9 +123,7 @@ export async function extractAnimecix(pageUrl) {
       const titleData = titleRes.data?.data || titleRes.data;
       const animeName = titleData?.title?.name;
       if (animeName) {
-        // Türkçe karakterleri ve özel karakterleri temizleyip boşlukları alt çizgi yapıyoruz
-        const cleanAnimeName = animeName.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-        title = `${cleanAnimeName}_S${season}_E${episode}`;
+        title = `${animeName} - Sezon ${season} Bölüm ${episode}`;
       }
     } catch (e) {
       console.error('Animecix başlık API hatası (devam ediyor):', e.message);
@@ -409,11 +407,15 @@ export async function getAnimecixSeasonEpisodes(seasonUrl) {
         }
       }
     }
-    const episodes = episodesWithSources.map(ep => ({
-      number: ep.episode_number,
-      name: ep.name || `${ep.episode_number}. Bölüm`,
-      url: `${host}/titles/${titleId}/season/${season}/episode/${ep.episode_number}`
-    }));
+    const episodes = episodesWithSources.map(ep => {
+      const epNum = ep.episode_number;
+      return {
+        season: String(season),
+        number: epNum,
+        name: `Sezon ${season} Bölüm ${epNum}`,
+        url: `${host}/titles/${titleId}/season/${season}/episode/${epNum}`
+      };
+    });
     episodes.sort((a, b) => a.number - b.number);
     return {
       animeName: data.title.name,
