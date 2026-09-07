@@ -267,12 +267,28 @@ export async function extractHentaizm(pageUrl, fromJid = null) {
           }
         }
       }
-      const vidIdEnc = Buffer.from(publicId).toString('base64');
       const userAgent = mailRes.request.options.headers['user-agent'];
+
+      // 1. Try direct weblink_get URL (fastest & most reliable MP4 download)
+      const weblinkGetMatch = mailRes.body.match(/"weblink_get"\s*:\s*\{\s*"count"[^}]+"url"\s*:\s*"([^"]+)"/);
+      if (weblinkGetMatch && weblinkGetMatch[1]) {
+        const getBase = weblinkGetMatch[1].replace(/\/$/, '');
+        const dlUrl = `${getBase}/${publicId}`;
+        return {
+          title,
+          source: 'CloudMailRu Direct',
+          url: dlUrl,
+          referer: 'https://cloud.mail.ru/',
+          cookies: mailRuJar.toJSON(),
+          userAgent: userAgent
+        };
+      }
+
+      // 2. Fallback to videowl_view stream
       const videoMatch = mailRes.body.match(/videowl_view":\s*\{\s*"count"\s*:\s*"1"\s*,\s*"url"\s*:\s*"([^"]+)"\s*\}/i);
       if (videoMatch) {
         const streamBase = videoMatch[1];
-        // Select master playlist (use raw base64 string, do NOT encodeURIComponent!)
+        const vidIdEnc = Buffer.from(publicId).toString('base64');
         const m3u8Url = `${streamBase}/0p/${vidIdEnc}.m3u8?double_encode=1`;
         return {
           title,
@@ -282,21 +298,6 @@ export async function extractHentaizm(pageUrl, fromJid = null) {
           cookies: mailRuJar.toJSON(),
           userAgent: userAgent,
           headers: mailRes.request.options.headers
-        };
-      }
-
-      // Try direct weblink get
-      const weblinkGetMatch = mailRes.body.match(/"weblink_get"\s*:\s*\{\s*"count"[^}]+"url"\s*:\s*"([^"]+)"/);
-      const weblinkMatch = mailRes.body.match(/"weblink"\s*:\s*"([^"]+)"/);
-      if (weblinkGetMatch && weblinkMatch) {
-        const dlUrl = weblinkGetMatch[1].endsWith('/') ? `${weblinkGetMatch[1]}${weblinkMatch[1]}` : `${weblinkGetMatch[1]}/${weblinkMatch[1]}`;
-        return {
-          title,
-          source: 'CloudMailRu Direct',
-          url: dlUrl,
-          referer: 'https://cloud.mail.ru/',
-          cookies: mailRuJar.toJSON(),
-          userAgent: userAgent
         };
       }
     }

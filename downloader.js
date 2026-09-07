@@ -17,6 +17,8 @@ try {
 }
 
 import { gotScraping as originalGotScraping } from 'got-scraping';
+import HttpsProxyAgentPkg from 'https-proxy-agent';
+const HttpsProxyAgent = HttpsProxyAgentPkg.HttpsProxyAgent || HttpsProxyAgentPkg;
 import { CookieJar, Cookie } from 'tough-cookie';
 import { getProxyUrl } from './config.js';
 
@@ -28,7 +30,10 @@ function shouldUseProxy(url) {
          lowerUrl.includes('hentaizm') ||
          lowerUrl.includes('turkifsahub.com') ||
          lowerUrl.includes('turkifsalar') ||
-         lowerUrl.includes('turkporno');
+         lowerUrl.includes('turkporno') ||
+         lowerUrl.includes('cloud.mail.ru') ||
+         lowerUrl.includes('cloclo') ||
+         lowerUrl.includes('mail.ru');
 }
 
 const gotScraping = new Proxy(originalGotScraping, {
@@ -183,7 +188,7 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
 }
 
 // Download a direct MP4/video file using streaming (no HLS parsing)
-async function downloadDirectVideo(url, outputPath, signal, progressCallback, refererOverride, cookiesOverride = null, userAgentOverride = null) {
+async function downloadDirectVideo(url, outputPath, signal, progressCallback, refererOverride, cookiesOverride = null, userAgentOverride = null, headersOverride = null) {
   // Referer'ı belirle
   let referer = null;
   if (url.includes('sibnet.ru')) {
@@ -198,14 +203,33 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
     referer = null;
   }
 
+  const safeUA = (typeof userAgentOverride === 'string' && userAgentOverride.trim()) ? userAgentOverride : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
   const headers = {
-    "User-Agent": userAgentOverride || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": safeUA,
     "Referer": referer || ""
   };
 
-  if (cookiesOverride) {
-    headers["Cookie"] = cookiesOverride;
+  if (headersOverride && typeof headersOverride === 'object') {
+    Object.assign(headers, headersOverride);
   }
+
+  if (cookiesOverride && typeof cookiesOverride === 'string') {
+    headers["Cookie"] = cookiesOverride;
+  } else if (cookiesOverride && typeof cookiesOverride === 'object' && cookiesOverride.cookies) {
+    try {
+      const parts = cookiesOverride.cookies.map(c => `${c.key || c.name}=${c.value}`);
+      if (parts.length > 0) headers["Cookie"] = parts.join('; ');
+    } catch (e) {}
+  }
+
+  const activeProxy = getProxyUrl();
+  let proxyAgent = null;
+  if (activeProxy && shouldUseProxy(url)) {
+    proxyAgent = new HttpsProxyAgent(activeProxy);
+  }
+
+  const agentOpts = proxyAgent ? { httpsAgent: proxyAgent, httpAgent: proxyAgent } : {};
 
   // Try checking segmented download support (multi-connection bypasses throttling)
   let supportsRange = false;
@@ -214,10 +238,10 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
     // HEAD isteğiyle Range desteği kontrol et (GET'ten çok daha hızlı)
     let headRes;
     try {
-      headRes = await axios.head(url, { headers, timeout: 10000, maxRedirects: 5 });
+      headRes = await axios.head(url, { headers, timeout: 10000, maxRedirects: 5, ...agentOpts });
     } catch {
       // HEAD desteklenmiyorsa GET ile dene (sadece ilk 2 byte)
-      headRes = await axios.get(url, { headers: { ...headers, Range: 'bytes=0-1' }, timeout: 10000, maxRedirects: 5 });
+      headRes = await axios.get(url, { headers: { ...headers, Range: 'bytes=0-1' }, timeout: 10000, maxRedirects: 5, ...agentOpts });
     }
     totalBytes = parseInt(
       headRes.headers['content-range']?.split('/')?.[1] ||
@@ -268,7 +292,8 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
                 },
                 responseType: 'stream',
                 signal: signal || undefined,
-                timeout: 25000
+                timeout: 25000,
+                ...agentOpts
               });
 
               const writer = fs.createWriteStream(partPath);
@@ -392,9 +417,10 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
   const res = await axios.get(url, {
     headers: reqHeaders,
     responseType: 'stream',
-    timeout: 0,
+    timeout: 60000,
     maxRedirects: 5,
-    signal: signal || undefined
+    signal: signal || undefined,
+    ...agentOpts
   });
 
   const actualResuming = isResuming && res.status === 206;
@@ -519,7 +545,7 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
     }
 
     let chromeVersion = 145;
-    if (userAgentOverride) {
+    if (userAgentOverride && typeof userAgentOverride === 'string') {
       const chromeMatch = userAgentOverride.match(/Chrome\/(\d+)/);
       if (chromeMatch) {
         chromeVersion = parseInt(chromeMatch[1], 10);
@@ -550,7 +576,7 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
     const isDirectBinaryFile = /\.(apk|zip|rar|7z|pdf|exe|tar|gz|mp3|wav|png|jpg|jpeg|gif)(\?.*)?$/i.test(urlLower);
     if (urlLower.endsWith('.mp4') || urlLower.endsWith('.mkv') || urlLower.endsWith('.webm') || urlLower.endsWith('.avi') || isDirectBinaryFile || m3u8Url.includes('sibnet.ru') || m3u8Url.includes('cloud.mail.ru') || m3u8Url.includes('cloclo')) {
       console.log('Direct download URL detected, streaming download...');
-      await downloadDirectVideo(m3u8Url, outputPath, signal, progressCallback, refererOverride, cookiesOverride, userAgentOverride);
+      await downloadDirectVideo(m3u8Url, outputPath, signal, progressCallback, refererOverride, cookiesOverride, userAgentOverride, headersOverride);
       return;
     }
 
