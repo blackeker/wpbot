@@ -20,7 +20,7 @@ import { gotScraping as originalGotScraping } from 'got-scraping';
 import HttpsProxyAgentPkg from 'https-proxy-agent';
 const HttpsProxyAgent = HttpsProxyAgentPkg.HttpsProxyAgent || HttpsProxyAgentPkg;
 import { CookieJar, Cookie } from 'tough-cookie';
-import { getProxyUrl } from './config.js';
+import { getProxyUrl, formatBytes, getProgressBar } from './config.js';
 
 function shouldUseProxy(url) {
   if (!url) return false;
@@ -230,6 +230,9 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
   }
 
   const agentOpts = proxyAgent ? { httpsAgent: proxyAgent, httpAgent: proxyAgent } : {};
+  const downloadStartTime = Date.now();
+  const proxyTag = proxyAgent ? '[PROXY AKTİF]' : '[PROXY PASİF]';
+  let lastConsoleLogTime = Date.now();
 
   // Try checking segmented download support (multi-connection bypasses throttling)
   let supportsRange = false;
@@ -258,7 +261,7 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
   }
 
   if (supportsRange && totalBytes > 0) {
-    console.log(`[Segmented Downloader] Starting chunked download: ${totalBytes} bytes (~${(totalBytes / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`[İNDİRME BAŞLADI] ${proxyTag} Yöntem: Segmented (8 Parça) | Boyut: ${formatBytes(totalBytes)} | URL: ${url}`);
     const numConnections = 8;
     const chunkSize = Math.ceil(totalBytes / numConnections);
     const promises = [];
@@ -316,6 +319,23 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
                     progressCallback(totalDownloaded, totalBytes);
                   }
                 }
+
+                if (now - lastConsoleLogTime > 4000) {
+                  lastConsoleLogTime = now;
+                  let totalDownloaded = 0;
+                  for (let val of downloadedMap.values()) {
+                    totalDownloaded += val;
+                  }
+                  const percent = Math.min(100, Math.round((totalDownloaded / totalBytes) * 100));
+                  const elapsedSec = (now - downloadStartTime) / 1000;
+                  const speedBps = elapsedSec > 0 ? totalDownloaded / elapsedSec : 0;
+                  const speedMBs = (speedBps / 1024 / 1024).toFixed(2);
+                  const remBytes = totalBytes - totalDownloaded;
+                  const etaSec = speedBps > 0 && remBytes > 0 ? Math.round(remBytes / speedBps) : 0;
+                  const etaStr = etaSec > 60 ? `${Math.floor(etaSec / 60)}dk ${etaSec % 60}sn` : `${etaSec}sn`;
+
+                  console.log(`[İNDİRME İLERLEME] %${percent} [${getProgressBar(percent)}] | ${formatBytes(totalDownloaded)} / ${formatBytes(totalBytes)} | Hız: ~${speedMBs} MB/s | Kalan: ${etaStr}`);
+                }
               });
 
               await new Promise((resolve, reject) => {
@@ -346,7 +366,7 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
             } catch (err) {
               lastErr = err;
               if (err.message === 'İndirme iptal edildi.') throw err;
-              console.warn(`[Segmented Downloader] Chunk #${i} download failed (Attempt ${attempt}/3): ${err.message}`);
+              console.warn(`[Segmented Downloader] Parça #${i} indirme denemesi ${attempt}/3 başarısız: ${err.message}`);
               await new Promise(r => setTimeout(r, 2000));
             }
           }
@@ -359,7 +379,7 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
       await Promise.all(promises);
 
       // Merge segments sequentially
-      console.log('[Segmented Downloader] Merging part files...');
+      console.log('[Segmented Downloader] Parça dosyaları birleştiriliyor...');
       // Merge segments sequentially using low-level fd copy (prevents stream buffer race conditions)
       const finalFd = fs.openSync(outputPath, 'w');
       try {
@@ -381,11 +401,13 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
       } finally {
         fs.closeSync(finalFd);
       }
-      console.log('[Segmented Downloader] Download and merge completed successfully!');
+      const durationSec = ((Date.now() - downloadStartTime) / 1000).toFixed(1);
+      const avgSpeed = durationSec > 0 ? (totalBytes / 1024 / 1024 / durationSec).toFixed(2) : '0.00';
+      console.log(`[İNDİRME TAMAMLANDI] Dosya: ${path.basename(outputPath)} | Boyut: ${formatBytes(totalBytes)} | Süre: ${durationSec}s | Ort. Hız: ~${avgSpeed} MB/s`);
       return;
 
     } catch (segmentedErr) {
-      console.error('[Segmented Downloader] Segmented download failed, cleaning up parts and trying sequential fallback:', segmentedErr.message);
+      console.error('[Segmented Downloader] Segmented indirme başarısız oldu, tekli akışa geçiliyor:', segmentedErr.message);
       // Clean up temp files
       for (const partPath of partFiles) {
         try {
@@ -400,7 +422,7 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
   }
 
   // Fallback sequential download
-  console.log('[Downloader] Running sequential stream download...');
+  console.log(`[İNDİRME BAŞLADI] ${proxyTag} Yöntem: Tekli Akış (Sequential) | URL: ${url}`);
   const partPath = `${outputPath}.part`;
   let existingSize = 0;
   if (fs.existsSync(partPath)) {
@@ -411,7 +433,7 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
   const isResuming = existingSize > 0 && supportsRange;
   if (isResuming) {
     reqHeaders['Range'] = `bytes=${existingSize}-`;
-    console.log(`[Downloader] Resuming download from byte: ${existingSize}`);
+    console.log(`[Downloader] Kaldığı yerden devam ediliyor (Byte: ${existingSize})`);
   }
 
   const res = await axios.get(url, {
@@ -451,11 +473,28 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
           progressCallback(downloaded, downloaded + 1);
         }
       }
+
+      const now = Date.now();
+      if (now - lastConsoleLogTime > 4000) {
+        lastConsoleLogTime = now;
+        const elapsedSec = (now - downloadStartTime) / 1000;
+        const speedBps = elapsedSec > 0 ? downloaded / elapsedSec : 0;
+        const speedMBs = (speedBps / 1024 / 1024).toFixed(2);
+        if (contentLen > 0) {
+          const percent = Math.min(100, Math.round((downloaded / contentLen) * 100));
+          console.log(`[İNDİRME İLERLEME] %${percent} [${getProgressBar(percent)}] | ${formatBytes(downloaded)} / ${formatBytes(contentLen)} | Hız: ~${speedMBs} MB/s`);
+        } else {
+          console.log(`[İNDİRME İLERLEME] İndirilen: ${formatBytes(downloaded)} | Hız: ~${speedMBs} MB/s`);
+        }
+      }
     });
 
     writer.on('finish', () => {
       try {
         fs.renameSync(partPath, outputPath);
+        const durationSec = ((Date.now() - downloadStartTime) / 1000).toFixed(1);
+        const avgSpeed = durationSec > 0 ? (downloaded / 1024 / 1024 / durationSec).toFixed(2) : '0.00';
+        console.log(`[İNDİRME TAMAMLANDI] Dosya: ${path.basename(outputPath)} | Boyut: ${formatBytes(downloaded)} | Süre: ${durationSec}s | Ort. Hız: ~${avgSpeed} MB/s`);
         resolve();
       } catch (renameErr) {
         reject(renameErr);
