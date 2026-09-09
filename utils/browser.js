@@ -1,6 +1,10 @@
 import fs from 'fs';
 import { execSync } from 'child_process';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { getProxyUrl } from '../config.js';
+
+puppeteer.use(StealthPlugin());
 
 let sharedBrowser = null;
 let browserLaunchPromise = null;
@@ -41,15 +45,20 @@ export async function getSharedBrowser() {
     console.log('[Browser Manager] Launching shared Puppeteer browser instance...');
     const executablePath = findChromeExecutable();
     const launchOptions = {
-      headless: true,
+      headless: "new",
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--ignore-certificate-errors',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-blink-features=AutomationControlled'
       ]
     };
+    const activeProxy = getProxyUrl();
+    if (activeProxy) {
+      launchOptions.args.push(`--proxy-server=${activeProxy}`);
+    }
     if (executablePath) {
       console.log(`[Browser Manager] Using system Chrome executable: ${executablePath}`);
       launchOptions.executablePath = executablePath;

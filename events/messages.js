@@ -25,6 +25,7 @@ import {
 } from '../queue.js';
 import { getDiskUsage } from '../config.js';
 import { commands } from '../bot.js';
+import { isReplyDownloadTrigger, handleReplyDownload } from '../utils/quotedHandler.js';
 
 export async function handleMessage(sock, m) {
   const msg = m.messages[0];
@@ -34,6 +35,13 @@ export async function handleMessage(sock, m) {
 
   const from = msg.key.remoteJid;
   const config = readConfig();
+
+  const text = (msg.message.conversation ||
+    msg.message.extendedTextMessage?.text ||
+    '').trim();
+  const ltext = text.toLowerCase().trim();
+
+  console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}"`);
 
   if (msg.key.fromMe) {
     if (config.groupJid && from !== config.groupJid) {
@@ -53,11 +61,6 @@ export async function handleMessage(sock, m) {
       }
     }
   }
-
-  const text = (msg.message.conversation ||
-    msg.message.extendedTextMessage?.text ||
-    '').trim();
-  const ltext = text.toLowerCase().trim();
 
   // Custom Commands
   const customCmds = config.customCommands || {};
@@ -91,7 +94,7 @@ export async function handleMessage(sock, m) {
     'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru',
     'dood', 'ds2play', 'streamtape', 'streamta.pe', 'stape.fun', 'filemoon', 'moonplayer',
     'vk.com', 'vkvideo', 'vk.ru', 'vidmoly', 'dizipal', 'dizibox', 'dizigom', 'diziroll', 'dramadizilerim', 'instagram.com', 'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com', 'liteapks.com', 'modyolo.com', 'koreanturk', 'koreanizm',
-    'filmmodu', 'fullhdfilmizlesene', 'rule34video', 'hanime.tv', 'jable.tv', 'missav',
+    'filmmodu', 'fullhdfilmizlesene', 'filmmakinesi', 'rule34video', 'hanime.tv', 'jable.tv', 'missav',
     'erome.com', 'fapello.com', 'camwhores', 'hentaihaven', 'hentaimama', 'hentaiseason',
     'spankbang', 'xvideos', 'xnxx', 'eporner', 'xhamster', 'beeg', 'hqporner', 'youporn',
     'redtube', 'tnaflix', 'thumbzilla', 'tube8', 'txxx', 'youjizz', 'porntrex', 'pornone',
@@ -112,6 +115,109 @@ export async function handleMessage(sock, m) {
   if (pendingSelections[from]) {
     const selection = pendingSelections[from];
     
+    if (selection.type === 'multi_season') {
+      const input = text.trim().toLowerCase();
+
+      if (input === 'iptal' || input === 'vazgeç' || input === 'cancel') {
+        delete pendingSelections[from];
+        await sock.sendMessage(from, { text: '❌ Dizi indirme işlemi iptal edildi.' });
+        return;
+      }
+
+      let selectedEpisodes = [];
+      let label = '';
+
+      // 1. All seasons
+      if (input === 'hepsi' || input === 'tümü' || input === 'full' || input === 'all' || input === 'sezonlar') {
+        selectedEpisodes = selection.allEpisodes;
+        label = `Tüm Sezonlar (${selectedEpisodes.length} Bölüm)`;
+      } else {
+        // 2. Season + Episode Range (e.g. `s1 1-5`, `s2 1-12`, `1 1-5`, `2 5-10`, `sezon 1 1-5`)
+        const sRangeMatch = input.match(/^(?:s|sezon\s*)?(\d+)[\s,]+(\d+)\s*[-to–—\s]\s*(\d+)$/i) || input.match(/^(?:s|sezon\s*)?(\d+)[\s,]+(\d+)\s+(\d+)$/i);
+        if (sRangeMatch) {
+          const sNum = parseInt(sRangeMatch[1], 10);
+          const start = parseInt(sRangeMatch[2], 10);
+          const end = parseInt(sRangeMatch[3], 10);
+          const targetSeason = selection.seasons.find(s => s.season == sNum);
+          if (targetSeason && targetSeason.episodes.length > 0) {
+            const minNum = Math.min(start, end);
+            const maxNum = Math.max(start, end);
+            selectedEpisodes = targetSeason.episodes.filter(ep => ep.number >= minNum && ep.number <= maxNum);
+            if (selectedEpisodes.length > 0) {
+              label = `${sNum}. Sezon ${minNum}-${maxNum} arası bölümler`;
+            }
+          }
+        }
+
+        // 3. Single Season selected (e.g. `1`, `2`, `s1`, `s2`, `sezon 1`, `sezon 2`)
+        if (selectedEpisodes.length === 0) {
+          const sSelectMatch = input.match(/^(?:s|sezon\s*)?(\d+)$/i);
+          if (sSelectMatch) {
+            const sNum = parseInt(sSelectMatch[1], 10);
+            const targetSeason = selection.seasons.find(s => s.season == sNum);
+            if (targetSeason) {
+              selectedEpisodes = targetSeason.episodes;
+              label = `${targetSeason.name || `${sNum}. Sezon`} (Tümü)`;
+            }
+          }
+        }
+
+        // 4. Episode range without season (e.g. `1-5`) -> defaults to Season 1
+        if (selectedEpisodes.length === 0) {
+          const rangeMatch = input.match(/^(\d+)\s*[-to–—\s]\s*(\d+)$/i) || input.match(/^(\d+)\s+(\d+)$/);
+          if (rangeMatch) {
+            const start = parseInt(rangeMatch[1], 10);
+            const end = parseInt(rangeMatch[2], 10);
+            const s1 = selection.seasons[0];
+            if (s1 && s1.episodes.length > 0) {
+              const minNum = Math.min(start, end);
+              const maxNum = Math.max(start, end);
+              selectedEpisodes = s1.episodes.filter(ep => ep.number >= minNum && ep.number <= maxNum);
+              if (selectedEpisodes.length > 0) {
+                label = `${s1.name || `${s1.season}. Sezon`} ${minNum}-${maxNum} arası bölümler`;
+              }
+            }
+          }
+        }
+      }
+
+      if (selectedEpisodes.length > 0) {
+        delete pendingSelections[from];
+
+        await sock.sendMessage(from, {
+          text: `🎬 *${selection.seriesName}* - *${label}* sıraya ekleniyor...\n📦 Toplam *${selectedEpisodes.length}* bölüm sıraya ekleniyor...`
+        });
+
+        let addedCount = 0;
+        let skipCount = 0;
+        for (const ep of selectedEpisodes) {
+          try {
+            addDownloadTask(ep.url, from, `${selection.seriesName} - ${ep.name}`, null, selection.priority);
+            addedCount++;
+          } catch (e) {
+            skipCount++;
+          }
+        }
+
+        let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
+        if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+        if (selection.priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+        replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+        await sock.sendMessage(from, { text: replyMsg });
+        return;
+      } else {
+        let helpText = `⚠️ Geçersiz seçim! Lütfen şunlardan birini yazın:\n\n` +
+          `• Tüm sezonlar için: *hepsi*\n`;
+        selection.seasons.forEach(s => {
+          helpText += `• ${s.season}. Sezon için: *${s.season}* (veya *s${s.season}*)\n`;
+        });
+        helpText += `• Belirli bölüm aralığı için: *s1 1-5* veya *s2 1-12*\n` +
+          `• İptal etmek için: *iptal*`;
+        await sock.sendMessage(from, { text: helpText });
+        return;
+      }
+    }
+
     if (selection.type === 'series') {
       const input = text.trim().toLowerCase();
       
@@ -128,16 +234,23 @@ export async function handleMessage(sock, m) {
         selectedEpisodes = selection.episodes;
         label = 'Tüm Sezon';
       } else {
-        const rangeMatch = input.match(/^(\d+)-(\d+)$/);
+        const rangeMatch = input.match(/^(\d+)\s*[-to–—\s]\s*(\d+)$/i) || input.match(/^(\d+)\s+(\d+)$/);
+        const singleMatch = input.match(/^(\d+)$/);
         if (rangeMatch) {
           const start = parseInt(rangeMatch[1], 10);
           const end = parseInt(rangeMatch[2], 10);
-          
-          if (start > 0 && end >= start && start <= selection.episodes.length) {
-            const startIndex = start - 1;
-            const endIndex = Math.min(end, selection.episodes.length);
-            selectedEpisodes = selection.episodes.slice(startIndex, endIndex);
-            label = `${start} ile ${endIndex} arası bölümler`;
+          const minNum = Math.min(start, end);
+          const maxNum = Math.max(start, end);
+          selectedEpisodes = selection.episodes.filter(ep => ep.number >= minNum && ep.number <= maxNum);
+          if (selectedEpisodes.length > 0) {
+            label = `${minNum} ile ${maxNum} arası bölümler`;
+          }
+        } else if (singleMatch) {
+          const epNum = parseInt(singleMatch[1], 10);
+          const foundEp = selection.episodes.find(ep => ep.number === epNum);
+          if (foundEp) {
+            selectedEpisodes = [foundEp];
+            label = `${epNum}. Bölüm`;
           }
         }
       }
@@ -300,6 +413,22 @@ export async function handleMessage(sock, m) {
     return;
   }
 
+  // Quoted / Reply-to-download Handler (e.g. replying to an anime poster or link with "." or ". acil")
+  const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+  const hasQuoted = Boolean(contextInfo?.quotedMessage || contextInfo?.stanzaId);
+  if (isReplyDownloadTrigger(text, hasQuoted)) {
+    const handled = await handleReplyDownload(sock, msg, from, text, {
+      text,
+      ltext,
+      config,
+      botState,
+      activeCaptchasMap: global.activeCaptchasMap || new Map(),
+      downloadsDir,
+      formatBytes
+    });
+    if (handled) return;
+  }
+
   // Help / Menu check
   const isMenuRequest = [
     'menü', 'menu', 'merhaba', 'selam', 'sa', 'hey', 'hi',
@@ -350,6 +479,20 @@ export async function handleMessage(sock, m) {
       args = text.split(' ').slice(2);
     } else if (ltext === 'temizle') {
       commandName = 'temizle';
+    } else if (/^(?:he[n]?taizmfav|he[n]?taizm\s+fav|he[n]?taifav|fav\s*he[n]?tai)(?:\s+.*)?$/i.test(ltext)) {
+      commandName = 'hentaizmfav';
+      args = text.trim().split(/\s+/).slice(1);
+    } else if (/^(?:indir\s*he[n]?tai|indirhe[n]?tai|he[n]?tai\s*indir|he[n]?taiindir)(?:\s+.*)?$/i.test(ltext)) {
+      commandName = 'indirhentai';
+      args = text.trim().split(/\s+/).slice(1);
+    } else if (/^(?:toplu\s*he[n]?tai|topluhe[n]?tai|he[n]?tai\s*toplu|he[n]?taitoplu)(?:\s+.*)?$/i.test(ltext)) {
+      commandName = 'topluhentai';
+      args = text.trim().split(/\s+/).slice(1);
+    } else if (/^(?:he[n]?tai\s*grup|he[n]?taigrup)(?:\s+.*)?$/i.test(ltext)) {
+      commandName = 'hentaigrup';
+      args = text.trim().split(/\s+/).slice(1);
+    } else if (['hhelp', 'hentaihelp', 'h-help', 'hyardim', 'hentaiyardim', 'hentai yardım', 'hentai yardim'].includes(ltext)) {
+      commandName = 'hhelp';
     }
   }
 

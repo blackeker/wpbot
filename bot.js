@@ -1,6 +1,16 @@
 import dotenv from 'dotenv';
 dotenv.config({ override: true });
-import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, Browsers } from '@whiskeysockets/baileys';
+
+// Process Crash Resilience: Catch unhandled errors and rejections to prevent bot crashes
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err?.message || err);
+  if (err?.stack) console.error(err.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[UNHANDLED REJECTION] At:', promise, 'Reason:', reason);
+});
+import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, Browsers, makeCacheableSignalKeyStore } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
@@ -27,6 +37,17 @@ const PORT = process.env.PORT || 7860;
 
 // Dynamic Command Loader
 export const commands = new Map();
+
+// In-memory message store for retry-receipts and quoted message lookups
+export const messageStore = new Map();
+export function storeMessage(key, message) {
+  if (!key?.id || !message) return;
+  messageStore.set(key.id, message);
+  if (messageStore.size > 2000) {
+    const oldestKey = messageStore.keys().next().value;
+    messageStore.delete(oldestKey);
+  }
+}
 
 async function loadCommands() {
   commands.clear();
@@ -85,12 +106,22 @@ async function startBot() {
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
+
   const sock = makeWASocket({
     version,
-    auth: state,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger)
+    },
     logger: logger,
     browser: Browsers.macOS('Desktop'),
-    printQRInTerminal: false
+    printQRInTerminal: false,
+    getMessage: async (key) => {
+      if (key?.id && messageStore.has(key.id)) {
+        return messageStore.get(key.id);
+      }
+      return undefined;
+    }
   });
 
   botSocketRef.current = sock;
@@ -100,6 +131,9 @@ async function startBot() {
     const result = await originalSendMessage(...args);
     if (result && result.key && result.key.id) {
       addSentMessageId(result.key.id);
+      if (result.message) {
+        storeMessage(result.key, result.message);
+      }
     }
     return result;
   };
@@ -111,6 +145,11 @@ async function startBot() {
   });
 
   sock.ev.on('messages.upsert', async (m) => {
+    for (const msg of m.messages || []) {
+      if (msg?.key && msg?.message) {
+        storeMessage(msg.key, msg.message);
+      }
+    }
     await handleMessage(sock, m);
   });
 }

@@ -13,7 +13,7 @@ try {
 } catch (e) {
   ffmpegPath = ffmpegStaticPath;
 }
-import { extractVideoUrl } from './extractor.js';
+import { extractVideoUrl, gotScraping } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
 import { notifyQueueUpdate } from './queue.js';
 import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig, getProxyUrl } from './config.js';
@@ -74,8 +74,8 @@ async function withRetry(fn, retries = 3, delayMs = 3000) {
   throw lastError;
 }
 
-// Global media sending lock & queue to prevent rate limits and bandwidth spikes
-let isUploadingMedia = false;
+// Global media sending queue with concurrency support
+let activeUploadsCount = 0;
 const mediaUploadQueue = [];
 
 export async function queueMediaSend(jid, messageContent) {
@@ -86,24 +86,33 @@ export async function queueMediaSend(jid, messageContent) {
 }
 
 async function processMediaUploadQueue() {
-  if (isUploadingMedia || mediaUploadQueue.length === 0) return;
-  isUploadingMedia = true;
+  const config = readConfig();
+  const maxConcurrentUploads = Math.max(1, Number(config.concurrencyLimit) || 1);
 
-  const { jid, messageContent, resolve, reject } = mediaUploadQueue.shift();
-  try {
-    if (!botSocketRef.current) {
-      throw new Error("WhatsApp bot bağlantısı aktif değil.");
-    }
-    const result = await botSocketRef.current.sendMessage(jid, messageContent);
-    resolve(result);
-  } catch (err) {
-    reject(err);
-  } finally {
-    // Cooldown of 8 seconds before next media upload can start
-    setTimeout(() => {
-      isUploadingMedia = false;
-      processMediaUploadQueue();
-    }, 8000);
+  while (activeUploadsCount < maxConcurrentUploads && mediaUploadQueue.length > 0) {
+    activeUploadsCount++;
+    const { jid, messageContent, resolve, reject } = mediaUploadQueue.shift();
+
+    (async () => {
+      try {
+        if (!botSocketRef.current) {
+          throw new Error("WhatsApp bot bağlantısı aktif değil.");
+        }
+        let contentToSend = messageContent;
+        if (typeof messageContent === 'function') {
+          contentToSend = await messageContent();
+        }
+        const result = await botSocketRef.current.sendMessage(jid, contentToSend);
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      } finally {
+        setTimeout(() => {
+          activeUploadsCount--;
+          processMediaUploadQueue();
+        }, 1500);
+      }
+    })();
   }
 }
 
@@ -925,6 +934,279 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
   return;
 }
 
+// Series Pack Pipeline (Downloads All Episodes to Disk First, Then Dispatches Poster + Title + All Video Files)
+export async function executeSeriesPackPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject) {
+  const pipelineStart = Date.now();
+  const pack = taskObject.seriesPack;
+  let seriesName = pack.seriesName || taskObject.title || 'Seri';
+  let posterUrl = pack.posterUrl;
+  let description = pack.description || '';
+  let episodes = pack.episodes || [];
+  const replyJid = pack.replyJid || recipientJid;
+
+  if (episodes.length === 0 && targetUrl.includes('hentaizm')) {
+    await progressUpdateCallback(`🔍 *${seriesName}* bölümleri taranıyor...`);
+    const { getHentaizmSeasonEpisodes } = await import('./extractors/hentaizm.js');
+    const animeData = await getHentaizmSeasonEpisodes(targetUrl);
+    episodes = animeData.episodes || [];
+    if (!posterUrl) posterUrl = animeData.posterUrl;
+    if (!description) description = animeData.description;
+    if (animeData.seriesName) seriesName = animeData.seriesName;
+  }
+
+  const totalEps = episodes.length;
+  if (totalEps === 0) {
+    throw new Error("Seride indirilecek bölüm bulunamadı.");
+  }
+
+  const packTempDir = path.join(downloadsDir, `pack_${taskObject.id || Date.now()}_${Date.now()}`);
+  if (!fs.existsSync(packTempDir)) fs.mkdirSync(packTempDir, { recursive: true });
+
+  const safeTitle = replaceTurkishChars(seriesName).replace(/[^a-zA-Z0-9]/g, '_');
+  const downloadedEpisodes = [];
+  let localPosterPath = null;
+
+  try {
+    await progressUpdateCallback(
+      `🎬 *${seriesName}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 *${totalEps}* bölümlük paket indirmesi başlatılıyor...\n` +
+      `_Tüm bölümler önce sunucuya indirilecek, ardından kapak resmiyle birlikte topluca gönderilecektir._`
+    );
+
+    // 1. Download Poster Image if available
+    if (posterUrl) {
+      try {
+        const pRes = await gotScraping.get({
+          url: posterUrl,
+          responseType: 'buffer',
+          headerGeneratorOptions: { devices: ['desktop'], locales: ['tr-TR', 'en-US'], operatingSystems: ['windows'] },
+          timeout: { request: 15000 }
+        });
+        const pBuf = pRes.rawBody || pRes.body;
+        if (pBuf && pBuf.length > 0) {
+          localPosterPath = path.join(packTempDir, 'cover.jpg');
+          fs.writeFileSync(localPosterPath, pBuf);
+        }
+      } catch (pErr) {
+        console.warn(`[Series Pack] Kapak resmi indirilemedi: ${pErr.message}`);
+      }
+    }
+
+    // 2. Download each episode sequentially to packTempDir
+    for (let i = 0; i < totalEps; i++) {
+      if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
+      const ep = episodes[i];
+      const epNumStr = String(ep.number || (i + 1)).padStart(2, '0');
+      const epFileName = `${safeTitle}_Bolum_${epNumStr}.mp4`;
+      const epFilePath = path.join(packTempDir, epFileName);
+
+      const overallBar = getProgressBar(Math.round((i / totalEps) * 100));
+      await progressUpdateCallback(
+        `🎬 *${seriesName}*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 Paket İlerleyişi: *%${Math.round((i / totalEps) * 100)}* (Bölüm ${i + 1}/${totalEps})\n` +
+        `\`[${overallBar}]\`\n` +
+        `▶️ Başlatılan: *${ep.name}*`
+      );
+
+      try {
+        let epResult = getCachedResult(ep.url);
+        if (!epResult) {
+          epResult = await withRetry(() => extractVideoUrl(ep.url, recipientJid));
+          saveToCache(ep.url, epResult);
+        }
+
+        if (epResult.filePath && fs.existsSync(epResult.filePath)) {
+          fs.copyFileSync(epResult.filePath, epFilePath);
+        } else {
+          let lastEpPercent = -1;
+          let lastEpUpdateTime = 0;
+          const epDownloadStart = Date.now();
+
+          await withRetry(async () => {
+            lastEpUpdateTime = 0;
+            await downloadM3u8(
+              epResult.url,
+              epFilePath,
+              signal,
+              async (completed, total) => {
+                const now = Date.now();
+                const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+                const timePassed = now - lastEpUpdateTime > 4000;
+                if (!timePassed && percent !== 100 && percent === lastEpPercent) return;
+                lastEpPercent = percent;
+                lastEpUpdateTime = now;
+
+                const overallPercent = Math.min(99, Math.round(((i + (percent / 100)) / totalEps) * 100));
+                const currentBar = getProgressBar(overallPercent);
+                const elapsedSec = (now - epDownloadStart) / 1000;
+                const speedBps = elapsedSec > 0 ? completed / elapsedSec : 0;
+                const speedMBs = (speedBps / 1024 / 1024).toFixed(2);
+
+                if (taskObject) {
+                  taskObject.status = `Bölüm ${i + 1}/${totalEps} (%${percent}) - Paket: %${overallPercent}`;
+                  taskObject.speed = speedMBs;
+                  notifyQueueUpdate();
+                }
+
+                await progressUpdateCallback(
+                  `🎬 *${seriesName}*\n` +
+                  `━━━━━━━━━━━━━━━━━━━━\n` +
+                  `📦 Paket İlerleyişi: *%${overallPercent}* (Bölüm ${i + 1}/${totalEps})\n` +
+                  `\`[${currentBar}]\`\n` +
+                  `▶️ İndirilen: *${ep.name}* (%${percent})\n` +
+                  `⚡ Anlık Hız: ~${speedMBs} MB/s`
+                );
+              },
+              epResult.referer || null,
+              epResult.cookies || null,
+              epResult.userAgent || null,
+              epResult.headers || null,
+              epResult.audioUrl || null
+            );
+          });
+        }
+
+        if (fs.existsSync(epFilePath) && fs.statSync(epFilePath).size > 1000) {
+          const epSize = fs.statSync(epFilePath).size;
+          downloadedEpisodes.push({
+            ep,
+            filePath: epFilePath,
+            fileName: `${seriesName} - ${ep.name}.mp4`.replace(/[\\/:*?"<>|]/g, '_'),
+            size: epSize
+          });
+          console.log(`[Series Pack] Bölüm indirildi: ${ep.name} (${formatBytes(epSize)})`);
+        }
+      } catch (epErr) {
+        console.warn(`[Series Pack] Bölüm ${ep.name} (${ep.url}) başarısız: ${epErr.message}`);
+        if (epErr.message === 'İndirme iptal edildi.') throw epErr;
+        await progressUpdateCallback(`⚠️ *${ep.name}* atlandı: ${epErr.message}\nSonraki bölüme geçiliyor...`).catch(() => {});
+      }
+    }
+
+    if (downloadedEpisodes.length === 0) {
+      throw new Error("Seçilen bölümlerin hiçbiri indirilemedi.");
+    }
+
+    // 3. Dispatch to WhatsApp
+    const config = readConfig();
+    const targetJid = config.hentaiGroupJid || recipientJid;
+    const sock = botSocketRef.current;
+    const totalSize = downloadedEpisodes.reduce((acc, d) => acc + d.size, 0);
+    const totalSizeStr = formatBytes(totalSize);
+
+    const sendTaskObj = {
+      id: `send_pack_${taskObject.id || Date.now()}`,
+      title: `${seriesName} (Paket)`,
+      status: `WhatsApp'a yükleniyor...`,
+      startTime: Date.now()
+    };
+    botState.sendingTasks.push(sendTaskObj);
+
+    try {
+      // 3a. Cover Poster Image + Info
+      let captionText = `🎬 *${seriesName}*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📑 *Toplam Bölüm:* ${downloadedEpisodes.length} Bölüm\n` +
+        `📦 *Toplam Boyut:* ${totalSizeStr}\n`;
+      if (description) {
+        captionText += `📝 *Açıklama:* ${description.slice(0, 200)}...\n`;
+      }
+      captionText += `\n🚀 Bölüm videoları sırayla yükleniyor...`;
+
+      if (sock) {
+        if (localPosterPath && fs.existsSync(localPosterPath)) {
+          await sock.sendMessage(targetJid, {
+            image: fs.readFileSync(localPosterPath),
+            caption: captionText
+          });
+        } else {
+          await sock.sendMessage(targetJid, { text: captionText });
+        }
+      }
+
+      // 3b. Send each episode
+      for (let idx = 0; idx < downloadedEpisodes.length; idx++) {
+        const item = downloadedEpisodes[idx];
+        const fileStream = fs.createReadStream(item.filePath);
+        let lastWaUpdate = 0;
+        const progressStream = new ProgressStream(item.size, (uploaded, percent) => {
+          sendTaskObj.status = `Bölüm ${idx + 1}/${downloadedEpisodes.length} yükleniyor... %${percent}`;
+          notifyQueueUpdate();
+          const now = Date.now();
+          if (now - lastWaUpdate > 5000) {
+            lastWaUpdate = now;
+            const bar = getProgressBar(percent);
+            progressUpdateCallback(
+              `🎬 *${seriesName}*\n` +
+              `━━━━━━━━━━━━━━━━━━━━\n` +
+              `🚀 WhatsApp'a yükleniyor: *${idx + 1}/${downloadedEpisodes.length} Bölüm* (*%${percent}*)\n` +
+              `\`[${bar}]\`\n` +
+              `📁 ${item.fileName}`
+            ).catch(() => {});
+          }
+        });
+        fileStream.pipe(progressStream);
+
+        await withRetry(() => queueMediaSend(targetJid, {
+          document: { stream: progressStream },
+          mimetype: 'video/mp4',
+          fileName: item.fileName
+        }));
+
+        // Depo grubuna da gönder (farklıysa)
+        await sendToDepot(item.filePath, item.fileName, 'video/mp4', `${seriesName} - ${item.ep.name}`, targetJid);
+
+        if (idx < downloadedEpisodes.length - 1) {
+          await new Promise(r => setTimeout(r, 4000));
+        }
+      }
+
+      // 3c. Completion Summary
+      const finalSummary = `🎬 *${seriesName}*\n\n` +
+        `✅ *Tüm Bölümler Başarıyla Gönderildi!*\n` +
+        `📦 Gönderilen: *${downloadedEpisodes.length} Bölüm*\n` +
+        `💾 Toplam Boyut: *${totalSizeStr}*`;
+      if (sock) {
+        await sock.sendMessage(targetJid, { text: finalSummary });
+        if (replyJid && replyJid !== targetJid) {
+          await sock.sendMessage(replyJid, {
+            text: `✅ *${seriesName}* paketi (${downloadedEpisodes.length} bölüm) hedef gruba başarıyla gönderildi!`
+          });
+        }
+      }
+
+      console.log(`[Series Pack] ✅ Seri paketi tamamlandı ve gönderildi: ${seriesName}`);
+
+      if (taskObject) { taskObject.endTime = Date.now(); }
+      addHistory({
+        title: `${seriesName} (${downloadedEpisodes.length} Bölüm)`,
+        url: targetUrl,
+        sizeMB: (totalSize / 1024 / 1024).toFixed(2),
+        duration: formatDuration(Date.now() - pipelineStart),
+        watchUrl: '',
+        fileName: `${safeTitle}_paket`,
+        recipientJid: targetJid
+      });
+    } finally {
+      botState.sendingTasks = botState.sendingTasks.filter(t => t.id !== sendTaskObj.id);
+    }
+  } catch (err) {
+    console.error(`[Series Pack] Seri paketi hatası (${seriesName}):`, err.message);
+    addErrorLog({ title: seriesName, url: targetUrl, error: err.message });
+    progressUpdateCallback(`❌ *Paket Hatası*\n━━━━━━━━━━━━━━━━━━━━\n${seriesName} işlenirken hata oluştu: ${err.message}`).catch(() => {});
+  } finally {
+    try {
+      if (fs.existsSync(packTempDir)) {
+        fs.rmSync(packTempDir, { recursive: true, force: true });
+      }
+    } catch (cleanErr) {
+      console.error(`[Series Pack] Temizlik hatası:`, cleanErr.message);
+    }
+  }
+}
+
 // Core Download Pipeline (Reusable for WhatsApp and Dashboard)
 export async function executeDownloadPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject = null) {
   if (targetUrl && typeof targetUrl === 'string') {
@@ -933,6 +1215,10 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   console.log(`Starting extraction for target: ${targetUrl}`);
 
   if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
+
+  if (taskObject?.seriesPack) {
+    return await executeSeriesPackPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject);
+  }
 
   if (taskObject?.episodeBatch && Array.isArray(taskObject.episodeBatch) && taskObject.episodeBatch.length > 1) {
     return await executeBatchDownloadPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject);
@@ -977,6 +1263,13 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     result.title = taskObject.title;
   } else if (taskObject && result?.title) {
     taskObject.title = result.title;
+  }
+
+  // ── Ayıklanan bağlantı YouTube ise executeYouTubePipeline'a yönlendir ──
+  if (result?.url && /youtube\.com|youtu\.be/i.test(result.url)) {
+    console.log(`[Pipeline] Ayıklanan bağlantı YouTube embed/video, executeYouTubePipeline'a yönlendiriliyor: ${result.url}`);
+    const taskFormat = taskObject ? taskObject.format : null;
+    return await executeYouTubePipeline(result.url, recipientJid, progressUpdateCallback, signal, false, taskFormat, taskObject);
   }
 
   let fileExt = '.mp4';
@@ -1378,25 +1671,26 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
             console.log(`[SPLIT SEND] Waiting 10 seconds before sending part ${i + 1}...`);
             await new Promise(r => setTimeout(r, 10000));
           }
-          const partSize = fs.statSync(partPath).size;
-          const fileStream = fs.createReadStream(partPath);
-          let lastWaUpdate = 0;
-          const progressStream = new ProgressStream(partSize, (uploaded, percent) => {
-            sendTaskObj.status = `Parça ${i + 1}/${splitFiles.length} yükleniyor... %${percent}`;
-            notifyQueueUpdate();
-            const now = Date.now();
-            if (now - lastWaUpdate > 5000) {
-              lastWaUpdate = now;
-              const bar = getProgressBar(percent);
-              progressUpdateCallback(`🎬 *${finalTitle}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 *Durum:* WhatsApp'a yükleniyor (Parça ${i + 1}/${splitFiles.length} - *%${percent}*)\n\`[${bar}]\``).catch(() => {});
-            }
-          });
-          fileStream.pipe(progressStream);
-
-          await withRetry(() => queueMediaSend(recipientJid, {
-            document: { stream: progressStream },
-            mimetype: finalMimeType,
-            fileName: splitFiles[i]
+          await withRetry(() => queueMediaSend(recipientJid, () => {
+            const partSize = fs.statSync(partPath).size;
+            const fileStream = fs.createReadStream(partPath);
+            let lastWaUpdate = 0;
+            const progressStream = new ProgressStream(partSize, (uploaded, percent) => {
+              sendTaskObj.status = `Parça ${i + 1}/${splitFiles.length} yükleniyor... %${percent}`;
+              notifyQueueUpdate();
+              const now = Date.now();
+              if (now - lastWaUpdate > 5000) {
+                lastWaUpdate = now;
+                const bar = getProgressBar(percent);
+                progressUpdateCallback(`🎬 *${finalTitle}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 *Durum:* WhatsApp'a yükleniyor (Parça ${i + 1}/${splitFiles.length} - *%${percent}*)\n\`[${bar}]\``).catch(() => {});
+              }
+            });
+            fileStream.pipe(progressStream);
+            return {
+              document: { stream: progressStream },
+              mimetype: finalMimeType,
+              fileName: splitFiles[i]
+            };
           }));
         }
         const summary = `${icon} *${finalTitle}*\n\n✅ *Tüm Parçalar Tamamlandı!*\n📦 Toplam Boyut: ${finalSizeStr}\n⏱️ Süre: ${totalDuration}\n\n🔗 *İndirme Linki (VDS):*\n${watchUrl.replace(fileExt, finalFileExt)}`;
@@ -1412,26 +1706,28 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         if (!fs.existsSync(finalFilePath)) {
           throw new Error(`İndirilen dosya bulunamadı: ${finalFilePath}`);
         }
-        const fileStream = fs.createReadStream(finalFilePath);
-        fileStream.on('error', (err) => console.error('[Pipeline Stream Error]:', err.message));
-        let lastWaUpdate = 0;
-        const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
-          sendTaskObj.status = `WhatsApp'a yükleniyor... %${percent}`;
-          notifyQueueUpdate();
-          const now = Date.now();
-          if (now - lastWaUpdate > 5000) {
-            lastWaUpdate = now;
-            const bar = getProgressBar(percent);
-            progressUpdateCallback(`${icon} *${finalTitle}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 WhatsApp'a yükleniyor: *%${percent}*\n\`[${bar}]\`\nBoyut: ${finalSizeStr}`).catch(() => {});
-          }
-        });
-        fileStream.pipe(progressStream);
 
         const waFileName = `${cleanTitle.replace(/[\\/:*?"<>|]/g, '_')}${finalFileExt}`;
-        await withRetry(() => queueMediaSend(recipientJid, {
-          document: { stream: progressStream },
-          mimetype: finalMimeType,
-          fileName: waFileName
+        await withRetry(() => queueMediaSend(recipientJid, () => {
+          const fileStream = fs.createReadStream(finalFilePath);
+          fileStream.on('error', (err) => console.error('[Pipeline Stream Error]:', err.message));
+          let lastWaUpdate = 0;
+          const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
+            sendTaskObj.status = `WhatsApp'a yükleniyor... %${percent}`;
+            notifyQueueUpdate();
+            const now = Date.now();
+            if (now - lastWaUpdate > 5000) {
+              lastWaUpdate = now;
+              const bar = getProgressBar(percent);
+              progressUpdateCallback(`${icon} *${finalTitle}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 WhatsApp'a yükleniyor: *%${percent}*\n\`[${bar}]\`\nBoyut: ${finalSizeStr}`).catch(() => {});
+            }
+          });
+          fileStream.pipe(progressStream);
+          return {
+            document: { stream: progressStream },
+            mimetype: finalMimeType,
+            fileName: waFileName
+          };
         }));
 
         const customCaptionHeader = (taskObject && taskObject.caption) ? `${taskObject.caption}\n━━━━━━━━━━━━━━━━━━━━` : `${icon} *${finalTitle}*`;

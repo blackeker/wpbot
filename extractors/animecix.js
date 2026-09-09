@@ -1,5 +1,42 @@
 import { gotScraping, sleep, tryDecrypt, dcHello, getAndUnpack, rot13Str, rot13Buffer, unmix } from "../extractor.js";
 import axios from 'axios';
+
+const SECURITY_TOKEN = "7Y2ozlO+QysR5w9Q6Tupmtvl9jJp7ThFH8SB+Lo7NvZjgjqRSqOgcT2v4ISM9sP10LmnlYI8WQ==.xrlyOBFS5BHjQ2Lk";
+const APP_HASH = "b849e8a9f6cceff267251a73644faacc801ad726cc8f22a9c323c56a203f5446";
+
+export function getAnimecixHeaders(host = "https://animecix.tv") {
+  const cleanHost = host.endsWith('/') ? host.slice(0, -1) : host;
+  return {
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
+    'X-Requested-With': 'com.kraptor.AnimeciX',
+    'X-App-Version': '1.0.5',
+    'x-e-h': SECURITY_TOKEN,
+    'X-App-Hash': APP_HASH,
+    'Referer': cleanHost + '/'
+  };
+}
+
+export async function requestAnimecixApi(pathAndQuery, preferredHost = "https://animecix.tv") {
+  const candidateHosts = [preferredHost, "https://ecchicix.com", "https://animecix.tv"].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
+  let lastErr = null;
+  for (const host of candidateHosts) {
+    try {
+      const cleanPath = pathAndQuery.startsWith('/') ? pathAndQuery : '/' + pathAndQuery;
+      const url = `${host}${cleanPath}`;
+      const res = await axios.get(url, {
+        headers: getAnimecixHeaders(host),
+        timeout: 12000
+      });
+      if (res.data && typeof res.data === 'object') {
+        return res.data;
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error("Animecix API sunucularına erişilemedi.");
+}
+
 export
 // ==========================================
 // ANIMECIX EXTRACTOR AND RESOLVER FUNCTIONS
@@ -7,26 +44,13 @@ export
 async function resolveAnimecixSlug(slug, host = "https://animecix.tv") {
   const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9\-]/g, '');
   const words = cleanSlug.split('-');
-  const SECURITY_TOKEN = "7Y2ozlO+QysR5w9Q6Tupmtvl9jJp7ThFH8SB+Lo7NvZjgjqRSqOgcT2v4ISM9sP10LmnlYI8WQ==.xrlyOBFS5BHjQ2Lk";
-  const APP_HASH = "b849e8a9f6cceff267251a73644faacc801ad726cc8f22a9c323c56a203f5446";
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
-    'X-Requested-With': 'com.kraptor.AnimeciX',
-    'X-App-Version': '1.0.5',
-    'x-e-h': SECURITY_TOKEN,
-    'X-App-Hash': APP_HASH,
-    'Referer': host + '/'
-  };
   let items = [];
   // Fallback search loop from longest to shortest query
   for (let len = Math.min(words.length, 3); len >= 1; len--) {
     const query = words.slice(0, len).join(' ');
     try {
-      const res = await axios.get(`${host}/secure/titles?query=${encodeURIComponent(query)}`, {
-        headers,
-        timeout: 10000
-      });
-      items = res.data?.pagination?.data || [];
+      const data = await requestAnimecixApi(`/secure/titles?query=${encodeURIComponent(query)}`, host);
+      items = data?.pagination?.data || [];
       if (items.length > 0) {
         break;
       }
@@ -101,26 +125,11 @@ export async function extractAnimecix(pageUrl) {
     }
     if (!season) season = "1";
     if (!episode) episode = "1";
-    const SECURITY_TOKEN = "7Y2ozlO+QysR5w9Q6Tupmtvl9jJp7ThFH8SB+Lo7NvZjgjqRSqOgcT2v4ISM9sP10LmnlYI8WQ==.xrlyOBFS5BHjQ2Lk";
-    const APP_HASH = "b849e8a9f6cceff267251a73644faacc801ad726cc8f22a9c323c56a203f5446";
-    const apiHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
-      'X-Requested-With': 'com.kraptor.AnimeciX',
-      'X-App-Version': '1.0.5',
-      'x-e-h': SECURITY_TOKEN,
-      'X-App-Hash': APP_HASH,
-      'Referer': host + '/'
-    };
-
     // ── Başlığı Title Detail API'den çek (anime adı + bölüm adı) ──
     let title = `Animecix - Sezon ${season} Bölüm ${episode}`;
     try {
-      const titleApiUrl = `${host}/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${season}&page=1&perPage=100`;
-      const titleRes = await axios.get(titleApiUrl, {
-        headers: apiHeaders,
-        timeout: 15000
-      });
-      const titleData = titleRes.data?.data || titleRes.data;
+      const titleRes = await requestAnimecixApi(`/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${season}&page=1&perPage=100`, host);
+      const titleData = titleRes?.data || titleRes;
       const animeName = titleData?.title?.name;
       if (animeName) {
         title = `${animeName} - Sezon ${season} Bölüm ${episode}`;
@@ -130,12 +139,8 @@ export async function extractAnimecix(pageUrl) {
     }
 
     // ── Video kaynaklarını çek ──
-    const apiUrl = `${host}/secure/episode-videos?titleId=${titleId}&season=${season}&episode=${episode}`;
-    const response = await axios.get(apiUrl, {
-      headers: apiHeaders,
-      timeout: 15000
-    });
-    const sources = response.data.data || response.data;
+    const epRes = await requestAnimecixApi(`/secure/episode-videos?titleId=${titleId}&season=${season}&episode=${episode}`, host);
+    const sources = epRes?.data || epRes;
     if (Array.isArray(sources) && sources.length > 0) {
       let providerUrl = null;
       let sourceName = '';
@@ -327,100 +332,175 @@ export async function getAnimecixSeasonEpisodes(seasonUrl) {
       }
     }
 
-    // Parse season (default to "1" if show main page URL is provided)
-    let season = null;
+    if (!titleId) {
+      throw new Error("Geçersiz Animecix Sezon URL formatı.");
+    }
+
+    // Check if a specific season was requested in the URL
+    let requestedSeason = null;
     const seasonIdx = parts.findIndex(p => p.toLowerCase().startsWith('season') || p.toLowerCase().startsWith('sezon'));
     if (seasonIdx !== -1) {
       const sPart = parts[seasonIdx];
       const sMatch = sPart.match(/\d+/);
       if (sMatch) {
-        season = sMatch[0];
+        requestedSeason = sMatch[0];
       } else if (seasonIdx + 1 < parts.length) {
-        season = parts[seasonIdx + 1];
+        requestedSeason = parts[seasonIdx + 1];
       }
     }
-    if (!season) {
-      season = "1";
-    }
-    if (!titleId) {
-      throw new Error("Geçersiz Animecix Sezon URL formatı.");
-    }
-    const apiUrl = `${host}/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${season}&page=1&perPage=100`;
-    const SECURITY_TOKEN = "7Y2ozlO+QysR5w9Q6Tupmtvl9jJp7ThFH8SB+Lo7NvZjgjqRSqOgcT2v4ISM9sP10LmnlYI8WQ==.xrlyOBFS5BHjQ2Lk";
-    const APP_HASH = "b849e8a9f6cceff267251a73644faacc801ad726cc8f22a9c323c56a203f5446";
-    const response = await axios.get(apiUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
-        'X-Requested-With': 'com.kraptor.AnimeciX',
-        'X-App-Version': '1.0.5',
-        'x-e-h': SECURITY_TOKEN,
-        'X-App-Hash': APP_HASH,
-        'Referer': host + '/'
-      },
-      timeout: 15000
-    });
-    const data = response.data.data || response.data;
+
+    const initSeason = requestedSeason || "1";
+    const response = await requestAnimecixApi(`/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${initSeason}&page=1&perPage=100`, host);
+    const data = response?.data || response;
     if (!data || !data.title || !data.title.seasons) {
       throw new Error('API yanıtı geçersiz.');
     }
-    const seasonObj = data.title.seasons.find(s => s.number == season);
-    if (!seasonObj || !seasonObj.episodePagination || !seasonObj.episodePagination.data) {
-      throw new Error(`Sezon ${season} için bölüm listesi bulunamadı.`);
+
+    const allSeasons = data.title.seasons || [];
+    const targetSeasons = [];
+    if (requestedSeason) {
+      const sObj = allSeasons.find(s => s.number == requestedSeason);
+      if (sObj) targetSeasons.push(sObj);
+      else targetSeasons.push({ number: parseInt(requestedSeason, 10) });
+    } else {
+      targetSeasons.push(...allSeasons);
     }
 
-    // Get candidate episodes (not in future)
-    const candidates = seasonObj.episodePagination.data.filter(ep => {
-      if (ep.release_date) {
-        const relDate = new Date(ep.release_date);
-        if (relDate > new Date()) return false; // Skip future episodes
-      }
-      return true;
-    });
+    const seasonDataMap = new Map();
+    const initSObj = allSeasons.find(s => s.number == initSeason);
+    if (initSObj) seasonDataMap.set(Number(initSeason), initSObj);
 
-    // Pre-check: verify each episode actually has video sources (parallel, max 5 at a time)
-    const apiHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
-      'X-Requested-With': 'com.kraptor.AnimeciX',
-      'X-App-Version': '1.0.5',
-      'x-e-h': SECURITY_TOKEN,
-      'X-App-Hash': APP_HASH,
-      'Referer': host + '/'
-    };
-    const CHUNK_SIZE = 5;
-    const episodesWithSources = [];
-    let skippedCount = 0;
-    for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
-      const chunk = candidates.slice(i, i + CHUNK_SIZE);
-      const results = await Promise.allSettled(chunk.map(ep => axios.get(`${host}/secure/episode-videos?titleId=${titleId}&season=${season}&episode=${ep.episode_number}`, {
-        headers: apiHeaders,
-        timeout: 10000
-      }).then(r => ({
-        ep,
-        sources: r.data?.data || r.data || []
-      }))));
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value.sources.length > 0) {
-          episodesWithSources.push(result.value.ep);
-        } else {
-          skippedCount++;
-          console.log(`[Season Filter] Bölüm ${result.value?.ep?.episode_number ?? '?'} atlandı - video kaynağı yok`);
+    // Helper: Fetch all raw episodes across all pagination pages for a season
+    async function fetchAllRawEpisodesForSeason(sNum, initialSeasonObj) {
+      let sObj = initialSeasonObj;
+      if (!sObj || !sObj.episodePagination) {
+        try {
+          const res = await requestAnimecixApi(`/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${sNum}&page=1&perPage=100`, host);
+          const d = res?.data || res;
+          sObj = d?.title?.seasons?.find(s => s.number == sNum);
+        } catch (e) {
+          console.warn(`[Animecix] Sezon ${sNum} ilk sayfa alınamadı:`, e.message);
+          return [];
         }
       }
+      if (!sObj || !sObj.episodePagination) {
+        return [];
+      }
+
+      const pagination = sObj.episodePagination;
+      let allRaw = [...(pagination.data || [])];
+      const lastPage = pagination.last_page || 1;
+
+      if (lastPage > 1) {
+        const pagePromises = [];
+        for (let p = 2; p <= lastPage; p++) {
+          pagePromises.push(
+            requestAnimecixApi(`/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${sNum}&page=${p}&perPage=100`, host)
+              .then(res => {
+                const d = res?.data || res;
+                const foundS = d?.title?.seasons?.find(s => s.number == sNum);
+                return foundS?.episodePagination?.data || [];
+              })
+              .catch(err => {
+                console.warn(`[Animecix] Sezon ${sNum} sayfa ${p} alınamadı:`, err.message);
+                return [];
+              })
+          );
+        }
+        const pages = await Promise.all(pagePromises);
+        for (const pData of pages) {
+          if (Array.isArray(pData)) {
+            allRaw.push(...pData);
+          }
+        }
+      }
+
+      // Deduplicate by episode_number
+      const seen = new Set();
+      const deduped = [];
+      for (const ep of allRaw) {
+        if (!ep || ep.episode_number == null) continue;
+        if (!seen.has(ep.episode_number)) {
+          seen.add(ep.episode_number);
+          deduped.push(ep);
+        }
+      }
+      return deduped;
     }
-    const episodes = episodesWithSources.map(ep => {
-      const epNum = ep.episode_number;
-      return {
-        season: String(season),
-        number: epNum,
-        name: `Sezon ${season} Bölüm ${epNum}`,
-        url: `${host}/titles/${titleId}/season/${season}/episode/${epNum}`
-      };
-    });
-    episodes.sort((a, b) => a.number - b.number);
+
+    const seasonsResult = [];
+    let totalSkipped = 0;
+
+    for (const s of targetSeasons) {
+      const sNum = s.number;
+      const sObj = seasonDataMap.get(Number(sNum));
+      const rawEps = await fetchAllRawEpisodesForSeason(sNum, sObj);
+      const candidates = rawEps.filter(ep => {
+        if (ep.release_date) {
+          const relDate = new Date(ep.release_date);
+          if (relDate > new Date()) return false;
+        }
+        return true;
+      });
+
+      // Filter episodes that have video sources (in chunks of 15 with retry)
+      const episodesWithSources = [];
+      const CHUNK_SIZE = 15;
+      for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
+        const chunk = candidates.slice(i, i + CHUNK_SIZE);
+        const results = await Promise.allSettled(chunk.map(async ep => {
+          let sources = [];
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const r = await requestAnimecixApi(`/secure/episode-videos?titleId=${titleId}&season=${sNum}&episode=${ep.episode_number}`, host);
+              sources = r?.data || r || [];
+              if (Array.isArray(sources) && sources.length > 0) break;
+            } catch (e) {
+              if (attempt === 0) await sleep(250);
+            }
+          }
+          return { ep, sources };
+        }));
+
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value.sources && result.value.sources.length > 0) {
+            episodesWithSources.push(result.value.ep);
+          } else {
+            totalSkipped++;
+            console.log(`[Season Filter] Sezon ${sNum} Bölüm ${result.value?.ep?.episode_number ?? '?'} atlandı - video kaynağı yok`);
+          }
+        }
+      }
+
+      const episodes = episodesWithSources.map(ep => {
+        const epNum = ep.episode_number;
+        return {
+          season: String(sNum),
+          number: epNum,
+          name: ep.name ? `Sezon ${sNum} Bölüm ${epNum} - ${ep.name}` : `Sezon ${sNum} Bölüm ${epNum}`,
+          url: `${host}/titles/${titleId}/season/${sNum}/episode/${epNum}`
+        };
+      }).sort((a, b) => a.number - b.number);
+
+      seasonsResult.push({
+        season: sNum,
+        name: `${sNum}. Sezon`,
+        episodes
+      });
+    }
+
+    // Only consider seasons that actually have available episodes
+    const activeSeasons = seasonsResult.filter(s => s.episodes && s.episodes.length > 0);
+    const allEpisodes = activeSeasons.flatMap(s => s.episodes);
+    const isMultiSeason = !requestedSeason && activeSeasons.length > 1;
+
     return {
       animeName: data.title.name,
-      episodes,
-      skippedCount
+      isMultiSeason,
+      seasons: activeSeasons,
+      allEpisodes,
+      episodes: allEpisodes,
+      skippedCount: totalSkipped
     };
   } catch (err) {
     throw new Error(`Bölümler alınamadı: ${err.message}`);

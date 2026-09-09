@@ -20,7 +20,28 @@ import { gotScraping as originalGotScraping } from 'got-scraping';
 import HttpsProxyAgentPkg from 'https-proxy-agent';
 const HttpsProxyAgent = HttpsProxyAgentPkg.HttpsProxyAgent || HttpsProxyAgentPkg;
 import { CookieJar, Cookie } from 'tough-cookie';
-import { getProxyUrl, formatBytes, getProgressBar } from './config.js';
+import { getProxyUrl, formatBytes, getProgressBar, cleanOldDownloads } from './config.js';
+
+async function checkAvailableDiskSpace(targetDir, requiredBytes = 500 * 1024 * 1024) {
+  try {
+    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+    if (typeof fs.statfsSync === 'function') {
+      const stats = fs.statfsSync(targetDir);
+      const freeBytes = stats.bavail * stats.bsize;
+      if (freeBytes < 2 * 1024 * 1024 * 1024) {
+        console.warn(`[DISK UYARISI] Düşük boş disk alanı (${(freeBytes / 1024 / 1024).toFixed(0)} MB). Temizlik tetikleniyor...`);
+        cleanOldDownloads();
+      }
+      const statsAfter = fs.statfsSync(targetDir);
+      const freeAfter = statsAfter.bavail * statsAfter.bsize;
+      if (freeAfter < Math.max(requiredBytes, 1024 * 1024 * 1024)) {
+        throw new Error(`Yetersiz disk alanı: Sadece ${(freeAfter / 1024 / 1024).toFixed(0)} MB boş alan var.`);
+      }
+    }
+  } catch (err) {
+    if (err.message && err.message.startsWith('Yetersiz disk')) throw err;
+  }
+}
 
 function shouldUseProxy(url) {
   if (!url) return false;
@@ -260,6 +281,8 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
     console.log('[Segmented Downloader] Range check failed, falling back to standard sequential download:', headErr.message);
   }
 
+  await checkAvailableDiskSpace(path.dirname(outputPath), totalBytes);
+
   if (supportsRange && totalBytes > 0) {
     console.log(`[İNDİRME BAŞLADI] ${proxyTag} Yöntem: Segmented (8 Parça) | Boyut: ${formatBytes(totalBytes)} | URL: ${url}`);
     const numConnections = 8;
@@ -300,6 +323,10 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
               });
 
               const writer = fs.createWriteStream(partPath);
+              let streamEarlyError = null;
+              const onEarlyErr = (err) => { streamEarlyError = err; };
+              writer.on('error', onEarlyErr);
+              res.data.on('error', onEarlyErr);
               res.data.pipe(writer);
 
               let lastProgressReportTime = 0;
@@ -339,8 +366,15 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
               });
 
               await new Promise((resolve, reject) => {
+                writer.removeListener('error', onEarlyErr);
+                res.data.removeListener('error', onEarlyErr);
+                if (streamEarlyError) {
+                  try { writer.destroy(); } catch {}
+                  return reject(streamEarlyError);
+                }
+
                 const onAbort = () => {
-                  writer.destroy();
+                  try { writer.destroy(); } catch {}
                   reject(new Error("İndirme iptal edildi."));
                 };
 
@@ -351,6 +385,7 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
 
                 const onError = (e) => {
                   if (signal) signal.removeEventListener('abort', onAbort);
+                  try { writer.destroy(); } catch {}
                   reject(e);
                 };
 
@@ -445,6 +480,11 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
     ...agentOpts
   });
 
+  const contentType = (res.headers['content-type'] || '').toLowerCase();
+  if (contentType.includes('text/html') || contentType.includes('application/json')) {
+    throw new Error(`Geçersiz video kaynağı (Sunucu video dosyası yerine web sayfası veya metin döndürdü: ${contentType.split(';')[0]}).`);
+  }
+
   const actualResuming = isResuming && res.status === 206;
   const writeFlags = actualResuming ? 'a' : 'w';
   if (!actualResuming) {
@@ -456,8 +496,32 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
 
   await new Promise((resolve, reject) => {
     const writer = fs.createWriteStream(partPath, { flags: writeFlags });
+    let settled = false;
+    let streamTimer = null;
+
+    const cleanup = () => {
+      if (streamTimer) {
+        clearTimeout(streamTimer);
+        streamTimer = null;
+      }
+    };
+
+    const resetTimeout = () => {
+      cleanup();
+      streamTimer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          try { writer.destroy(); } catch {}
+          try { res.data.destroy(); } catch {}
+          reject(new Error("İndirme zaman aşımına uğradı (60 saniye boyunca veri akışı sağlanamadı)."));
+        }
+      }, 60000);
+    };
+
+    resetTimeout();
 
     res.data.on('data', (chunk) => {
+      resetTimeout();
       downloaded += chunk.length;
       const canWrite = writer.write(chunk);
       if (!canWrite) {
@@ -489,7 +553,15 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
       }
     });
 
+    res.data.on('end', () => {
+      cleanup();
+      writer.end();
+    });
+
     writer.on('finish', () => {
+      cleanup();
+      if (settled) return;
+      settled = true;
       try {
         fs.renameSync(partPath, outputPath);
         const durationSec = ((Date.now() - downloadStartTime) / 1000).toFixed(1);
@@ -500,18 +572,30 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
         reject(renameErr);
       }
     });
+
     writer.on('error', (err) => {
-      writer.destroy();
+      cleanup();
+      if (settled) return;
+      settled = true;
+      try { writer.destroy(); } catch {}
       reject(err);
     });
+
     res.data.on('error', (err) => {
-      writer.destroy();
+      cleanup();
+      if (settled) return;
+      settled = true;
+      try { writer.destroy(); } catch {}
       reject(err);
     });
 
     if (signal) {
       signal.addEventListener('abort', () => {
-        writer.destroy();
+        cleanup();
+        if (settled) return;
+        settled = true;
+        try { writer.destroy(); } catch {}
+        try { res.data.destroy(); } catch {}
         reject(new Error("İndirme iptal edildi."));
       });
     }
@@ -702,6 +786,10 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
 
     // İçerik M3U8 playlist değilse (binary veya HTML geldi), direkt stream indir
     if (!content.includes('#EXTM3U') && !content.includes('#EXT-X-')) {
+      const lower = content.toLowerCase();
+      if (lower.includes('<html') || lower.includes('<!doctype') || lower.includes('just a moment') || lower.includes('cf-browser-verification')) {
+        throw new Error("M3U8 linki geçersiz: Video oynatma listesi yerine web sayfası (HTML) döndü.");
+      }
       console.log('Response is not an M3U8 playlist, falling back to direct stream download...');
       await downloadDirectVideo(m3u8Url, outputPath, signal, progressCallback, referer, cookiesOverride, userAgentOverride);
       return;
@@ -730,7 +818,7 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
               firstAudioPlaylistUrl = resolved;
             }
             const langValue = (langMatch ? langMatch[1] : (nameMatch ? nameMatch[1] : '')).toLowerCase();
-            if (langValue === 'tr' || langValue === 'tr-tr' || langValue.startsWith('tr') || langValue === 'tur' || langValue === 'turkish') {
+            if (langValue === 'tr' || langValue === 'tr-tr' || langValue.startsWith('tr') || langValue === 'tur' || langValue === 'turkish' || langValue.includes('türk') || langValue.includes('turk')) {
               audioPlaylistUrl = resolved;
             }
           }

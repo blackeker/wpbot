@@ -126,6 +126,11 @@ export async function extractFilmMakinesi(pageUrl) {
     await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 60000 });
     
     const rawTitle = await page.title();
+    if (rawTitle.includes('Access denied') || rawTitle.includes('Cloudflare') || rawTitle.includes('Attention Required')) {
+      await page.close();
+      page = null;
+      throw new Error("FilmMakinesi sunucusu sunucu IP'mizi Cloudflare üzerinden engelliyor (Hata 1005). Bu filmi indirmek için web dashboard ayarlarından bir Proxy tanımlayabilir veya linki HDfilmcehennemi, FullHDFilmİzlesene ya da FilmModu üzerinden gönderebilirsiniz.");
+    }
     const title = rawTitle.replace(/ - Film Makinesi.*/i, '').trim();
 
     // Extract alternative embed/player links

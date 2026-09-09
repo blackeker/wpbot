@@ -18,7 +18,8 @@ db.exec(`
     format TEXT,
     priority INTEGER,
     addedTime TEXT,
-    episodeBatch TEXT
+    episodeBatch TEXT,
+    seriesPack TEXT
   );
   
   CREATE TABLE IF NOT EXISTS active_tasks (
@@ -30,12 +31,15 @@ db.exec(`
     format TEXT,
     priority INTEGER,
     addedTime TEXT,
-    episodeBatch TEXT
+    episodeBatch TEXT,
+    seriesPack TEXT
   );
 `);
 
 try { db.exec("ALTER TABLE tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE active_tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN seriesPack TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE active_tasks ADD COLUMN seriesPack TEXT"); } catch (e) {}
 
 export let downloadQueue = [];
 export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...] } }
@@ -57,19 +61,19 @@ export const queueState = {
 };
 
 // SQLite Kaydet
-function saveQueueToFile() {
+export function saveQueueToFile() {
   try {
     const deleteTasks = db.prepare('DELETE FROM tasks');
     const deleteActive = db.prepare('DELETE FROM active_tasks');
     
     const insertTask = db.prepare(`
-      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertActive = db.prepare(`
-      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = db.transaction(() => {
@@ -86,7 +90,8 @@ function saveQueueToFile() {
           t.format || null,
           t.priority ? 1 : 0,
           new Date(t.addedTime).toISOString(),
-          t.episodeBatch ? JSON.stringify(t.episodeBatch) : null
+          t.episodeBatch ? JSON.stringify(t.episodeBatch) : null,
+          t.seriesPack ? JSON.stringify(t.seriesPack) : null
         );
       }
 
@@ -100,7 +105,8 @@ function saveQueueToFile() {
           t.format || null,
           t.priority ? 1 : 0,
           new Date(t.addedTime).toISOString(),
-          t.episodeBatch ? JSON.stringify(t.episodeBatch) : null
+          t.episodeBatch ? JSON.stringify(t.episodeBatch) : null,
+          t.seriesPack ? JSON.stringify(t.seriesPack) : null
         );
       }
     });
@@ -123,6 +129,10 @@ function loadQueueFromFile() {
       if (r.episodeBatch) {
         try { epBatch = JSON.parse(r.episodeBatch); } catch (e) {}
       }
+      let sPack = null;
+      if (r.seriesPack) {
+        try { sPack = JSON.parse(r.seriesPack); } catch (e) {}
+      }
       loadedQueue.push({
         id: r.id,
         url: r.url,
@@ -133,6 +143,7 @@ function loadQueueFromFile() {
         priority: Boolean(r.priority),
         addedTime: new Date(r.addedTime),
         episodeBatch: epBatch,
+        seriesPack: sPack,
         isCancelled: false,
         startTime: null,
         endTime: null,
@@ -148,6 +159,10 @@ function loadQueueFromFile() {
       if (r.episodeBatch) {
         try { epBatch = JSON.parse(r.episodeBatch); } catch (e) {}
       }
+      let sPack = null;
+      if (r.seriesPack) {
+        try { sPack = JSON.parse(r.seriesPack); } catch (e) {}
+      }
       loadedQueue.push({
         id: r.id,
         url: r.url,
@@ -158,6 +173,7 @@ function loadQueueFromFile() {
         priority: Boolean(r.priority),
         addedTime: new Date(r.addedTime),
         episodeBatch: epBatch,
+        seriesPack: sPack,
         isCancelled: false,
         startTime: null,
         endTime: null,
@@ -203,7 +219,7 @@ export const activeTask = {
   }
 };
 
-export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null, episodeBatch = null) {
+export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null, episodeBatch = null, seriesPack = null) {
   const isDuplicate = downloadQueue.some(t => t.url === url) || activeTasksList.some(t => t.url === url);
   if (isDuplicate) {
     throw new Error("Bu link zaten indirme kuyrugunda veya su an indiriliyor.");
@@ -227,6 +243,7 @@ export function addDownloadTask(url, recipientJid, title, format = null, priorit
     priority,
     caption: caption || null,
     episodeBatch: episodeBatch || null,
+    seriesPack: seriesPack || null,
     addedTime: new Date(),
     startTime: null,
     endTime: null,
@@ -336,102 +353,98 @@ export function getEstimatedWaitTime(queueIndex) {
 
 export async function processQueue() {
   const config = readConfig();
-  const limit = config.concurrencyLimit || 1;
+  const limit = Math.max(1, Number(config.concurrencyLimit) || 1);
 
-  if (activeTasksList.length >= limit) return;
   if (queueState.isPaused) return;
-  if (downloadQueue.length === 0) return;
 
-  const task = downloadQueue.shift();
-  activeTasksList.push(task);
-  saveQueueToFile();
-  notifyQueueUpdate();
-  
-  if (task.isCancelled) {
-    console.log(`Task ${task.id} cancelled before start.`);
-    const idx = activeTasksList.indexOf(task);
-    if (idx !== -1) activeTasksList.splice(idx, 1);
+  while (activeTasksList.length < limit && downloadQueue.length > 0 && !queueState.isPaused) {
+    const task = downloadQueue.shift();
+    activeTasksList.push(task);
+    saveQueueToFile();
     notifyQueueUpdate();
-    processQueue();
-    return;
-  }
-
-  task.status = 'indiriliyor';
-  task.startTime = Date.now();
-  task.abortController = new AbortController();
-
-  (async () => {
-    try {
-      const sock = botSocketRef.current;
-      if (!sock) throw new Error("WhatsApp bağlantısı henüz kurulmadı.");
-      
-      const from = task.recipientJid;
-
-      console.log(`Starting queue task: ${task.title} (${task.url})`);
-      let statusMsgKey = null;
-      const isBatch = task.episodeBatch && Array.isArray(task.episodeBatch) && task.episodeBatch.length > 1;
-      const startText = isBatch
-        ? `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\n📦 ${task.episodeBatch.length} bölümlük paket indiriliyor ve tek video olarak birleştiriliyor...`
-        : `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\nVideo çözümleniyor ve indirme başlatılıyor...`;
-      try {
-        const statusMsg = await sock.sendMessage(from, { text: startText });
-        statusMsgKey = statusMsg?.key;
-        task.statusMsgKey = statusMsgKey;
-      } catch (e) {
-        console.error('Kuyruk başlangıç mesajı gönderilemedi:', e.message);
-      }
-
-      await executeDownloadPipeline(
-        task.url, 
-        from, 
-        async (statusText) => {
-          try {
-            if (botSocketRef.current && statusMsgKey) {
-              await botSocketRef.current.sendMessage(from, { text: statusText, edit: statusMsgKey });
-            }
-          } catch (e) { }
-          notifyQueueUpdate();
-        }, 
-        task.abortController.signal,
-        task
-      );
-
-    } catch (error) {
-      console.error('Error running queued task:', error?.message || error?.stack || error);
-      const isNoSource = error.message && (
-        error.message.includes('video kaynağı bulunamadı') ||
-        error.message.includes('Çözümlenebilir video') ||
-        error.message.includes('No alternative video sources')
-      );
-      try {
-        if (botSocketRef.current) {
-          let text;
-          if (error.message === 'İndirme iptal edildi.') {
-            text = `⚠️ *İndirme İptal Edildi:* ${task.title}`;
-          } else if (isNoSource) {
-            text = `⏩ *Atlandı:* ${task.title}\n└ Bu bölüm henüz platforma yüklenmemiş, sonraki bölüme geçiliyor...`;
-          } else {
-            text = `❌ *Hata (${task.title}):* ${error.message}`;
-          }
-          
-          if (task.statusMsgKey) {
-            await botSocketRef.current.sendMessage(task.recipientJid, { text, edit: task.statusMsgKey });
-          } else {
-            await botSocketRef.current.sendMessage(task.recipientJid, { text });
-          }
-        }
-      } catch (e) { }
-    } finally {
+    
+    if (task.isCancelled) {
+      console.log(`Task ${task.id} cancelled before start.`);
       const idx = activeTasksList.indexOf(task);
-      if (idx !== -1) {
-        activeTasksList.splice(idx, 1);
-      }
-      saveQueueToFile();
+      if (idx !== -1) activeTasksList.splice(idx, 1);
       notifyQueueUpdate();
-      processQueue();
+      continue;
     }
-  })();
 
-  // Try initiating another worker if limit allows
-  processQueue();
+    task.status = 'indiriliyor';
+    task.startTime = Date.now();
+    task.abortController = new AbortController();
+
+    (async () => {
+      try {
+        const sock = botSocketRef.current;
+        if (!sock) throw new Error("WhatsApp bağlantısı henüz kurulmadı.");
+        
+        const from = task.recipientJid;
+
+        console.log(`Starting queue task: ${task.title} (${task.url})`);
+        let statusMsgKey = null;
+        const isBatch = task.episodeBatch && Array.isArray(task.episodeBatch) && task.episodeBatch.length > 1;
+        const startText = isBatch
+          ? `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\n📦 ${task.episodeBatch.length} bölümlük paket indiriliyor ve tek video olarak birleştiriliyor...`
+          : `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\nVideo çözümleniyor ve indirme başlatılıyor...`;
+        try {
+          const statusMsg = await sock.sendMessage(from, { text: startText });
+          statusMsgKey = statusMsg?.key;
+          task.statusMsgKey = statusMsgKey;
+        } catch (e) {
+          console.error('Kuyruk başlangıç mesajı gönderilemedi:', e.message);
+        }
+
+        await executeDownloadPipeline(
+          task.url, 
+          from, 
+          async (statusText) => {
+            try {
+              if (botSocketRef.current && statusMsgKey) {
+                await botSocketRef.current.sendMessage(from, { text: statusText, edit: statusMsgKey });
+              }
+            } catch (e) { }
+            notifyQueueUpdate();
+          }, 
+          task.abortController.signal,
+          task
+        );
+
+      } catch (error) {
+        console.error('Error running queued task:', error?.message || error?.stack || error);
+        const isNoSource = error.message && (
+          error.message.includes('video kaynağı bulunamadı') ||
+          error.message.includes('Çözümlenebilir video') ||
+          error.message.includes('No alternative video sources')
+        );
+        try {
+          if (botSocketRef.current) {
+            let text;
+            if (error.message === 'İndirme iptal edildi.') {
+              text = `⚠️ *İndirme İptal Edildi:* ${task.title}`;
+            } else if (isNoSource) {
+              text = `⏩ *Atlandı:* ${task.title}\n└ Bu bölüm henüz platforma yüklenmemiş, sonraki bölüme geçiliyor...`;
+            } else {
+              text = `❌ *Hata (${task.title}):* ${error.message}`;
+            }
+            
+            if (task.statusMsgKey) {
+              await botSocketRef.current.sendMessage(task.recipientJid, { text, edit: task.statusMsgKey });
+            } else {
+              await botSocketRef.current.sendMessage(task.recipientJid, { text });
+            }
+          }
+        } catch (e) { }
+      } finally {
+        const idx = activeTasksList.indexOf(task);
+        if (idx !== -1) {
+          activeTasksList.splice(idx, 1);
+        }
+        saveQueueToFile();
+        notifyQueueUpdate();
+        processQueue();
+      }
+    })();
+  }
 }

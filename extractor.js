@@ -517,22 +517,80 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
               }
             }
           }
+
+          if (!decryptedUrl) {
+            iframe$('script').each((_, sEl) => {
+              if (decryptedUrl) return;
+              const sc = $(sEl).html() || '';
+              if (sc.includes('function') && (sc.includes('.join(') || sc.includes('atob(') || sc.includes('btoa('))) {
+                try {
+                  const ctx = {
+                    Buffer,
+                    atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+                    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+                    Math,
+                    String
+                  };
+                  vm.createContext(ctx);
+                  vm.runInContext(sc, ctx, { timeout: 1000 });
+                  for (const k of Object.keys(ctx)) {
+                    if (typeof ctx[k] === 'string' && (ctx[k].startsWith('http://') || ctx[k].startsWith('https://'))) {
+                      decryptedUrl = ctx[k];
+                      break;
+                    }
+                  }
+                } catch (e) {}
+              }
+            });
+          }
+
           if (decryptedUrl) {
             // Extract subtitles if any are defined
             let subtitles = [];
-            const tracksMatch = unpacked.match(/tracks\s*:\s*\[([\s\S]*?)\]/);
+            let tracksText = '';
+            const tracksMatch = (scriptText + ' ' + unpacked).match(/tracks\s*:\s*(\[\s*\{[\s\S]*?\}\s*\])/);
             if (tracksMatch) {
-              const tracksText = tracksMatch[1];
+              try {
+                const parsedTracks = JSON.parse(tracksMatch[1]);
+                for (const t of parsedTracks) {
+                  if (t.file) {
+                    let subUrl = t.file.replace(/\\/g, '');
+                    if (subUrl.startsWith('/')) {
+                      subUrl = `https://hdfilmcehennemi.mobi${subUrl}`;
+                    }
+                    const label = t.label || 'Türkçe';
+                    subtitles.push({
+                      url: subUrl,
+                      language: label.toLowerCase().includes('türk') ? 'tur' : 'eng',
+                      label: label
+                    });
+                  }
+                }
+              } catch (e) {
+                tracksText = tracksMatch[1];
+              }
+            }
+            if (subtitles.length === 0 && tracksText) {
               const fileMatches = [...tracksText.matchAll(/file\s*:\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
               const labelMatches = [...tracksText.matchAll(/label\s*:\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
               for (let k = 0; k < fileMatches.length; k++) {
                 let label = labelMatches[k] || 'Türkçe';
                 subtitles.push({
-                  url: fileMatches[k],
+                  url: fileMatches[k].replace(/\\/g, ''),
                   language: label.toLowerCase().includes('türk') ? 'tur' : 'eng',
                   label: label
                 });
               }
+            }
+
+            if (langCode === 'DUAL') {
+              console.log(`[HDfilmcehennemi] DUAL release stream resolved: ${decryptedUrl}`);
+              return {
+                title,
+                source: sourceName + " (DUAL)",
+                url: decryptedUrl,
+                subtitles: subtitles.length > 0 ? subtitles : foundSubtitles
+              };
             }
 
             if (langCode === 'ALTYAZI' || langCode === 'EN') {
@@ -546,6 +604,12 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
                 dublajUrl = decryptedUrl;
                 activeSourceName = sourceName;
                 if (subtitles.length > 0 && foundSubtitles.length === 0) foundSubtitles = subtitles;
+              }
+            } else {
+              if (!altyaziliUrl) {
+                altyaziliUrl = decryptedUrl;
+                activeSourceName = sourceName;
+                if (subtitles.length > 0) foundSubtitles = subtitles;
               }
             }
 
@@ -613,8 +677,8 @@ export function tryDecrypt(hexPayload, keyHex, ivHex, algo = 'AES-CBC') {
 }
 import { resolveAnimecixSlug, extractAnimecix, resolveTauVideo, resolveSibNet, resolveOkRu, pickBestQuality, getAnimecixSeasonEpisodes  } from "./extractors/animecix.js";
 export { resolveAnimecixSlug, extractAnimecix, resolveTauVideo, resolveSibNet, resolveOkRu, pickBestQuality, getAnimecixSeasonEpisodes  };
-import { decryptHentaizmString, cleanHentaizmTitle, initiateHentaizmLogin, extractHentaizm, resolvePlayerIframe, resolvePlayerAjax  } from "./extractors/hentaizm.js";
-export { decryptHentaizmString, cleanHentaizmTitle, initiateHentaizmLogin, extractHentaizm, resolvePlayerIframe, resolvePlayerAjax  };
+import { decryptHentaizmString, cleanHentaizmTitle, initiateHentaizmLogin, extractHentaizm, getHentaizmSeasonEpisodes, extractHentaizmListingPage, resolvePlayerIframe, resolvePlayerAjax  } from "./extractors/hentaizm.js";
+export { decryptHentaizmString, cleanHentaizmTitle, initiateHentaizmLogin, extractHentaizm, getHentaizmSeasonEpisodes, extractHentaizmListingPage, resolvePlayerIframe, resolvePlayerAjax  };
 import { extractDoeda  } from "./extractors/doeda.js";
 export { extractDoeda  };
 import { extractHdabla  } from "./extractors/hdabla.js";

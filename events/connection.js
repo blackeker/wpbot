@@ -4,6 +4,7 @@ import QRCodeImage from 'qrcode';
 import { botState, pairingState, sessionPath, backupSession, backupCredsFile } from '../config.js';
 import { startTrackerService } from '../tracker.js';
 import { notifyStatusUpdate } from '../server.js';
+import { processQueue } from '../queue.js';
 
 export async function handleConnectionUpdate(sock, update, startBot) {
   const { connection, lastDisconnect, qr } = update;
@@ -78,6 +79,11 @@ export async function handleConnectionUpdate(sock, update, startBot) {
       startTrackerService();
     } catch (err) {
       console.error('[Tracker] Failed to start tracker service:', err.message);
+    }
+    try {
+      processQueue();
+    } catch (err) {
+      console.error('[QUEUE] Failed to start queue on connection open:', err.message);
     }
   }
   notifyStatusUpdate();

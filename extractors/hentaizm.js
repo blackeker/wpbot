@@ -103,8 +103,273 @@ export async function initiateHentaizmLogin(fromJid, pageUrl = 'https://www.hent
     console.error("[Hentaizm Login] Error initiating login:", err.message);
   }
 }
+
+export async function extractHentaizmListingPage(pageUrl, startPage = 1, endPage = 1) {
+  const config = readConfig();
+  let cookieJar;
+  if (config.hentaizmCookies) {
+    try {
+      cookieJar = CookieJar.fromJSON(config.hentaizmCookies);
+    } catch (e) {
+      cookieJar = new CookieJar();
+    }
+  } else {
+    cookieJar = new CookieJar();
+  }
+
+  let baseUrl = 'https://www.hentaizm2.com';
+  try { baseUrl = new URL(pageUrl).origin; } catch (e) {}
+
+  const animeMap = new Map();
+  let pageTitle = '';
+
+  const sPage = Math.max(1, parseInt(startPage, 10) || 1);
+  const ePage = Math.max(sPage, parseInt(endPage, 10) || sPage);
+
+  for (let p = sPage; p <= ePage; p++) {
+    let currentUrl = pageUrl;
+    if (/([?&]page=)\d+/i.test(currentUrl)) {
+      currentUrl = currentUrl.replace(/([?&]page=)\d+/i, `$1${p}`);
+    } else if (p > 1 || currentUrl.includes('page=')) {
+      currentUrl = currentUrl.includes('?') ? `${currentUrl}&page=${p}` : `${currentUrl}?page=${p}`;
+    }
+
+    try {
+      const res = await gotScraping.get({
+        url: currentUrl,
+        cookieJar,
+        headerGeneratorOptions: {
+          devices: ['desktop'],
+          locales: ['tr-TR', 'en-US'],
+          operatingSystems: ['windows']
+        },
+        timeout: { request: 15000 }
+      });
+
+      const $ = cheerio.load(res.body);
+      if (!pageTitle) {
+        pageTitle = cleanHentaizmTitle($('title').text().trim() || 'Hentaizm Liste');
+      }
+
+      let foundThisPage = 0;
+      let scope = $('.col-md-8, .main-content, #main-content, .content-left, .left-content, main');
+      if (scope.length === 0) scope = $('body');
+
+      scope.find('a[href*="/anime/"]').each((i, el) => {
+        // Strictly exclude sidebar elements (e.g. Animecix anime list, widgets, aside)
+        if ($(el).closest('.col-md-4, #sidebar, .sidebar, aside, .link-list-2, .sidebar-anime-item, .sidebar-section, .right-sidebar').length > 0) {
+          return;
+        }
+
+        let href = $(el).attr('href');
+        if (!href) return;
+        if (href.startsWith('/')) href = `${baseUrl}${href}`;
+        try {
+          const u = new URL(href);
+          const cleanUrl = `${u.origin}${u.pathname}`.replace(/\/+$/, '');
+          const parts = u.pathname.split('/').filter(Boolean);
+          if (parts[0] === 'anime' && parts.length >= 2) {
+            // Search for image in self, siblings, or nearby parent
+            let imgEl = $(el).find('img');
+            if (imgEl.length === 0) {
+              imgEl = $(el).parent().siblings().find('img');
+            }
+            if (imgEl.length === 0) {
+              imgEl = $(el).closest('.box, .item, .col, .post, .card, .anime-card, .film-item, div').find('img');
+            }
+
+            const altTitle = imgEl.attr('alt') ? cleanHentaizmTitle(imgEl.attr('alt').replace(/\s+/g, ' ').trim()) : null;
+            let title = $(el).attr('title') || $(el).text().trim();
+            title = cleanHentaizmTitle(title.replace(/\s+/g, ' ').trim());
+            // If text/title is truncated with ..., prefer full altTitle or formatted slug
+            if (altTitle && (title.endsWith('...') || !title || altTitle.length > title.length)) {
+              title = altTitle;
+            }
+            const slugFormatted = parts[1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            if (!title || title.endsWith('...')) {
+              title = slugFormatted;
+            }
+
+            let poster = imgEl.attr('data-src') || imgEl.attr('src') || imgEl.attr('data-original') || imgEl.attr('data-lazy-src') || null;
+            if (poster && poster.startsWith('/')) {
+              poster = `${baseUrl}${poster}`;
+            }
+            if (!poster && parts[1]) {
+              poster = `${baseUrl}/uploads/afis/${parts[1]}.jpg`;
+            }
+
+            if (!animeMap.has(cleanUrl)) {
+              animeMap.set(cleanUrl, {
+                url: cleanUrl,
+                title: title || slugFormatted,
+                posterUrl: poster || null
+              });
+              foundThisPage++;
+            }
+          }
+        } catch (e) {}
+      });
+
+      // Fallback: if no /anime/ links found in main content, check /izle/ links
+      if (foundThisPage === 0) {
+        scope.find('a[href*="/izle/"]').each((i, el) => {
+          if ($(el).closest('.col-md-4, #sidebar, .sidebar, aside, .link-list-2, .sidebar-anime-item, .sidebar-section, .right-sidebar').length > 0) {
+            return;
+          }
+          let href = $(el).attr('href');
+          if (!href) return;
+          if (href.startsWith('/')) href = `${baseUrl}${href}`;
+          try {
+            const u = new URL(href);
+            const parts = u.pathname.split('/').filter(Boolean);
+            if (parts[0] === 'izle' && parts[1]) {
+              const cleanUrl = `${baseUrl}/anime/${parts[1]}`;
+              if (!animeMap.has(cleanUrl)) {
+                const slugFormatted = parts[1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                animeMap.set(cleanUrl, {
+                  url: cleanUrl,
+                  title: slugFormatted,
+                  posterUrl: `${baseUrl}/uploads/afis/${parts[1]}.jpg`
+                });
+                foundThisPage++;
+              }
+            }
+          } catch (e) {}
+        });
+      }
+
+      console.log(`[Hentaizm Listing] Sayfa ${p}: ${foundThisPage} yeni anime bulundu. (Toplam: ${animeMap.size})`);
+      if (foundThisPage === 0 && p > sPage) {
+        break;
+      }
+    } catch (err) {
+      console.warn(`[Hentaizm Listing] Sayfa ${p} alınamadı:`, err.message);
+      if (p === sPage) throw err;
+      break;
+    }
+  }
+
+  const allAnimeler = Array.from(animeMap.values());
+  return {
+    pageTitle,
+    animeList: allAnimeler,
+    items: allAnimeler,
+    totalFound: allAnimeler.length
+  };
+}
+
+export async function getHentaizmSeasonEpisodes(animeUrl) {
+  try {
+    const config = readConfig();
+    let cookieJar;
+    if (config.hentaizmCookies) {
+      try {
+        cookieJar = CookieJar.fromJSON(config.hentaizmCookies);
+      } catch (e) {
+        cookieJar = new CookieJar();
+      }
+    } else {
+      cookieJar = new CookieJar();
+    }
+
+    const host = new URL(animeUrl).origin;
+    const res = await gotScraping.get({
+      url: animeUrl,
+      cookieJar,
+      headerGeneratorOptions: {
+        devices: ['desktop'],
+        locales: ['tr-TR', 'en-US'],
+        operatingSystems: ['windows']
+      }
+    });
+
+    const html = res.body;
+    const $ = cheerio.load(html);
+
+    const rawTitle = $('title').text().trim() || $('h1').text().trim() || 'Hentaizm Anime';
+    const seriesName = cleanHentaizmTitle(rawTitle);
+
+    const episodes = [];
+    const seenUrls = new Set();
+
+    $('a.episode-list-item, a[href*="/izle/"], .episode-list-container a').each((i, el) => {
+      let href = $(el).attr('href');
+      if (!href) return;
+      if (!href.startsWith('http')) {
+        href = `${host}${href.startsWith('/') ? '' : '/'}${href}`;
+      }
+      if (seenUrls.has(href)) return;
+      seenUrls.add(href);
+
+      const rawText = $(el).text().trim().replace(/\s+/g, ' ');
+      let season = '1';
+      let number = episodes.length + 1;
+
+      const urlMatch = href.match(/sezon-(\d+)-bolum-(\d+)/i) || href.match(/\/sezon-(\d+)\/bolum-(\d+)/i);
+      if (urlMatch) {
+        season = urlMatch[1];
+        number = parseInt(urlMatch[2], 10);
+      } else {
+        const textMatch = rawText.match(/(?:(\d+)\.\s*sezon\s*)?(\d+)\.\s*bölüm/i);
+        if (textMatch) {
+          if (textMatch[1]) season = textMatch[1];
+          if (textMatch[2]) number = parseInt(textMatch[2], 10);
+        }
+      }
+
+      episodes.push({
+        season,
+        number,
+        name: rawText || `Sezon ${season} Bölüm ${number}`,
+        url: href
+      });
+    });
+
+    episodes.sort((a, b) => {
+      const sDiff = parseInt(a.season, 10) - parseInt(b.season, 10);
+      if (sDiff !== 0) return sDiff;
+      return a.number - b.number;
+    });
+
+    let posterUrl = $('meta[property="og:image"]').attr('content') || '';
+    if (!posterUrl) {
+      const imgEl = $('.poster img, .anime-poster img, .film-poster img, img[src*="/uploads/afis/"]').first();
+      posterUrl = imgEl.attr('data-src') || imgEl.attr('src') || '';
+    }
+    if (posterUrl && !posterUrl.startsWith('http')) {
+      posterUrl = `${host}${posterUrl.startsWith('/') ? '' : '/'}${posterUrl}`;
+    }
+
+    const description = $('meta[property="og:description"]').attr('content') || 
+      $('.description, .anime-details, .summary, .story').first().text().trim() || '';
+
+    return {
+      seriesName,
+      posterUrl,
+      description,
+      episodes
+    };
+  } catch (err) {
+    throw new Error(`Hentaizm anime bölümleri alınamadı: ${err.message}`);
+  }
+}
+
 export async function extractHentaizm(pageUrl, fromJid = null) {
   try {
+    // If target URL is an anime overview page, automatically resolve the first episode as fallback
+    if (pageUrl.includes('/anime/')) {
+      const animeData = await getHentaizmSeasonEpisodes(pageUrl);
+      if (animeData && animeData.episodes && animeData.episodes.length > 0) {
+        const firstEp = animeData.episodes[0];
+        console.log(`[Hentaizm] Anime overview link detected: "${animeData.seriesName}". Resolving 1st episode: ${firstEp.url}`);
+        const result = await extractHentaizm(firstEp.url, fromJid);
+        return {
+          ...result,
+          title: result.title || `${animeData.seriesName} - ${firstEp.name}`
+        };
+      }
+    }
+
     const config = readConfig();
     let cookieJar;
     if (config.hentaizmCookies) {
@@ -201,6 +466,19 @@ export async function extractHentaizm(pageUrl, fromJid = null) {
       }
     }
     if (!streamUrl) {
+      const episodeLinks = $('a.episode-list-item, a[href*="/izle/"]');
+      if (episodeLinks.length > 0) {
+        const animeData = await getHentaizmSeasonEpisodes(pageUrl);
+        if (animeData && animeData.episodes && animeData.episodes.length > 0) {
+          const firstEp = animeData.episodes[0];
+          console.log(`[Hentaizm] Video oynatıcı yerine bölüm listesi bulundu (${animeData.seriesName}). 1. bölüm çözümleniyor: ${firstEp.url}`);
+          const result = await extractHentaizm(firstEp.url, fromJid);
+          return {
+            ...result,
+            title: result.title || `${animeData.seriesName} - ${firstEp.name}`
+          };
+        }
+      }
       throw new Error("Video kaynak linki hentaizm sayfasından ayıklanamadı.");
     }
     if (streamUrl.startsWith('//')) {

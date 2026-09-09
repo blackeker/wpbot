@@ -43,6 +43,9 @@ import {
   resumeQueue,
   queueState,
   activeTasksList,
+  processQueue,
+  saveQueueToFile,
+  notifyQueueUpdate,
   setQueueUpdateCallback
 } from './queue.js';
 
@@ -324,7 +327,7 @@ app.post('/api/indir', (req, res) => {
 
   try {
     const customTitle = title || fileName || url;
-    const task = addDownloadTask(url, jid, customTitle, null, false, caption || null);
+    const task = addDownloadTask(url, jid, customTitle, null, Boolean(req.body.priority), caption || null);
     res.json({ ok: true, taskId: task.id, message: 'Görev kuyruğa eklendi.' });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -346,6 +349,47 @@ app.post('/api/kuyruk-devam', (req, res) => {
   res.json({ ok: true, message: 'Kuyruk devam ediyor.' });
 });
 
+app.post('/api/queue/insert-after', (req, res) => {
+  const { tasks, afterTitle } = req.body;
+  if (!tasks || !Array.isArray(tasks)) return res.status(400).json({ error: 'tasks dizisi gereklidir.' });
+
+  let insertIndex = downloadQueue.length;
+  if (afterTitle) {
+    const idx = downloadQueue.findIndex(t => t.title && t.title.includes(afterTitle));
+    if (idx !== -1) insertIndex = idx + 1;
+  }
+
+  const created = [];
+  for (let i = 0; i < tasks.length; i++) {
+    const item = tasks[i];
+    const task = {
+      id: String(Date.now() + i),
+      url: item.url,
+      recipientJid: item.recipientJid,
+      title: item.title,
+      status: 'queued',
+      isCancelled: false,
+      format: item.format || null,
+      priority: false,
+      caption: item.caption || null,
+      episodeBatch: null,
+      seriesPack: null,
+      addedTime: new Date(),
+      startTime: null,
+      endTime: null,
+      speed: null,
+      sizeMB: null
+    };
+    downloadQueue.splice(insertIndex + i, 0, task);
+    created.push(task);
+  }
+
+  saveQueueToFile();
+  notifyQueueUpdate();
+  processQueue();
+  res.json({ ok: true, count: created.length });
+});
+
 async function getUniversalSeasonEpisodes(url) {
   if (url.includes('animecix')) {
     return await getAnimecixSeasonEpisodes(url);
@@ -362,7 +406,13 @@ async function getUniversalSeasonEpisodes(url) {
       return await getDramadizilerimSeasonEpisodes(url);
     }
   }
-  throw new Error('Desteklenmeyen platform. Animecix, HDfilmcehennemi veya HDKore dizi/sezon bağlantısı girin.');
+  if (url.includes('hentaizm')) {
+    const { getHentaizmSeasonEpisodes } = await import('./extractors/hentaizm.js');
+    if (getHentaizmSeasonEpisodes) {
+      return await getHentaizmSeasonEpisodes(url);
+    }
+  }
+  throw new Error('Desteklenmeyen platform. Animecix, HDfilmcehennemi, HDKore, Dramadizilerim veya Hentaizm dizi/sezon bağlantısı girin.');
 }
 
 app.get('/api/fetch-episodes', async (req, res) => {
@@ -374,6 +424,89 @@ app.get('/api/fetch-episodes', async (req, res) => {
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Hentaizm Listing Scanner
+app.post('/api/hentai/scan-listing', async (req, res) => {
+  const { url, startPage = 1, endPage = 1 } = req.body;
+  if (!url) return res.status(400).json({ error: 'url parametresi gereklidir.' });
+
+  try {
+    const { extractHentaizmListingPage } = await import('./extractors/hentaizm.js');
+    const result = await extractHentaizmListingPage(url, startPage, endPage);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Hentaizm Bulk Queue
+app.post('/api/hentai/queue-bulk', async (req, res) => {
+  const { items, phone, targetJid: customTargetJid, priority } = req.body;
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'items dizisi gereklidir.' });
+  }
+
+  try {
+    const config = readConfig();
+    let targetJid = customTargetJid ? customTargetJid.trim() : null;
+    if (!targetJid && phone) {
+      const raw = phone.trim();
+      if (raw.includes('@')) {
+        targetJid = raw;
+      } else {
+        const clean = raw.replace(/[^0-9]/g, '');
+        if (clean) targetJid = `${clean}@s.whatsapp.net`;
+      }
+    }
+    if (!targetJid) {
+      targetJid = config.hentaiGroupJid || (config.whatsappPhoneNumber ? `${config.whatsappPhoneNumber.replace(/[^0-9]/g, '')}@s.whatsapp.net` : '');
+    }
+    if (!targetJid) {
+      return res.status(400).json({ error: 'Hedef WhatsApp numarası veya Hentai hedef grubu bulunamadı.' });
+    }
+
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    for (const item of items) {
+      const url = typeof item === 'string' ? item : item.url;
+      const title = (typeof item === 'object' && item.title) ? item.title : 'Hentai Seri';
+      const posterUrl = (typeof item === 'object' && item.posterUrl) ? item.posterUrl : null;
+
+      try {
+        addDownloadTask(
+          url,
+          targetJid,
+          `🔞 ${title} (Paket)`,
+          null,
+          Boolean(priority),
+          null,
+          null,
+          {
+            type: 'hentai_pack',
+            seriesName: title,
+            posterUrl,
+            episodes: [],
+            replyJid: targetJid
+          }
+        );
+        addedCount++;
+      } catch (e) {
+        skippedCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      addedCount,
+      skippedCount,
+      targetJid,
+      message: `${addedCount} anime paketi kuyruğa eklendi.`
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -689,6 +822,7 @@ app.get('/api/settings', (req, res) => {
 app.post('/api/settings', (req, res) => {
   try {
     writeConfig(req.body);
+    processQueue();
     res.json({ success: true, message: 'Ayarlar başarıyla kaydedildi.' });
   } catch (e) {
     res.status(500).json({ error: e.message });

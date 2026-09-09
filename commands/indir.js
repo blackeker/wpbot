@@ -2,6 +2,67 @@ import { exec } from 'child_process';
 import { addDownloadTask, pendingSelections } from '../queue.js';
 import { getYtDlpCommand, getProxyUrl } from '../config.js';
 
+function parseAnimecixEpisodeInfo(url) {
+  try {
+    const host = new URL(url).origin;
+    let titleId = null;
+    let slug = null;
+
+    const tMatch = url.match(/\/titles\/(\d+)/i);
+    if (tMatch) titleId = tMatch[1];
+    const dMatch = url.match(/\/dizi\/([^/?#]+)/i);
+    if (dMatch) slug = dMatch[1];
+
+    let season = "1";
+    const sPreMatch = url.match(/(\d+)[-_.]?(?:season|sezon)/i);
+    const sPostMatch = url.match(/(?:season|sezon)[-_/](\d+)/i);
+    const sParamMatch = url.match(/[?&]s(?:eason)?=(\d+)/i);
+    if (sPreMatch) {
+      season = sPreMatch[1];
+    } else if (sPostMatch) {
+      season = sPostMatch[1];
+    } else if (sParamMatch) {
+      season = sParamMatch[1];
+    }
+
+    let episode = null;
+    const ePreMatch = url.match(/(\d+)[-_.]?(?:episode|bolum|bölüm)/i);
+    const ePostMatch = url.match(/(?:episode|bolum|bölüm)[-_/]?(\d+)/i);
+    const eParamMatch = url.match(/[?&]e(?:pisode)?=(\d+)/i);
+    if (ePreMatch) {
+      episode = parseInt(ePreMatch[1], 10);
+    } else if (ePostMatch) {
+      episode = parseInt(ePostMatch[1], 10);
+    } else if (eParamMatch) {
+      episode = parseInt(eParamMatch[1], 10);
+    }
+
+    return { host, titleId, slug, season, episode };
+  } catch (e) {
+    return null;
+  }
+}
+
+function buildAnimecixEpisodeUrl(origUrl, titleId, season, slug, ep) {
+  const host = new URL(origUrl).origin;
+  if (titleId) {
+    return `${host}/titles/${titleId}/season/${season}/episode/${ep}`;
+  }
+  if (/(?:episode|bolum|bölüm)[/-]\d+/i.test(origUrl)) {
+    return origUrl.replace(/(episode|bolum|bölüm)([/-])\d+/i, `$1$2${ep}`);
+  }
+  if (/(?:episode|bolum|bölüm)\d+/i.test(origUrl)) {
+    return origUrl.replace(/(episode|bolum|bölüm)\d+/i, `$1${ep}`);
+  }
+  if (/\d+-(?:episode|bolum|bölüm)/i.test(origUrl)) {
+    return origUrl.replace(/\d+(-(?:episode|bolum|bölüm))/i, `${ep}$1`);
+  }
+  if (slug) {
+    return `${host}/dizi/${slug}/sezon-${season}/bolum-${ep}`;
+  }
+  return `${origUrl}#ep=${ep}`;
+}
+
 export default {
   name: 'indir',
   aliases: ['download'],
@@ -9,79 +70,36 @@ export default {
     const isMp3Cmd = ctx.text.startsWith('!mp3');
     const isIndir = ctx.text.startsWith('!indir') || ctx.text.startsWith('!download') || isMp3Cmd;
 
-    let parts;
-    if (!isIndir) {
-      parts = ['!indir', ctx.text]; // direct link trigger
-    } else {
-      parts = ctx.text.split(/\s+/);
-      if (parts.length < 2) {
-        await sock.sendMessage(from, { text: '📢 Link gönder, hemen indir! Sıramı görmek için *kuyruk* yaz.' });
-        return;
-      }
+    const parts = ctx.text.trim().split(/\s+/);
+    if (isIndir && parts.length < 2) {
+      await sock.sendMessage(from, { text: '📢 Link gönder, hemen indir! Sıramı görmek için *kuyruk* yaz.' });
+      return;
     }
 
-    // ─── Dizi Aralığı İndirme ───
-    if (parts.length >= 3) {
-      const url1 = parts[1].trim();
-      const url2 = parts[2].trim();
-
-      if (url1.includes('hdfilmcehennemi.nl') && url2.includes('hdfilmcehennemi.nl')) {
-        const match1 = url1.match(/\/sezon-(\d+)\/bolum-(\d+)\/?$/);
-        const match2 = url2.match(/\/sezon-(\d+)\/bolum-(\d+)\/?$/);
-
-        if (match1 && match2 && match1[1] === match2[1]) {
-          const season = match1[1];
-          const startEp = Math.min(parseInt(match1[2], 10), parseInt(match2[2], 10));
-          const endEp = Math.max(parseInt(match1[2], 10), parseInt(match2[2], 10));
-          const baseUrl = url1.split(`/sezon-${season}/`)[0];
-
-          await sock.sendMessage(from, { text: `🎬 *Dizi Aralığı Algılandı!*\nSezon: ${season}\nBölümler: ${startEp} ile ${endEp} arası sıraya ekleniyor...` });
-
-          let addedCount = 0;
-          let skipCount = 0;
-          for (let ep = startEp; ep <= endEp; ep++) {
-            const epUrl = `${baseUrl}/sezon-${season}/bolum-${ep}/`;
-            try {
-              addDownloadTask(epUrl, from, `Sezon ${season} Bölüm ${ep}`);
-              addedCount++;
-            } catch (e) {
-              skipCount++;
-            }
-          }
-
-          let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
-          if (skipCount > 0) {
-            replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
-          }
-          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
-          await sock.sendMessage(from, { text: replyMsg });
-          return;
-        }
-      }
+    const priority = parts.includes('--oncelikli') || parts.includes('--öncelikli');
+    let urls = parts.filter(p => p.startsWith('http://') || p.startsWith('https://') || p.startsWith('magnet:'));
+    if (urls.length === 0) {
+      await sock.sendMessage(from, { text: 'Lütfen geçerli bir link belirtin. Örnek: `!indir https://animecix.net/...`' });
+      return;
     }
 
-    const targetUrl = parts[1].trim();
-    const isPriority = targetUrl === '--oncelikli' || targetUrl === '--öncelikli';
-
-    let urls = [];
-    let priority = false;
-
-    if (isPriority && parts.length >= 3) {
-      priority = true;
-      urls = [parts[2].trim()];
-    } else {
-      urls = parts.slice(1).filter(p => p.startsWith('http') || p.startsWith('magnet:'));
-      if (urls.length === 0) {
-        await sock.sendMessage(from, { text: 'Lütfen geçerli bir link belirtin. Örnek: `!indir https://www.hdfilmcehennemi.nl/dizi/...`' });
-        return;
-      }
+    // Check if arguments specify an episode range (e.g. `!indir <url> 10 15` or `!indir <url> 10-15`)
+    let numRange = null;
+    const nonUrlParts = parts.filter(p => !p.startsWith('http://') && !p.startsWith('https://') && !p.startsWith('magnet:') && !p.startsWith('!') && !p.startsWith('--'));
+    const joinedNonUrls = nonUrlParts.join(' ').trim();
+    const rangeMatch = joinedNonUrls.match(/^(\d+)\s*[-to–—]\s*(\d+)$/i) || joinedNonUrls.match(/^(\d+)\s+(\d+)$/);
+    if (rangeMatch) {
+      numRange = {
+        start: parseInt(rangeMatch[1], 10),
+        end: parseInt(rangeMatch[2], 10)
+      };
     }
 
     const supportedDomains = [
       'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm',
       'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
       'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru', 'instagram.com',
-      'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com', 'liteapks.com', 'modyolo.com', 'koreanturk', 'koreanizm', 'dizigom', 'dizibox', 'dizipal', 'filmmodu', 'fullhdfilmizlesene', 'dramadizilerim'
+      'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com', 'liteapks.com', 'modyolo.com', 'koreanturk', 'koreanizm', 'dizigom', 'dizibox', 'dizipal', 'filmmodu', 'fullhdfilmizlesene', 'dramadizilerim', 'filmmakinesi'
     ];
 
     // ─── Aralık İndirme (2 link varsa) ───
@@ -120,29 +138,23 @@ export default {
 
       if ((urls[0].includes('animecix') || urls[0].includes('ecchicix')) && 
           (urls[1].includes('animecix') || urls[1].includes('ecchicix'))) {
-        const match1 = urls[0].match(/\/season\/(\d+)\/episode\/(\d+)/i);
-        const match2 = urls[1].match(/\/season\/(\d+)\/episode\/(\d+)/i);
+        const epInfo1 = parseAnimecixEpisodeInfo(urls[0]);
+        const epInfo2 = parseAnimecixEpisodeInfo(urls[1]);
 
-        if (match1 && match2 && match1[1] === match2[1]) {
-          const season = match1[1];
-          const startEp = Math.min(parseInt(match1[2], 10), parseInt(match2[2], 10));
-          const endEp = Math.max(parseInt(match1[2], 10), parseInt(match2[2], 10));
-          const baseUrl = urls[0].split(`/season/${season}/`)[0];
+        if (epInfo1 && epInfo2 && epInfo1.episode !== null && epInfo2.episode !== null && epInfo1.season === epInfo2.season) {
+          const season = epInfo1.season;
+          const startEp = Math.min(epInfo1.episode, epInfo2.episode);
+          const endEp = Math.max(epInfo1.episode, epInfo2.episode);
+          const host = epInfo1.host;
 
+          let titleId = epInfo1.titleId || epInfo2.titleId;
+          const slug = epInfo1.slug || epInfo2.slug;
           let animeName = '';
+
           try {
-            const host = new URL(urls[0]).origin;
-            const parts = baseUrl.split('/');
-            const titlesIdx = parts.indexOf('titles');
-            let titleId = null;
-            if (titlesIdx !== -1) {
-              titleId = parts[titlesIdx + 1];
-            } else {
-              const diziMatch = urls[0].match(/\/dizi\/([^/]+)/);
-              if (diziMatch) {
-                const { resolveAnimecixSlug } = await import('../extractor.js');
-                titleId = await resolveAnimecixSlug(diziMatch[1], host);
-              }
+            if (!titleId && slug) {
+              const { resolveAnimecixSlug } = await import('../extractor.js');
+              titleId = await resolveAnimecixSlug(slug, host);
             }
             if (titleId) {
               const { gotScraping } = await import('../extractor.js');
@@ -167,9 +179,40 @@ export default {
           let addedCount = 0;
           let skipCount = 0;
           for (let ep = startEp; ep <= endEp; ep++) {
-            const epUrl = `${baseUrl}/season/${season}/episode/${ep}`;
+            const epUrl = buildAnimecixEpisodeUrl(urls[0], titleId, season, slug, ep);
             try {
               addDownloadTask(epUrl, from, `${titlePrefix}Sezon ${season} Bölüm ${ep}`, null, priority);
+              addedCount++;
+            } catch (e) {
+              skipCount++;
+            }
+          }
+
+          let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
+          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
+          return;
+        }
+      }
+
+      if (urls[0].includes('hentaizm') && urls[1].includes('hentaizm')) {
+        const match1 = urls[0].match(/sezon-(\d+)-bolum-(\d+)/i) || urls[0].match(/\/sezon-(\d+)\/bolum-(\d+)/i);
+        const match2 = urls[1].match(/sezon-(\d+)-bolum-(\d+)/i) || urls[1].match(/\/sezon-(\d+)\/bolum-(\d+)/i);
+
+        if (match1 && match2 && match1[1] === match2[1]) {
+          const season = match1[1];
+          const startEp = Math.min(parseInt(match1[2], 10), parseInt(match2[2], 10));
+          const endEp = Math.max(parseInt(match1[2], 10), parseInt(match2[2], 10));
+
+          await sock.sendMessage(from, { text: `🎬 *Hentaizm Dizi Aralığı Algılandı!*\nSezon: ${season}\nBölümler: ${startEp} ile ${endEp} arası sıraya ekleniyor...` });
+
+          let addedCount = 0;
+          let skipCount = 0;
+          for (let ep = startEp; ep <= endEp; ep++) {
+            const epUrl = urls[0].replace(/sezon-\d+-bolum-\d+/i, `sezon-${season}-bolum-${ep}`);
+            try {
+              addDownloadTask(epUrl, from, `Hentaizm Sezon ${season} Bölüm ${ep}`, null, priority);
               addedCount++;
             } catch (e) {
               skipCount++;
@@ -351,8 +394,104 @@ export default {
       }
     }
 
+    // ─── Tek Link + Sayısal Bölüm Aralığı (Örn: !indir <url> 10 15 veya 10-15) ───
+    if (urls.length === 1 && numRange) {
+      if (urls[0].includes('animecix') || urls[0].includes('ecchicix')) {
+        const epInfo = parseAnimecixEpisodeInfo(urls[0]);
+        if (epInfo) {
+          const season = epInfo.season || "1";
+          const startEp = Math.min(numRange.start, numRange.end);
+          const endEp = Math.max(numRange.start, numRange.end);
+          const host = epInfo.host;
+
+          let titleId = epInfo.titleId;
+          const slug = epInfo.slug;
+          let animeName = '';
+
+          try {
+            if (!titleId && slug) {
+              const { resolveAnimecixSlug } = await import('../extractor.js');
+              titleId = await resolveAnimecixSlug(slug, host);
+            }
+            if (titleId) {
+              const { gotScraping } = await import('../extractor.js');
+              const res = await gotScraping.get(`${host}/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${season}&page=1&perPage=1`, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36',
+                  'X-Requested-With': 'com.kraptor.AnimeciX',
+                  'X-App-Version': '1.0.5',
+                  'x-e-h': "7Y2ozlO+QysR5w9Q6Tupmtvl9jJp7ThFH8SB+Lo7NvZjgjqRSqOgcT2v4ISM9sP10LmnlYI8WQ==.xrlyOBFS5BHjQ2Lk",
+                  'X-App-Hash': "b849e8a9f6cceff267251a73644faacc801ad726cc8f22a9c323c56a203f5446"
+                },
+                timeout: 5000
+              });
+              const d = JSON.parse(res.body);
+              animeName = d?.data?.title?.name || d?.title?.name || '';
+            }
+          } catch (e) {}
+
+          const titlePrefix = animeName ? `${animeName} - ` : '';
+          await sock.sendMessage(from, { text: `🎬 *${animeName || 'Animecix'} Dizi Aralığı Algılandı!*\nSezon: ${season}\nBölümler: ${startEp} ile ${endEp} arası sıraya ekleniyor...` });
+
+          let addedCount = 0;
+          let skipCount = 0;
+          for (let ep = startEp; ep <= endEp; ep++) {
+            const epUrl = buildAnimecixEpisodeUrl(urls[0], titleId, season, slug, ep);
+            try {
+              addDownloadTask(epUrl, from, `${titlePrefix}Sezon ${season} Bölüm ${ep}`, null, priority);
+              addedCount++;
+            } catch (e) {
+              skipCount++;
+            }
+          }
+
+          let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
+          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
+          return;
+        }
+      }
+
+      if (urls[0].includes('hdfilmcehennemi')) {
+        const match = urls[0].match(/\/sezon-(\d+)\/bolum-(\d+)/i) || urls[0].match(/\/sezon-(\d+)/i);
+        if (match) {
+          const season = match[1];
+          const startEp = Math.min(numRange.start, numRange.end);
+          const endEp = Math.max(numRange.start, numRange.end);
+          const baseUrl = urls[0].split(`/sezon-${season}/`)[0];
+
+          await sock.sendMessage(from, { text: `🎬 *HDfilmcehennemi Dizi Aralığı Algılandı!*\nSezon: ${season}\nBölümler: ${startEp} ile ${endEp} arası sıraya ekleniyor...` });
+
+          let addedCount = 0;
+          let skipCount = 0;
+          for (let ep = startEp; ep <= endEp; ep++) {
+            const epUrl = `${baseUrl}/sezon-${season}/bolum-${ep}/`;
+            try {
+              addDownloadTask(epUrl, from, `Sezon ${season} Bölüm ${ep}`, null, priority);
+              addedCount++;
+            } catch (e) {
+              skipCount++;
+            }
+          }
+
+          let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
+          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
+          return;
+        }
+      }
+    }
+
     // ─── Çoklu Bağımsız Link (2+) ───
     if (urls.length > 1) {
+      const hentaizmLinks = urls.filter(u => u.includes('hentaizm'));
+      if (hentaizmLinks.length === urls.length && hentaizmLinks.some(u => u.includes('/anime/') || (!u.includes('/izle/') && !u.includes('/manga/')))) {
+        const topluCmd = (await import('./topluhentai.js')).default;
+        return await topluCmd.execute(sock, msg, from, urls, ctx);
+      }
+
       let addedCount = 0;
       let skipCount = 0;
       let unsupportedCount = 0;
@@ -398,7 +537,7 @@ export default {
     const isTeraboxUrl = singleUrl.includes('terabox.com') || singleUrl.includes('teraboxapp.com') || singleUrl.includes('nephobox.com') || singleUrl.includes('terabox');
     const isLiteapksUrl = singleUrl.includes('liteapks.com');
     const isModyoloUrl = singleUrl.includes('modyolo.com');
-    const isDiziSitesiUrl = singleUrl.includes('dizigom') || singleUrl.includes('dizibox') || singleUrl.includes('koreanturk') || singleUrl.includes('koreanizm') || singleUrl.includes('dizipal') || singleUrl.includes('filmmodu') || singleUrl.includes('fullhdfilmizlesene');
+    const isDiziSitesiUrl = singleUrl.includes('dizigom') || singleUrl.includes('dizibox') || singleUrl.includes('koreanturk') || singleUrl.includes('koreanizm') || singleUrl.includes('dizipal') || singleUrl.includes('filmmodu') || singleUrl.includes('fullhdfilmizlesene') || singleUrl.includes('filmmakinesi');
     const isDramadizilerim = singleUrl.includes('dramadizilerim.com');
     const isTorrentUrl = singleUrl.startsWith('magnet:') || singleUrl.toLowerCase().includes('.torrent');
 
@@ -415,13 +554,91 @@ export default {
       const { getAnimecixSeasonEpisodes } = await import('../extractor.js');
       await sock.sendMessage(from, { text: '🔍 Sezon bölümleri alınıyor, lütfen bekleyin...' });
       try {
-        const { animeName, episodes, skippedCount: preSkipped } = await getAnimecixSeasonEpisodes(singleUrl);
+        const result = await getAnimecixSeasonEpisodes(singleUrl);
+        const { animeName, episodes, skippedCount: preSkipped, isMultiSeason, seasons } = result;
 
         if (episodes.length === 0) {
           const emptyMsg = preSkipped > 0
             ? `❌ Bu sezondaki *${preSkipped}* bölümün tamamı henüz platforma yüklenmemiş.`
             : '❌ Bu sezonda hiçbir bölüm bulunamadı.';
           await sock.sendMessage(from, { text: emptyMsg });
+          return;
+        }
+
+        // Direct auto-download if user specified 'hepsi', 'tümü', 'full', 'all', 'oto'
+        const wantsAll = nonUrlParts.some(p => ['hepsi', 'tümü', 'tumu', 'all', 'full', 'oto', 'tamamı'].includes(p.toLowerCase()));
+        if (wantsAll) {
+          await sock.sendMessage(from, {
+            text: `🎬 *${animeName}* - *Tüm Sezonlar & Bölümler*\n📦 Toplam *${episodes.length}* bölüm doğrudan sıraya ekleniyor...`
+          });
+          let addedCount = 0;
+          let skipCount = 0;
+          for (const ep of episodes) {
+            try {
+              addDownloadTask(ep.url, from, `${animeName} - ${ep.name}`, null, priority);
+              addedCount++;
+            } catch (e) {
+              skipCount++;
+            }
+          }
+          let replyMsg = `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.`;
+          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+          if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+          replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
+          return;
+        }
+
+        // Direct auto-download if user specified a range like "1-12"
+        if (numRange) {
+          const rangeEps = episodes.filter(ep => {
+            const epNum = ep.number || parseInt(ep.name?.match(/\d+/)?.[0], 10);
+            return epNum >= numRange.start && epNum <= numRange.end;
+          });
+          if (rangeEps.length > 0) {
+            await sock.sendMessage(from, {
+              text: `🎬 *${animeName}* - Bölüm ${numRange.start}-${numRange.end}\n📦 Toplam *${rangeEps.length}* bölüm sıraya ekleniyor...`
+            });
+            let addedCount = 0;
+            for (const ep of rangeEps) {
+              try {
+                addDownloadTask(ep.url, from, `${animeName} - ${ep.name}`, null, priority);
+                addedCount++;
+              } catch (e) {}
+            }
+            await sock.sendMessage(from, { text: `✅ Toplam *${addedCount}* bölüm başarıyla sıraya eklendi.` });
+            return;
+          }
+        }
+
+        if (isMultiSeason && seasons && seasons.length > 1) {
+          pendingSelections[from] = {
+            type: 'multi_season',
+            seriesName: animeName,
+            seasons: seasons,
+            allEpisodes: episodes,
+            priority: priority
+          };
+
+          let prompt = `🎬 *${animeName}* animesi algılandı!\n` +
+            `✨ Toplam *${seasons.length}* sezon bulundu:\n\n`;
+
+          seasons.forEach((s) => {
+            prompt += `  • *${s.name || `${s.season}. Sezon`}*: ${s.episodes.length} Bölüm\n`;
+          });
+          prompt += `  *(Toplam ${episodes.length} Bölüm)*\n\n`;
+
+          prompt += `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
+            `🌟 *Tüm Sezonları İndir:* *hepsi* (veya *tümü*)\n`;
+
+          seasons.forEach((s) => {
+            prompt += `${s.season}️⃣ *${s.name || `${s.season}. Sezon`}u İndir:* *${s.season}* (veya *s${s.season}*)\n`;
+          });
+
+          prompt += `\n🔢 *Bölüm Aralığı İndir:* (Örn: *s1 1-5* veya *s2 1-12*)\n` +
+            `❌ İptal etmek için *iptal* yazın.`;
+
+          await sock.sendMessage(from, { text: prompt });
           return;
         }
 
@@ -443,6 +660,76 @@ export default {
         await sock.sendMessage(from, { text: seasonPrompt });
       } catch (err) {
         await sock.sendMessage(from, { text: `❌ Sezon bölümleri alınırken hata oluştu: ${err.message}` });
+      }
+      return;
+    }
+
+    // Hentaizm Liste/Kategori/Favori kontrolü
+    const isHentaizmListing = isHentaizm && (
+      singleUrl.includes('?tab=') || 
+      singleUrl.includes('tab=fav') || 
+      singleUrl.includes('/hentai-listesi') || 
+      singleUrl.includes('/kategori/') || 
+      singleUrl.includes('/etiket/') || 
+      singleUrl.includes('/arsiv/') ||
+      singleUrl.includes('/ara?')
+    );
+
+    if (isHentaizmListing) {
+      const topluCmd = (await import('./topluhentai.js')).default;
+      return await topluCmd.execute(sock, msg, from, urls, ctx);
+    }
+
+    // Hentaizm Sezon/Anime kontrolü
+    const isHentaizmAnime = isHentaizm && (
+      singleUrl.includes('/anime/') || 
+      (!singleUrl.includes('/izle/') && !singleUrl.includes('/manga/') && !singleUrl.includes('/manga-oku/'))
+    );
+
+    if (isHentaizmAnime) {
+      const { getHentaizmSeasonEpisodes } = await import('../extractor.js');
+      await sock.sendMessage(from, { text: '🔍 Hentaizm anime bölümleri taranıyor, lütfen bekleyin...' });
+      try {
+        const { seriesName, posterUrl, description, episodes } = await getHentaizmSeasonEpisodes(singleUrl);
+
+        if (!episodes || episodes.length === 0) {
+          await sock.sendMessage(from, { text: '❌ Bu animede hiçbir bölüm bulunamadı.' });
+          return;
+        }
+
+        const config = (await import('../config.js')).readConfig();
+        const targetJid = config.hentaiGroupJid || from;
+
+        // Otomatik tüm bölümleri paket olarak sıraya ekle:
+        // Önce tüm bölümleri sunucuya indirecek, sonra kapak resmi + ismi + videoları sırayla gönderecek.
+        addDownloadTask(
+          singleUrl,
+          targetJid,
+          `🔞 ${seriesName} (${episodes.length} Bölüm Paket)`,
+          null,
+          priority,
+          null,
+          null,
+          {
+            type: 'hentai_pack',
+            seriesName,
+            posterUrl,
+            description,
+            episodes,
+            replyJid: from
+          }
+        );
+
+        let startMsg = `🎬 *${seriesName}* paketi sıraya eklendi!\n` +
+          `📦 Toplam *${episodes.length}* bölüm bulundu.\n` +
+          `⏳ *İşlem:* Önce tüm bölümler sunucuya indirilecek, ardından kapak resmi ve isim bilgisiyle birlikte topluca gönderilecektir.`;
+        if (targetJid !== from) {
+          startMsg += `\n🎯 *Hedef Grup:* \`${targetJid}\``;
+        }
+        startMsg += `\n\nSırayı görmek için: \`!kuyruk\``;
+        await sock.sendMessage(from, { text: startMsg });
+      } catch (err) {
+        await sock.sendMessage(from, { text: `❌ Anime bölümleri alınırken hata oluştu: ${err.message}` });
       }
       return;
     }

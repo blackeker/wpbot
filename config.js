@@ -96,6 +96,7 @@ const DEFAULT_CONFIG = {
   customCommands: {},
   depotGroupJid: "",
   groupJid: "",
+  hentaiGroupJid: "",
   cronSchedules: [
     { id: "cleanup", name: "Disk Temizliği", cron: "0 4 * * *", action: "cleanup", active: true }
   ]
@@ -334,11 +335,14 @@ export function getYtDlpCommand() {
 }
 
 export async function cleanOldDownloads() {
-  // Yapılandırılabilir saklama süresi (varsayılan: 4 saat veya .env DOWNLOAD_MAX_AGE_HOURS)
-  const maxAgeHours = parseFloat(process.env.DOWNLOAD_MAX_AGE_HOURS || '4');
+  const config = readConfig();
+  const maxAgeHours = parseFloat(config.downloadRetentionHours || process.env.DOWNLOAD_MAX_AGE_HOURS || '4');
   const expiryTime = maxAgeHours * 60 * 60 * 1000;
-  // Yapılandırılabilir maksimum disk önbellek limiti (varsayılan: 15 GB veya .env MAX_DOWNLOADS_CACHE_GB)
-  const maxCacheBytes = parseFloat(process.env.MAX_DOWNLOADS_CACHE_GB || '15') * 1024 * 1024 * 1024;
+  
+  // Güvenli disk sınırı: VDS diski 25 GB olduğu için en fazla 4 GB önbellek tut
+  const configuredGB = parseFloat(config.maxDownloadsCacheGB || process.env.MAX_DOWNLOADS_CACHE_GB || '4');
+  const safeLimitGB = Math.min(configuredGB, 4);
+  const maxCacheBytes = safeLimitGB * 1024 * 1024 * 1024;
   const now = Date.now();
 
   let activeList = [];
@@ -347,8 +351,29 @@ export async function cleanOldDownloads() {
     activeList = queueModule.activeTasksList || [];
   } catch (e) {}
 
+  // Gönderilmiş geçmiş dosyalarını oku
+  let historyFileNames = new Set();
+  if (config.autoCleanAfterSend !== false) {
+    try {
+      const history = readHistory();
+      for (const h of history) {
+        if (h.fileName) historyFileNames.add(h.fileName.toLowerCase());
+      }
+    } catch (e) {}
+  }
+
   try {
     if (!fs.existsSync(downloadsDir)) return;
+
+    // Gerçek disk boş alanını kontrol et
+    let freeDiskBytes = Infinity;
+    try {
+      const statfs = fs.statfsSync(downloadsDir);
+      freeDiskBytes = statfs.bavail * statfs.bsize;
+    } catch (e) {}
+
+    const isDiskCritical = freeDiskBytes < 2 * 1024 * 1024 * 1024; // < 2 GB serbest alan kaldıysa kritik mod
+
     const entries = fs.readdirSync(downloadsDir);
     const fileStats = [];
     let totalBytes = 0;
@@ -369,19 +394,34 @@ export async function cleanOldDownloads() {
         });
 
         // 1. Yarım kalmış veya geçici artık dosyaları temizle (.part, .ytdl, .tmp, segment_ vb.)
-        const isTemp = file.endsWith('.part') || file.endsWith('.ytdl') || file.endsWith('.tmp') || 
+        const isTemp = file.endsWith('.part') || file.includes('.part') || file.endsWith('.ytdl') || file.endsWith('.tmp') || 
                        file.startsWith('temp_') || file.startsWith('segment_') || file.startsWith('hentaizm_captcha_');
 
-        if (isTemp && (now - stat.mtimeMs > 15 * 60 * 1000)) {
+        if (isTemp && (now - stat.mtimeMs > 5 * 60 * 1000)) {
           fs.unlinkSync(filePath);
           console.log(`[CLEANUP] Silindi (Yetim geçici dosya): ${file}`);
           continue;
         }
 
-        // 2. Belirlenen maksimum yaştan eski dosyaları temizle
+        // 2. autoCleanAfterSend: Gönderimi tamamlanmış dosyaları sil
+        const isSentInHistory = historyFileNames.has(file.toLowerCase());
+        if (isSentInHistory && !isActive && (now - stat.mtimeMs > 60 * 1000)) {
+          fs.unlinkSync(filePath);
+          console.log(`[CLEANUP] Silindi (WhatsApp'a iletilmiş dosya): ${file}`);
+          continue;
+        }
+
+        // 3. Süresi dolan dosyaları temizle
         if (now - stat.mtimeMs > expiryTime && !isActive) {
           fs.unlinkSync(filePath);
           console.log(`[CLEANUP] Silindi (Süresi dolan dosya > ${maxAgeHours} saat): ${file}`);
+          continue;
+        }
+
+        // 4. Disk kritik seviyedeyse (< 2 GB), aktif olmayan dosyaları derhal temizle
+        if (isDiskCritical && !isActive && (now - stat.mtimeMs > 2 * 60 * 1000)) {
+          fs.unlinkSync(filePath);
+          console.log(`[CLEANUP] Silindi (Kritik Disk Alanı Koruması): ${file}`);
           continue;
         }
 
@@ -392,12 +432,12 @@ export async function cleanOldDownloads() {
       } catch {}
     }
 
-    // 3. Disk kotası kontrolü: Toplam boyut limiti aşarsa en eski dosyalardan başlayarak temizle
+    // 5. Disk kotası kontrolü: Toplam boyut limiti aşarsa en eski dosyalardan başlayarak temizle
     if (totalBytes > maxCacheBytes) {
       console.log(`[CLEANUP] İndirme önbelleği (${formatBytes(totalBytes)}) sınırı (${formatBytes(maxCacheBytes)}) aştı. En eski dosyalar temizleniyor...`);
       fileStats.sort((a, b) => a.mtime - b.mtime); // En eskiler başta
 
-      const targetSize = maxCacheBytes * 0.7; // %70 seviyesine kadar düşür
+      const targetSize = maxCacheBytes * 0.6; // %60 seviyesine kadar düşür
       for (const item of fileStats) {
         if (totalBytes <= targetSize) break;
         try {

@@ -1,4 +1,5 @@
-import { downloadQueue, activeTask, clearQueue, queueState, getEstimatedWaitTime } from '../queue.js';
+import { downloadQueue, activeTask, activeTasksList, clearQueue, queueState, getEstimatedWaitTime } from '../queue.js';
+import { readConfig } from '../config.js';
 
 export default {
   name: 'kuyruk',
@@ -11,16 +12,23 @@ export default {
       return;
     }
 
-    let responseText = `📋 *İNDİRME KUYRUĞU VE CANLI DURUM*\n`;
+    const config = readConfig();
+    const limit = Math.max(1, Number(config.concurrencyLimit) || 1);
+
+    let responseText = `📋 *İNDİRME KUYRUĞU VE CANLI DURUM* (Paralel Limit: ${limit})\n`;
     if (queueState.isPaused) responseText += `\n⏸️ *Kuyruk duraklatıldı.* Devam ettirmek için *devam* yaz.\n`;
     responseText += '\n';
 
-    if (activeTask.current) {
-      const elapsedMs = activeTask.current.startTime ? Date.now() - activeTask.current.startTime : 0;
-      const elapsedStr = elapsedMs > 60000 ? `${Math.floor(elapsedMs/60000)}dk ${Math.floor((elapsedMs%60000)/1000)}sn` : `${Math.floor(elapsedMs/1000)}sn`;
-      responseText += `🚀 *Şu An İndiriliyor:*\n🎬 *${activeTask.current.title}*\n📊 *Durum:* ${activeTask.current.status || 'İşleniyor...'}\n`;
-      if (activeTask.current.speed) responseText += `⚡ *Hız:* ~${activeTask.current.speed} MB/s\n`;
-      responseText += `⏱️ *Süre:* ${elapsedStr} geçti\n\n`;
+    if (activeTasksList.length > 0) {
+      responseText += `🚀 *Şu An İndirilenler (${activeTasksList.length}/${limit}):*\n`;
+      activeTasksList.forEach((task, idx) => {
+        const elapsedMs = task.startTime ? Date.now() - task.startTime : 0;
+        const elapsedStr = elapsedMs > 60000 ? `${Math.floor(elapsedMs/60000)}dk ${Math.floor((elapsedMs%60000)/1000)}sn` : `${Math.floor(elapsedMs/1000)}sn`;
+        responseText += `${idx + 1}. 🎬 *${task.title}*\n   ├ 📊 *Durum:* ${task.status || 'İşleniyor...'}\n`;
+        if (task.speed) responseText += `   ├ ⚡ *Hız:* ~${task.speed} MB/s\n`;
+        responseText += `   └ ⏱️ *Süre:* ${elapsedStr} geçti\n`;
+      });
+      responseText += '\n';
     } else {
       responseText += `💤 *Şu an aktif indirme yok.*\n\n`;
     }
