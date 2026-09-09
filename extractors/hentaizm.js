@@ -135,101 +135,146 @@ export async function extractHentaizmListingPage(pageUrl, startPage = 1, endPage
     }
 
     try {
-      const res = await gotScraping.get({
-        url: currentUrl,
-        cookieJar,
-        headerGeneratorOptions: {
-          devices: ['desktop'],
-          locales: ['tr-TR', 'en-US'],
-          operatingSystems: ['windows']
-        },
-        timeout: { request: 15000 }
-      });
-
-      const $ = cheerio.load(res.body);
-      if (!pageTitle) {
-        pageTitle = cleanHentaizmTitle($('title').text().trim() || 'Hentaizm Liste');
-      }
-
       let foundThisPage = 0;
-      let scope = $('.col-md-8, .main-content, #main-content, .content-left, .left-content, main');
-      if (scope.length === 0) scope = $('body');
 
-      scope.find('a[href*="/anime/"]').each((i, el) => {
-        // Strictly exclude sidebar elements (e.g. Animecix anime list, widgets, aside)
-        if ($(el).closest('.col-md-4, #sidebar, .sidebar, aside, .link-list-2, .sidebar-anime-item, .sidebar-section, .right-sidebar').length > 0) {
-          return;
+      if (pageUrl.includes('tab=fav') || pageUrl.includes('top_favorites')) {
+        const apiUrl = `${baseUrl}/api/top_favorites_list.php?page=${p}&_=${Date.now()}`;
+        try {
+          const apiRes = await gotScraping.get({
+            url: apiUrl,
+            cookieJar,
+            headerGeneratorOptions: {
+              devices: ['desktop'],
+              locales: ['tr-TR', 'en-US'],
+              operatingSystems: ['windows']
+            },
+            timeout: { request: 15000 }
+          });
+
+          let htmlData = '';
+          try {
+            const parsedJson = typeof apiRes.body === 'string' ? JSON.parse(apiRes.body) : apiRes.body;
+            htmlData = parsedJson?.html || apiRes.body;
+          } catch (e) {
+            htmlData = apiRes.body;
+          }
+
+          if (htmlData) {
+            const $fav = cheerio.load(htmlData);
+            if (!pageTitle) pageTitle = 'Hentaizm Favorileri';
+
+            $fav('.video-list-item').each((i, el) => {
+              const titleLink = $fav(el).find('.title a, a[href*="/anime/"], a[href*="/izle/"]').first();
+              let href = titleLink.attr('href');
+              if (!href) return;
+              if (href.startsWith('/')) href = `${baseUrl}${href}`;
+
+              try {
+                const u = new URL(href);
+                const parts = u.pathname.split('/').filter(Boolean);
+                if (!parts[1]) return;
+
+                const animeSlug = parts[1];
+                const cleanUrl = `${baseUrl}/anime/${animeSlug}`;
+
+                const clone = titleLink.clone();
+                clone.find('span, svg, i').remove();
+                let rawTitle = clone.text().replace(/\s+/g, ' ').trim();
+
+                const imgEl = $fav(el).find('img').first();
+                const alt = imgEl.attr('alt') ? imgEl.attr('alt').replace(/\s+/g, ' ').trim() : null;
+                if (!rawTitle || rawTitle === 'İncele' || rawTitle.endsWith('...')) {
+                  if (alt && alt !== 'İncele') rawTitle = alt;
+                }
+                const title = cleanHentaizmTitle(rawTitle || animeSlug.replace(/-/g, ' '));
+
+                let poster = imgEl.attr('data-src') || imgEl.attr('src') || imgEl.attr('data-original') || null;
+                if (poster && poster.startsWith('/')) poster = `${baseUrl}${poster}`;
+                if (!poster) poster = `${baseUrl}/uploads/afis/${animeSlug}.jpg`;
+
+                if (!animeMap.has(cleanUrl)) {
+                  animeMap.set(cleanUrl, {
+                    url: cleanUrl,
+                    title: title || animeSlug,
+                    posterUrl: poster || null
+                  });
+                  foundThisPage++;
+                }
+              } catch (e) {}
+            });
+          }
+        } catch (apiErr) {
+          console.warn(`[Hentaizm Listing] Top fav API sayfa ${p} alınamadı:`, apiErr.message);
+        }
+      } else {
+        const res = await gotScraping.get({
+          url: currentUrl,
+          cookieJar,
+          headerGeneratorOptions: {
+            devices: ['desktop'],
+            locales: ['tr-TR', 'en-US'],
+            operatingSystems: ['windows']
+          },
+          timeout: { request: 15000 }
+        });
+
+        const $ = cheerio.load(res.body);
+        if (!pageTitle) {
+          pageTitle = cleanHentaizmTitle($('title').text().trim() || 'Hentaizm Liste');
         }
 
-        let href = $(el).attr('href');
-        if (!href) return;
-        if (href.startsWith('/')) href = `${baseUrl}${href}`;
-        try {
-          const u = new URL(href);
-          const cleanUrl = `${u.origin}${u.pathname}`.replace(/\/+$/, '');
-          const parts = u.pathname.split('/').filter(Boolean);
-          if (parts[0] === 'anime' && parts.length >= 2) {
-            // Search for image in self, siblings, or nearby parent
-            let imgEl = $(el).find('img');
-            if (imgEl.length === 0) {
-              imgEl = $(el).parent().siblings().find('img');
-            }
-            if (imgEl.length === 0) {
-              imgEl = $(el).closest('.box, .item, .col, .post, .card, .anime-card, .film-item, div').find('img');
-            }
+        let scope = $('#top-favorites-content, #top-favorites-container, .col-md-8, .main-content, #main-content, .content-left, .left-content, main');
+        if (scope.length === 0) scope = $('body');
 
-            const altTitle = imgEl.attr('alt') ? cleanHentaizmTitle(imgEl.attr('alt').replace(/\s+/g, ' ').trim()) : null;
-            let title = $(el).attr('title') || $(el).text().trim();
-            title = cleanHentaizmTitle(title.replace(/\s+/g, ' ').trim());
-            // If text/title is truncated with ..., prefer full altTitle or formatted slug
-            if (altTitle && (title.endsWith('...') || !title || altTitle.length > title.length)) {
-              title = altTitle;
-            }
-            const slugFormatted = parts[1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            if (!title || title.endsWith('...')) {
-              title = slugFormatted;
-            }
-
-            let poster = imgEl.attr('data-src') || imgEl.attr('src') || imgEl.attr('data-original') || imgEl.attr('data-lazy-src') || null;
-            if (poster && poster.startsWith('/')) {
-              poster = `${baseUrl}${poster}`;
-            }
-            if (!poster && parts[1]) {
-              poster = `${baseUrl}/uploads/afis/${parts[1]}.jpg`;
-            }
-
-            if (!animeMap.has(cleanUrl)) {
-              animeMap.set(cleanUrl, {
-                url: cleanUrl,
-                title: title || slugFormatted,
-                posterUrl: poster || null
-              });
-              foundThisPage++;
-            }
-          }
-        } catch (e) {}
-      });
-
-      // Fallback: if no /anime/ links found in main content, check /izle/ links
-      if (foundThisPage === 0) {
-        scope.find('a[href*="/izle/"]').each((i, el) => {
+        scope.find('a[href*="/anime/"], a[href*="/izle/"]').each((i, el) => {
           if ($(el).closest('.col-md-4, #sidebar, .sidebar, aside, .link-list-2, .sidebar-anime-item, .sidebar-section, .right-sidebar').length > 0) {
             return;
           }
+
           let href = $(el).attr('href');
           if (!href) return;
           if (href.startsWith('/')) href = `${baseUrl}${href}`;
           try {
             const u = new URL(href);
             const parts = u.pathname.split('/').filter(Boolean);
-            if (parts[0] === 'izle' && parts[1]) {
-              const cleanUrl = `${baseUrl}/anime/${parts[1]}`;
+            if ((parts[0] === 'anime' || parts[0] === 'izle') && parts.length >= 2) {
+              const animeSlug = parts[1];
+              const cleanUrl = `${baseUrl}/anime/${animeSlug}`;
+
+              let imgEl = $(el).find('img');
+              if (imgEl.length === 0) {
+                imgEl = $(el).parent().siblings().find('img');
+              }
+              if (imgEl.length === 0) {
+                imgEl = $(el).closest('.video-list-item, .box, .item, .col, .post, .card, .anime-card, .film-item, div').find('img');
+              }
+
+              const altTitle = imgEl.attr('alt') ? cleanHentaizmTitle(imgEl.attr('alt').replace(/\s+/g, ' ').trim()) : null;
+              let title = $(el).attr('title') || $(el).text().trim();
+              title = cleanHentaizmTitle(title.replace(/\s+/g, ' ').trim());
+              if (title === 'İncele' || !title || title.endsWith('...') || (altTitle && altTitle.length > title.length)) {
+                if (altTitle && altTitle !== 'İncele') {
+                  title = altTitle;
+                }
+              }
+              const slugFormatted = animeSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              if (!title || title === 'İncele' || title.endsWith('...')) {
+                title = slugFormatted;
+              }
+
+              let poster = imgEl.attr('data-src') || imgEl.attr('src') || imgEl.attr('data-original') || null;
+              if (poster && poster.startsWith('/')) {
+                poster = `${baseUrl}${poster}`;
+              }
+              if (!poster && animeSlug) {
+                poster = `${baseUrl}/uploads/afis/${animeSlug}.jpg`;
+              }
+
               if (!animeMap.has(cleanUrl)) {
-                const slugFormatted = parts[1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
                 animeMap.set(cleanUrl, {
                   url: cleanUrl,
-                  title: slugFormatted,
-                  posterUrl: `${baseUrl}/uploads/afis/${parts[1]}.jpg`
+                  title: title || slugFormatted,
+                  posterUrl: poster || null
                 });
                 foundThisPage++;
               }

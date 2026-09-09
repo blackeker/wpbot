@@ -14,13 +14,6 @@ export default {
 • *!dur* / *!devam* ➔ İndirme kuyruğunu durdurur / devam ettirir.
 • *!temizle* ➔ Tamamlanmış / iptal edilmiş kuyruğu temizler.
 
-🔞 *HENTAİZM VE ANİME PAKETLERİ:*
-• *!hhelp* ➔ Hentaizm & paket sisteminin detaylı kullanım rehberi.
-• *hentaizmfav [sayfa]* ➔ Favori listesinde sayfa sayfa gezer (Örn: \`hentaizmfav 2\`).
-• *indirhentai <no>* ➔ Belirtilen animenin tüm bölümlerini + afişini paket indirir (Örn: \`indirhentai 12\`).
-• *!topluhentai <link/liste>* ➔ Toplu liste veya çoklu anime linklerini kuyruğa ekler.
-• *!hentaigrup [burası/sil]* ➔ Paketlerin gönderileceği hedef WhatsApp grubunu belirler.
-
 🌤️ *GÜNLÜK BİLGİ VE FİNANS:*
 • *!hava [şehir]* ➔ Canlı hava durumu (Varsayılan: Elazığ).
 • *!doviz* / *!dolar* / *!altin* / *!btc* ➔ Canlı kurlar & altın fiyatları.
