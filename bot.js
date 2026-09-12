@@ -161,6 +161,8 @@ async function startBot() {
     logger: logger,
     browser: Browsers.macOS('Desktop'),
     printQRInTerminal: false,
+    syncFullHistory: false,
+    markOnlineOnConnect: true,
     getMessage: async (key) => {
       if (key?.id && messageStore.has(key.id)) {
         return messageStore.get(key.id);

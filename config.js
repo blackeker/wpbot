@@ -553,12 +553,11 @@ export function cleanCorruptedSessions(dir = sessionPath) {
       const fp = path.join(dir, f);
       try {
         const stat = fs.statSync(fp);
-        // 1. Bozulmuş veya şişmiş oturum dosyaları (kullanıcı LIDs veya >3KB olanlar)
-        const isUserSession = f.startsWith('session-user-') || f.startsWith('session-90');
-        const isBloatedSession = f.startsWith('session-') && stat.size > 3000;
-        // 2. Bozulmuş sender-key dosyaları (>5KB)
+        // Yalnızca aşırı büyük / bozulmuş oturum ve sender-key dosyalarını temizle (>5KB)
+        const isBloatedSession = f.startsWith('session-') && stat.size > 5000;
         const isBloatedSenderKey = f.startsWith('sender-key-') && stat.size > 5000;
-        if (isUserSession || isBloatedSession || isBloatedSenderKey) {
+        const isBloatedAppState = f.startsWith('app-state-sync-') && stat.size > 10000;
+        if (isBloatedSession || isBloatedSenderKey || isBloatedAppState) {
           fs.unlinkSync(fp);
           cleaned++;
           console.log(`[Session Guard] Bozulmuş oturum anahtarı temizlendi: ${f} (${stat.size} bayt)`);
