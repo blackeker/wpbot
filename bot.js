@@ -10,7 +10,32 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[UNHANDLED REJECTION] At:', promise, 'Reason:', reason);
 });
-import { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, Browsers, makeCacheableSignalKeyStore } from '@whiskeysockets/baileys';
+
+// Libsignal gürültülü iç debug loglarını (Closing session, Opening session vb.) filtrele
+const originalConsoleInfo = console.info.bind(console);
+console.info = (...args) => {
+  if (typeof args[0] === 'string' && (args[0].startsWith('Closing session:') || args[0].startsWith('Opening session:'))) {
+    return;
+  }
+  originalConsoleInfo(...args);
+};
+
+const originalConsoleWarn = console.warn.bind(console);
+console.warn = (...args) => {
+  if (typeof args[0] === 'string' && args[0].includes('Closing open session in favor of incoming prekey bundle')) {
+    return;
+  }
+  originalConsoleWarn(...args);
+};
+
+import { 
+  makeWASocket, 
+  useMultiFileAuthState, 
+  fetchLatestBaileysVersion, 
+  Browsers, 
+  makeCacheableSignalKeyStore,
+  DEFAULT_CONNECTION_CONFIG
+} from '@whiskeysockets/baileys';
 import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
@@ -23,6 +48,7 @@ import {
   setupPingTimer,
   cleanOldDownloads,
   restoreSession,
+  cleanCorruptedSessions,
   getYtDlpCommand,
   sentMessageIds,
   addSentMessageId
@@ -96,6 +122,7 @@ async function startBot() {
   })();
 
   restoreSession();
+  cleanCorruptedSessions();
   let version = [2, 3000, 1037641644];
   try {
     const { version: latestVersion } = await fetchLatestBaileysVersion();
@@ -106,12 +133,30 @@ async function startBot() {
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
-
   const sock = makeWASocket({
     version,
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger)
+    },
+    makeSignalRepository: (auth) => {
+      const repository = DEFAULT_CONNECTION_CONFIG.makeSignalRepository(auth);
+      const originalDecryptMessage = repository.decryptMessage.bind(repository);
+      repository.decryptMessage = async ({ jid, type, ciphertext }) => {
+        try {
+          return await originalDecryptMessage({ jid, type, ciphertext });
+        } catch (err) {
+          if (err && err.message && (err.message.includes('Bad MAC') || err.message.includes('No matching sessions'))) {
+            const addrStr = repository.jidToSignalProtocolAddress(jid).toString();
+            console.warn(`[Session Auto-Fix] Bozulmuş oturum anahtarı (${err.message}) tespit edildi: ${addrStr}. Temizlenerek yeni anahtar değişimi tetikleniyor.`);
+            try {
+              await auth.keys.set({ session: { [addrStr]: null } });
+            } catch (clearErr) {}
+          }
+          throw err;
+        }
+      };
+      return repository;
     },
     logger: logger,
     browser: Browsers.macOS('Desktop'),

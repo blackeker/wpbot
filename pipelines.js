@@ -56,6 +56,33 @@ function getMediaStreamInfo(filePath) {
   }
 }
 
+export function convertVttToSrt(vttText) {
+  if (!vttText) return '';
+  let srt = vttText
+    .replace(/^WEBVTT[^\r\n]*\r?\n/i, '')
+    .replace(/NOTE[^\r\n]*\r?\n([\s\S]*?\r?\n\r?\n)/gi, '')
+    .replace(/(\d{2}):(\d{2}):(\d{2})\.(\d{3})/g, '$1:$2:$3,$4')
+    .replace(/(\d{2}):(\d{2})\.(\d{3})/g, '00:$1:$2,$3')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+
+  const blocks = srt.split(/\r?\n\r?\n+/);
+  const numberedBlocks = [];
+  let seq = 1;
+  for (let block of blocks) {
+    block = block.trim();
+    if (!block) continue;
+    const lines = block.split(/\r?\n/);
+    if (!/^\d+$/.test(lines[0])) {
+      numberedBlocks.push(`${seq}\n${block}`);
+    } else {
+      numberedBlocks.push(block);
+    }
+    seq++;
+  }
+  return numberedBlocks.join('\n\n');
+}
+
 // ─── Retry Yardımcısı ───
 async function withRetry(fn, retries = 3, delayMs = 3000) {
   let lastError;
@@ -235,13 +262,14 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
         );
       } else {
         const formatRule = selectedFormat 
-          ? `${selectedFormat}+bestaudio[ext=m4a]/best`
-          : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+          ? (selectedFormat.includes('+') ? selectedFormat : `${selectedFormat}+bestaudio[ext=m4a]/bestaudio/best`)
+          : 'bestvideo[vcodec^=avc][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
 
         args.push(
           '--ffmpeg-location', ffmpegPath,
           '-f', formatRule,
           '--merge-output-format', 'mp4',
+          '--postprocessor-args', 'ffmpeg:-movflags +faststart -brand mp42',
           '--no-playlist',
           '-o', mp4Path
         );
@@ -310,6 +338,10 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
     throw new Error('İndirme iptal edildi.');
   }
 
+  if (!isMp3 && fs.existsSync(finalPath)) {
+    await ensureWhatsAppCompatibleMp4(finalPath);
+  }
+
   const finalSize = fs.existsSync(finalPath) ? fs.statSync(finalPath).size : 0;
   const finalSizeStr = formatBytes(finalSize);
   const vdsIp = process.env.VDS_IP || '111.235.150.157';
@@ -323,8 +355,8 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
       if (finalSize > MAX_WA_SIZE) {
         const partPattern = path.join(downloadsDir, `${safeTitle}_part%03d${finalExt}`);
         const splitCmd = isMp3
-          ? `"${ffmpegPath}" -i "${finalPath}" -f segment -segment_time 1800 -c copy "${partPattern}"`
-          : `"${ffmpegPath}" -i "${finalPath}" -f segment -segment_time 2700 -segment_format_options movflags=+faststart -c copy -map 0 "${partPattern}"`;
+          ? `"${ffmpegPath}" -y -i "${finalPath}" -f segment -segment_time 1800 -c copy "${partPattern}"`
+          : `"${ffmpegPath}" -y -i "${finalPath}" -f segment -segment_time 2700 -segment_format_options movflags=+faststart:brand=mp42 -reset_timestamps 1 -c copy -map 0 "${partPattern}"`;
         await new Promise((resolve, reject) => {
           exec(splitCmd, (err) => err ? reject(err) : resolve());
         });
@@ -587,15 +619,19 @@ export async function executeTorrentPipeline(torrentId, recipientJid, progressUp
 }
 
 // Batch Download Pipeline (Downloads & Merges Multiple Episodes into One Video)
+// Batch Download Pipeline (Downloads & Packages Multiple Episodes into a ZIP Archive)
 export async function executeBatchDownloadPipeline(targetUrl, recipientJid, progressUpdateCallback, signal, taskObject) {
   const pipelineStart = Date.now();
   const batch = taskObject.episodeBatch;
   const totalEps = batch.length;
   const batchTempDir = path.join(downloadsDir, `batch_${taskObject.id || Date.now()}_${Date.now()}`);
-  if (!fs.existsSync(batchTempDir)) fs.mkdirSync(batchTempDir, { recursive: true });
 
   const safeTitle = replaceTurkishChars(taskObject.title).replace(/[^a-zA-Z0-9]/g, '_');
-  const finalMergedPath = path.join(downloadsDir, `${safeTitle}.mp4`);
+  const folderName = safeTitle;
+  const epFolder = path.join(batchTempDir, folderName);
+  if (!fs.existsSync(epFolder)) fs.mkdirSync(epFolder, { recursive: true });
+
+  const finalZipPath = path.join(downloadsDir, `${safeTitle}.zip`);
   const downloadedParts = [];
 
   try {
@@ -603,14 +639,15 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
       `🎬 *${taskObject.title}*\n` +
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `📦 *${totalEps}* bölümlük paket indirmesi başlatılıyor...\n` +
-      `_Bölümler tek tek indirilip tek bir video olarak birleştirilecektir._`
+      `_Bölümler tek tek indirilip bir klasörde toplanacak ve ZIP arşivi olarak gönderilecektir._`
     );
 
     for (let i = 0; i < totalEps; i++) {
       if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
       const ep = batch[i];
-      const epNumStr = String(i + 1).padStart(3, '0');
-      const epFilePath = path.join(batchTempDir, `part_${epNumStr}.mp4`);
+      const epNumStr = String(ep.episode || (i + 1)).padStart(2, '0');
+      const epFileName = `${safeTitle}_Bolum_${epNumStr}.mp4`;
+      const epFilePath = path.join(epFolder, epFileName);
 
       const epBar = getProgressBar(Math.round((i / totalEps) * 100));
       await progressUpdateCallback(
@@ -618,14 +655,16 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `📦 Paket İndiriliyor: *${i + 1}/${totalEps} Bölüm*\n` +
         `\`[${epBar}]\`\n` +
-        `▶️ Başlatılan: *${ep.name}*`
+        `▶️ Başlatılan: *${ep.name || `Bölüm ${i + 1}`}*`
       );
 
       try {
-        let epResult = getCachedResult(ep.url);
+        const epAudio = taskObject?.audioTrack || null;
+        const epCacheKey = epAudio ? `${ep.url}#audio=${epAudio}` : ep.url;
+        let epResult = getCachedResult(epCacheKey);
         if (!epResult) {
-          epResult = await withRetry(() => extractVideoUrl(ep.url, recipientJid));
-          saveToCache(ep.url, epResult);
+          epResult = await withRetry(() => extractVideoUrl(ep.url, recipientJid, epAudio));
+          saveToCache(epCacheKey, epResult);
         }
 
         if (epResult.filePath && fs.existsSync(epResult.filePath)) {
@@ -666,7 +705,7 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
                   `━━━━━━━━━━━━━━━━━━━━\n` +
                   `📦 Paket İlerleyişi: *%${overallPercent}* (Bölüm ${i + 1}/${totalEps})\n` +
                   `\`[${overallBar}]\`\n` +
-                  `▶️ İndirilen: *${ep.name}* (%${percent})\n` +
+                  `▶️ İndirilen: *${ep.name || `Bölüm ${i + 1}`}* (%${percent})\n` +
                   `⚡ Anlık Hız: ~${speedMBs} MB/s`
                 );
               },
@@ -674,18 +713,22 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
               epResult.cookies || null,
               epResult.userAgent || null,
               epResult.headers || null,
-              epResult.audioUrl || null
+              epResult.audioUrl || null,
+              epAudio
             );
           });
         }
 
         if (fs.existsSync(epFilePath) && fs.statSync(epFilePath).size > 1000) {
+          try {
+            await ensureWhatsAppCompatibleMp4(epFilePath);
+          } catch (e) {}
           downloadedParts.push(epFilePath);
         }
       } catch (epErr) {
         console.warn(`[Batch Pipeline] Episode ${ep.name} (${ep.url}) failed: ${epErr.message}`);
         if (epErr.message === 'İndirme iptal edildi.') throw epErr;
-        await progressUpdateCallback(`⚠️ *${ep.name}* atlandı: ${epErr.message}\nSonraki bölüme geçiliyor...`).catch(() => {});
+        await progressUpdateCallback(`⚠️ *${ep.name || `Bölüm ${i + 1}`}* atlandı: ${epErr.message}\nSonraki bölüme geçiliyor...`).catch(() => {});
       }
     }
 
@@ -693,138 +736,28 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
       throw new Error("Seçilen bölümlerin hiçbiri indirilemedi.");
     }
 
-    if (downloadedParts.length === 1) {
-      fs.copyFileSync(downloadedParts[0], finalMergedPath);
-    } else {
-      await progressUpdateCallback(
-        `🎬 *${taskObject.title}*\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🔄 *${downloadedParts.length}* bölüm tek video halinde birleştiriliyor...`
-      );
+    await progressUpdateCallback(
+      `🎬 *${taskObject.title}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `📦 *${downloadedParts.length}* bölüm başarıyla indirildi!\n` +
+      `🗜️ Bölümler klasörlenip ZIP arşivi oluşturuluyor...`
+    );
 
-      const partInfos = downloadedParts.map(p => getMediaStreamInfo(p));
-      const firstPartInfo = partInfos[0];
-      const allStreamsCompatible = partInfos.length === downloadedParts.length &&
-        partInfos.every(info => 
-          info &&
-          info.vCodec === 'h264' &&
-          info.width > 0 &&
-          firstPartInfo &&
-          info.width === firstPartInfo.width &&
-          info.height === firstPartInfo.height &&
-          info.aCodec === 'aac' &&
-          info.sampleRate === firstPartInfo.sampleRate &&
-          info.channels === firstPartInfo.channels
-        );
-
-      let mergeSuccess = false;
-
-      // Adım 1: Eğer tüm parçaların akış parametreleri (çözünürlük, codec, ses frekansı) tam eşleşiyorsa kayıpsız Intermediate TS Concat dene
-      if (allStreamsCompatible) {
-        try {
-          console.log(`[Batch Merge] Parametreler uyumlu. Kayıpsız Intermediate TS Concat deneniyor (${downloadedParts.length} parça)...`);
-          const tsParts = [];
-          for (let idx = 0; idx < downloadedParts.length; idx++) {
-            const mp4Part = downloadedParts[idx];
-            const tsPart = path.join(batchTempDir, `conv_${String(idx + 1).padStart(3, '0')}.ts`);
-            await new Promise((resolve, reject) => {
-              exec(`"${ffmpegPath}" -y -i "${mp4Part}" -c copy -bsf:v h264_mp4toannexb -f mpegts "${tsPart}"`, { timeout: 60000 }, (err) => {
-                if (err) reject(err);
-                else resolve();
-              });
-            });
-            if (fs.existsSync(tsPart) && fs.statSync(tsPart).size > 1000) {
-              tsParts.push(tsPart);
-            } else {
-              throw new Error(`TS dönüştürme başarısız: parça ${idx + 1}`);
-            }
-          }
-
-          if (tsParts.length === downloadedParts.length) {
-            const tsListFile = path.join(batchTempDir, 'ts_concat_list.txt');
-            const tsLines = tsParts.map(p => `file '${path.resolve(p)}'`).join('\n');
-            fs.writeFileSync(tsListFile, tsLines, 'utf8');
-
-            const tsMergeCmd = `"${ffmpegPath}" -y -f concat -safe 0 -i "${tsListFile}" -c copy -bsf:a aac_adtstoasc -movflags +faststart "${finalMergedPath}"`;
-            await new Promise((resolve, reject) => {
-              exec(tsMergeCmd, { timeout: 180000 }, (err) => {
-                if (err) reject(err);
-                else resolve();
-              });
-            });
-
-            // Dosya ve akış doğrulaması: Son saniyelerine kadar decode hatası olmamalı
-            if (fs.existsSync(finalMergedPath) && fs.statSync(finalMergedPath).size > 50000) {
-              try {
-                execSync(`"${ffmpegPath}" -v error -sseof -3 -i "${finalMergedPath}" -f null -`, { timeout: 10000 });
-                mergeSuccess = true;
-                console.log(`[Batch Merge] ✅ Kayıpsız TS Concat başarılı ve doğrulandı!`);
-              } catch (probeErr) {
-                console.warn(`[Batch Merge] TS çıktısında decode hatası saptandı, yeniden senkronize edilerek kodlanacak:`, probeErr.message);
-                try { fs.unlinkSync(finalMergedPath); } catch (e) {}
-              }
-            }
-          }
-        } catch (tsErr) {
-          console.warn(`[Batch Merge] Kayıpsız TS Concat başarısız (${tsErr.message}), garantili filtreli birleştirmeye geçiliyor.`);
-          try { if (fs.existsSync(finalMergedPath)) fs.unlinkSync(finalMergedPath); } catch (e) {}
-        }
-      } else {
-        console.log(`[Batch Merge] Parçaların çözünürlük veya ses parametreleri farklı (${downloadedParts.length} parça). Bozulmayı önlemek için garantili filtreli birleştirme uygulanıyor.`);
-      }
-
-      // Adım 2: Parametreler farklıysa veya TS concat başarısız olursa -> %100 Garantili Senkronize Filter Complex Concat
-      if (!mergeSuccess) {
-        await progressUpdateCallback(
-          `🎬 *${taskObject.title}*\n` +
-          `━━━━━━━━━━━━━━━━━━━━\n` +
-          `⚙️ Video ve ses akışları senkronize edilerek birleştiriliyor (Filtreli Mod)...`
-        );
-
-        console.log(`[Batch Merge] Filter Complex Concat başlatılıyor (${downloadedParts.length} parça)`);
-        const inputs = downloadedParts.map(p => `-i "${path.resolve(p)}"`).join(' ');
-
-        const targetW = (firstPartInfo?.width > 0) ? (firstPartInfo.width % 2 === 0 ? firstPartInfo.width : firstPartInfo.width + 1) : 720;
-        const targetH = (firstPartInfo?.height > 0) ? (firstPartInfo.height % 2 === 0 ? firstPartInfo.height : firstPartInfo.height + 1) : 1280;
-
-        // Her parçanın videosunu targetW x targetH boyutuna orantılı ölçekle, pad ekle, SAR=1 yap.
-        // Her parçanın sesini 44100Hz stereo formatına normalize et. Bu sayede hiçbir donma/yeşil ekran/ses kayması yaşanmaz!
-        const filterPads = [];
-        const concatInputs = [];
-        for (let idx = 0; idx < downloadedParts.length; idx++) {
-          filterPads.push(`[${idx}:v]scale=${targetW}:${targetH}:force_original_aspect_ratio=decrease,pad=${targetW}:${targetH}:(ow-iw)/2:(oh-ih)/2,setsar=1[v${idx}]`);
-          filterPads.push(`[${idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[a${idx}]`);
-          concatInputs.push(`[v${idx}][a${idx}]`);
-        }
-        filterPads.push(`${concatInputs.join('')}concat=n=${downloadedParts.length}:v=1:a=1[outv][outa]`);
-        const filterComplexStr = filterPads.join(';');
-
-        const filterCmd = `"${ffmpegPath}" -y ${inputs} -filter_complex "${filterComplexStr}" -map "[outv]" -map "[outa]" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -ar 44100 -movflags +faststart "${finalMergedPath}"`;
-
-        try {
-          await new Promise((resolve, reject) => {
-            exec(filterCmd, { timeout: 600000 }, (err) => {
-              if (err) reject(err);
-              else resolve();
-            });
+    // ZIP oluşturma: -1 hızlı sıkıştırma ile anında ziple
+    const zipCmd = `cd "${batchTempDir}" && zip -r -1 -q "${finalZipPath}" "${folderName}"`;
+    await new Promise((resolve, reject) => {
+      exec(zipCmd, { timeout: 300000 }, (err) => {
+        if (err) {
+          const pyZipCmd = `python3 -m zipfile -c "${finalZipPath}" "${path.join(batchTempDir, folderName)}"`;
+          exec(pyZipCmd, { timeout: 300000 }, (pyErr) => {
+            if (pyErr) reject(err);
+            else resolve();
           });
-          if (fs.existsSync(finalMergedPath) && fs.statSync(finalMergedPath).size > 10000) {
-            mergeSuccess = true;
-            console.log(`[Batch Merge] ✅ Filter Complex Concat başarılı!`);
-          }
-        } catch (filterErr) {
-          console.warn(`[Batch Merge] Filter complex ölçekli deneme başarısız (${filterErr.message}), basit concat filtresi deneniyor...`);
-          const simpleFilter = downloadedParts.map((_, i) => `[${i}:v][${i}:a]`).join('') + `concat=n=${downloadedParts.length}:v=1:a=1[v][a]`;
-          const simpleCmd = `"${ffmpegPath}" -y ${inputs} -filter_complex "${simpleFilter}" -map "[v]" -map "[a]" -c:v libx264 -preset ultrafast -crf 23 -c:a aac -b:a 128k -ar 44100 -movflags +faststart "${finalMergedPath}"`;
-          await new Promise((resolve, reject) => {
-            exec(simpleCmd, { timeout: 600000 }, (err) => {
-              if (err) reject(err);
-              else resolve();
-            });
-          });
+        } else {
+          resolve();
         }
-      }
-    }
+      });
+    });
 
     try {
       fs.rmSync(batchTempDir, { recursive: true, force: true });
@@ -835,7 +768,7 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
       if (fs.existsSync(batchTempDir)) fs.rmSync(batchTempDir, { recursive: true, force: true });
     } catch (e) {}
     try {
-      if (fs.existsSync(finalMergedPath)) fs.unlinkSync(finalMergedPath);
+      if (fs.existsSync(finalZipPath)) fs.unlinkSync(finalZipPath);
     } catch (e) {}
     if (err.message !== 'İndirme iptal edildi.') {
       addErrorLog({ title: taskObject?.title || targetUrl, url: targetUrl, error: err.message });
@@ -843,14 +776,14 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
     throw err;
   }
 
-  if (!fs.existsSync(finalMergedPath) || fs.statSync(finalMergedPath).size < 1000) {
-    throw new Error("Birleştirilen video dosyası oluşturulamadı.");
+  if (!fs.existsSync(finalZipPath) || fs.statSync(finalZipPath).size < 1000) {
+    throw new Error("ZIP arşivi oluşturulamadı.");
   }
 
-  const finalSize = fs.statSync(finalMergedPath).size;
+  const finalSize = fs.statSync(finalZipPath).size;
   const finalSizeStr = formatBytes(finalSize);
   const vdsIp = process.env.VDS_IP || '111.235.150.157';
-  const watchUrl = `http://${vdsIp}:7860/downloads/${encodeURIComponent(safeTitle)}.mp4`;
+  const watchUrl = `http://${vdsIp}:7860/downloads/${encodeURIComponent(safeTitle)}.zip`;
   const totalDuration = formatDuration(Date.now() - pipelineStart);
 
   const sendTaskObj = {
@@ -866,11 +799,11 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
       await progressUpdateCallback(
         `🎬 *${taskObject.title}*\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🚀 WhatsApp'a gönderiliyor...\n` +
-        `📦 Boyut: ${finalSizeStr} (${downloadedParts.length} Bölüm Birleştirildi)`
+        `🚀 WhatsApp'a gönderiliyor (ZIP)...\n` +
+        `📦 Boyut: ${finalSizeStr} (${downloadedParts.length} Bölüm Arşivlendi)`
       );
 
-      const fileStream = fs.createReadStream(finalMergedPath);
+      const fileStream = fs.createReadStream(finalZipPath);
       let lastWaUpdate = 0;
       const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
         sendTaskObj.status = `WhatsApp'a yükleniyor... %${percent}`;
@@ -884,33 +817,33 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
             `━━━━━━━━━━━━━━━━━━━━\n` +
             `🚀 WhatsApp'a yükleniyor: *%${percent}*\n` +
             `\`[${bar}]\`\n` +
-            `📦 Boyut: ${finalSizeStr} (${downloadedParts.length} Bölüm)`
+            `📦 Boyut: ${finalSizeStr} (${downloadedParts.length} Bölüm - ZIP)`
           ).catch(() => {});
         }
       });
       fileStream.pipe(progressStream);
 
-      const waFileName = `${taskObject.title.replace(/[\\/:*?"<>|]/g, '_')}.mp4`;
+      const waFileName = `${taskObject.title.replace(/[\\/:*?"<>|]/g, '_')}.zip`;
       await withRetry(() => queueMediaSend(recipientJid, {
         document: { stream: progressStream },
-        mimetype: 'video/mp4',
+        mimetype: 'application/zip',
         fileName: waFileName
       }));
 
       const summary = 
         `🎬 *${taskObject.title}*\n\n` +
-        `✅ *Birleştirme ve İndirme Tamamlandı!*\n` +
-        `🎞️ Birleştirilen: *${downloadedParts.length} Bölüm*\n` +
-        `📦 Boyut: ${finalSizeStr}\n` +
+        `✅ *Bölümler İndirildi ve ZIP Olarak Paketlendi!*\n` +
+        `📦 Paket İçeriği: *${downloadedParts.length} Bölüm (ZIP)*\n` +
+        `📦 Toplam Boyut: ${finalSizeStr}\n` +
         `⏱️ Toplam Süre: ${totalDuration}\n\n` +
-        `🔗 *İndirme Linki (VDS):*\n${watchUrl}`;
+        `🔗 *Doğrudan İndirme Linki (VDS):*\n${watchUrl}`;
 
       await progressUpdateCallback(summary);
-      console.log(`✅ Batch video gönderildi: ${taskObject.title}`);
+      console.log(`✅ Batch ZIP gönderildi: ${taskObject.title}`);
 
-      await sendToDepot(finalMergedPath, `${safeTitle}.mp4`, 'video/mp4', taskObject.title, recipientJid);
+      await sendToDepot(finalZipPath, `${safeTitle}.zip`, 'application/zip', taskObject.title, recipientJid);
 
-      try { if (fs.existsSync(finalMergedPath)) fs.unlinkSync(finalMergedPath); } catch {}
+      try { if (fs.existsSync(finalZipPath)) fs.unlinkSync(finalZipPath); } catch {}
 
       if (taskObject) { taskObject.endTime = Date.now(); }
       addHistory({
@@ -919,7 +852,7 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
         sizeMB: (finalSize / 1024 / 1024).toFixed(2),
         duration: totalDuration,
         watchUrl: watchUrl,
-        fileName: `${safeTitle}.mp4`,
+        fileName: `${safeTitle}.zip`,
         recipientJid
       });
     } catch (err) {
@@ -928,6 +861,7 @@ export async function executeBatchDownloadPipeline(targetUrl, recipientJid, prog
       progressUpdateCallback(`❌ *Gönderim Hatası*\n━━━━━━━━━━━━━━━━━━━━\nDosya WhatsApp'a yüklenirken bir hata oluştu: ${err.message}`).catch(() => {});
     } finally {
       botState.sendingTasks = botState.sendingTasks.filter(t => t.id !== sendTaskObj.id);
+      notifyQueueUpdate();
     }
   })();
 
@@ -1011,10 +945,12 @@ export async function executeSeriesPackPipeline(targetUrl, recipientJid, progres
       );
 
       try {
-        let epResult = getCachedResult(ep.url);
+        const epAudio = taskObject?.audioTrack || null;
+        const epCacheKey = epAudio ? `${ep.url}#audio=${epAudio}` : ep.url;
+        let epResult = getCachedResult(epCacheKey);
         if (!epResult) {
-          epResult = await withRetry(() => extractVideoUrl(ep.url, recipientJid));
-          saveToCache(ep.url, epResult);
+          epResult = await withRetry(() => extractVideoUrl(ep.url, recipientJid, epAudio));
+          saveToCache(epCacheKey, epResult);
         }
 
         if (epResult.filePath && fs.existsSync(epResult.filePath)) {
@@ -1063,7 +999,8 @@ export async function executeSeriesPackPipeline(targetUrl, recipientJid, progres
               epResult.cookies || null,
               epResult.userAgent || null,
               epResult.headers || null,
-              epResult.audioUrl || null
+              epResult.audioUrl || null,
+              epAudio
             );
           });
         }
@@ -1240,14 +1177,17 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     return await executeYouTubePipeline(targetUrl, recipientJid, progressUpdateCallback, signal, isPlaylist, taskFormat, taskObject);
   }
 
+  const selectedAudio = taskObject ? taskObject.audioTrack : null;
+  const cacheKey = selectedAudio ? `${targetUrl}#audio=${selectedAudio}` : targetUrl;
+
   // ── Extraction (retry destekli VEYA önbellek) ──
-  let result = getCachedResult(targetUrl);
+  let result = getCachedResult(cacheKey);
   if (result) {
-    console.log(`[Cache Hit] Serving extracted result from cache for: ${targetUrl}`);
+    console.log(`[Cache Hit] Serving extracted result from cache for: ${cacheKey}`);
   } else {
     try {
-      result = await withRetry(() => extractVideoUrl(targetUrl, recipientJid));
-      saveToCache(targetUrl, result);
+      result = await withRetry(() => extractVideoUrl(targetUrl, recipientJid, selectedAudio));
+      saveToCache(cacheKey, result);
     } catch (err) {
       addErrorLog({ title: targetUrl, url: targetUrl, error: err.message });
       throw err;
@@ -1274,30 +1214,45 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
 
   let fileExt = '.mp4';
   let mimeType = 'video/mp4';
-  let cleanTitle = result.title;
+  let cleanTitle = (result.title || 'Video').replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
 
-  const extMatch = result.title.match(/\.([a-zA-Z0-9]+)$/);
+  const knownDocExts = new Set(['.apk', '.zip', '.rar', '.7z', '.tar', '.gz', '.pdf', '.exe']);
+  const knownAudioExts = new Set(['.mp3', '.wav', '.flac', '.ogg', '.opus', '.m4a', '.aac']);
+  const knownVideoExts = new Set(['.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.wmv', '.m4v']);
+
+  const extMatch = cleanTitle.match(/\.([a-zA-Z0-9]{2,5})$/);
   if (extMatch) {
-    fileExt = `.${extMatch[1]}`;
-    cleanTitle = result.title.substring(0, result.title.lastIndexOf('.'));
+    const candidate = `.${extMatch[1].toLowerCase()}`;
+    if (knownDocExts.has(candidate) || knownAudioExts.has(candidate) || knownVideoExts.has(candidate)) {
+      fileExt = candidate;
+      cleanTitle = cleanTitle.substring(0, cleanTitle.lastIndexOf('.')).trim();
+    }
   } else {
     try {
       const urlPath = new URL(result.url).pathname;
-      const urlExtMatch = urlPath.match(/\.([a-zA-Z0-9]+)$/);
+      const urlExtMatch = urlPath.match(/\.([a-zA-Z0-9]{2,5})$/);
       if (urlExtMatch) {
-        fileExt = `.${urlExtMatch[1]}`;
+        const candidate = `.${urlExtMatch[1].toLowerCase()}`;
+        if (knownDocExts.has(candidate) || knownAudioExts.has(candidate)) {
+          fileExt = candidate;
+        } else if (knownVideoExts.has(candidate)) {
+          fileExt = candidate;
+        }
       }
     } catch (e) {}
   }
 
-  if (fileExt.toLowerCase() === '.m3u8' || fileExt.toLowerCase() === '.mpd') {
+  // Güvenlik / HLS Manifest Kontrolü: .txt, .m3u8, .mpd, .m3u, .ts, .html vb. video çıktı formatı olamaz, daima .mp4 olmalıdır
+  const manifestOrInvalidExts = ['.m3u8', '.mpd', '.m3u', '.txt', '.html', '.htm', '.php', '.asp', '.aspx', '.json', '.xml', '.ts', '.key'];
+  if (manifestOrInvalidExts.includes(fileExt.toLowerCase()) || (!knownDocExts.has(fileExt.toLowerCase()) && !knownAudioExts.has(fileExt.toLowerCase()) && !knownVideoExts.has(fileExt.toLowerCase()))) {
     fileExt = '.mp4';
   }
 
   const lowerExt = fileExt.toLowerCase();
-  const isVideo = ['.mp4', '.mkv', '.webm', '.avi', '.ts'].includes(lowerExt);
-  const icon = isVideo ? '🎬' : '📦';
-  const label = isVideo ? 'Video' : 'Dosya';
+  const isVideo = knownVideoExts.has(lowerExt);
+  const isAudio = knownAudioExts.has(lowerExt);
+  const icon = isVideo ? '🎬' : (isAudio ? '🎵' : '📦');
+  const label = isVideo ? 'Video' : (isAudio ? 'Ses' : 'Dosya');
 
   if (lowerExt === '.apk') {
     mimeType = 'application/vnd.android.package-archive';
@@ -1307,19 +1262,33 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     mimeType = 'application/pdf';
   } else if (lowerExt === '.rar') {
     mimeType = 'application/x-rar-compressed';
-  } else if (!isVideo) {
+  } else if (lowerExt === '.mp3') {
+    mimeType = 'audio/mpeg';
+  } else if (isVideo) {
+    mimeType = 'video/mp4';
+  } else {
     mimeType = 'application/octet-stream';
   }
 
-  const safeTitle = replaceTurkishChars(cleanTitle).replace(/[^a-zA-Z0-9]/g, '_');
+  const safeTitle = replaceTurkishChars(cleanTitle).replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'video';
   const filePath = path.join(downloadsDir, `${safeTitle}${fileExt}`);
   const vdsIp = process.env.VDS_IP || '111.235.150.157';
   const watchUrl = `http://${vdsIp}:7860/downloads/${encodeURIComponent(safeTitle)}${fileExt}`;
 
   if (signal && signal.aborted) throw new Error("İndirme iptal edildi.");
 
-  const actualFilePath = (result.filePath && fs.existsSync(result.filePath)) ? result.filePath : filePath;
-  const isPreCompiled = result.filePath && fs.existsSync(result.filePath);
+  let actualFilePath = (result.filePath && fs.existsSync(result.filePath)) ? result.filePath : filePath;
+  let isPreCompiled = Boolean(result.filePath && fs.existsSync(result.filePath));
+  if (!isPreCompiled && fs.existsSync(filePath) && fs.statSync(filePath).size > 50 * 1024 * 1024) {
+    try {
+      const checkCmd = `ffprobe -v quiet -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`;
+      const dur = parseFloat(execSync(checkCmd, { timeout: 10000 }).toString().trim());
+      if (!isNaN(dur) && dur > 60) {
+        console.log(`[Pipeline] Bulunan mevcut tamamlanmış dosya yeniden kullanılacak (${dur} sn): ${filePath}`);
+        isPreCompiled = true;
+      }
+    } catch (e) {}
+  }
 
   await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndirme / İşlem başlatılıyor...\n📡 Kaynak: ${result.source}\n🔗 Canlı İzle: ${watchUrl}`);
 
@@ -1396,13 +1365,13 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         }
 
         await progressUpdateCallback(`${icon} *${result.title}*\n━━━━━━━━━━━━━━━━━━━━\n📥 İndiriliyor: *%${percent}*\n\`[${bar}]\`\n📊 ${statusLine}\n⚡ Hız: ~${lastSpeedMBs} MB/s\n⏳ Kalan Süre: ${etaStr}\n🔗 Canlı İzle: ${watchUrl}`);
-      }, result.referer || null, result.cookies || null, result.userAgent || null, result.headers || null, result.audioUrl || null);
+      }, result.referer || null, result.cookies || null, result.userAgent || null, result.headers || null, result.audioUrl || null, selectedAudio);
         } catch (dlErr) {
-          deleteFromCache(targetUrl);
+          deleteFromCache(cacheKey);
           if (dlErr.message !== 'İndirme iptal edildi.') {
             console.warn(`[Pipeline] Download attempt failed (${dlErr.message}), clearing cache and re-extracting fresh URL for: ${targetUrl}`);
             try {
-              const freshRes = await extractVideoUrl(targetUrl, recipientJid);
+              const freshRes = await extractVideoUrl(targetUrl, recipientJid, selectedAudio);
               if (freshRes && freshRes.url) {
                 result = freshRes;
               }
@@ -1425,6 +1394,11 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     throw new Error("İndirme iptal edildi.");
   }
 
+  // WhatsApp uyumluluğunu (H.264 + AAC + moov atom) altyazı gömme öncesinde sağla
+  if (isVideo && fs.existsSync(actualFilePath)) {
+    actualFilePath = await ensureWhatsAppCompatibleMp4(actualFilePath);
+  }
+
   // ── Altyazı Muxing / Gömme Adımı ──
   let subtitlesList = [];
   if (result.subtitles && Array.isArray(result.subtitles) && result.subtitles.length > 0) {
@@ -1433,10 +1407,13 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     subtitlesList = [{ url: result.subtitleUrl, language: 'tur', label: 'Türkçe' }];
   }
 
+  let savedSrtPath = null;
+  let savedSrtName = null;
+
   if (subtitlesList.length > 0 && fs.existsSync(actualFilePath)) {
     try {
       const config = readConfig();
-      const burnSubtitles = process.env.BURN_SUBTITLES === 'true' || config.burnSubtitles === true;
+      const burnSubtitles = (taskObject && taskObject.burnSubtitles) || process.env.BURN_SUBTITLES === 'true' || config.burnSubtitles === true;
       const gotScrapingModule = await import('got-scraping');
       
       const tempSubPaths = [];
@@ -1466,7 +1443,10 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           }
 
           const isVtt = subContent.trim().startsWith('WEBVTT') || sub.url.includes('.vtt');
-          const ext = isVtt ? '.vtt' : '.srt';
+          if (isVtt) {
+            subContent = convertVttToSrt(subContent);
+          }
+          const ext = '.srt';
           
           const tempSubPath = path.join(downloadsDir, `temp_sub_${i}_${Date.now()}${ext}`);
           fs.writeFileSync(tempSubPath, subContent, 'utf8');
@@ -1479,18 +1459,28 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
       }
 
       if (preparedSubs.length > 0) {
+        // En uygun Türkçe altyazıyı belirle (ayrı dosya ve hardsub için)
+        const primarySubIndex = preparedSubs.findIndex(s => s.language === 'tur' || (s.label && s.label.toLowerCase().includes('türk')));
+        const targetSubIndex = primarySubIndex !== -1 ? primarySubIndex : 0;
+        const targetSub = preparedSubs[targetSubIndex];
+
+        // WhatsApp için eşlik eden .srt belgesini hazırla
+        const companionSrt = path.join(downloadsDir, `${safeTitle}_sub_${Date.now()}.srt`);
+        fs.copyFileSync(tempSubPaths[targetSubIndex], companionSrt);
+        savedSrtPath = companionSrt;
+        savedSrtName = `${cleanTitle.replace(/[\\/:*?"<>|]/g, '_')}.srt`;
+
         const subbedTempPath = path.join(downloadsDir, `subbed_temp_${Date.now()}${fileExt}`);
         
         if (burnSubtitles) {
-          // Hardsub (transcode with ONLY the first/Turkish subtitle)
-          const primarySubIndex = preparedSubs.findIndex(s => s.language === 'tur');
-          const subToBurnPath = primarySubIndex !== -1 ? tempSubPaths[primarySubIndex] : tempSubPaths[0];
-          const subToBurn = primarySubIndex !== -1 ? preparedSubs[primarySubIndex] : preparedSubs[0];
+          // Hardsub (videoya kalıcı gömme - transcode)
+          const subToBurnPath = tempSubPaths[targetSubIndex];
+          const subToBurn = targetSub;
           
           await progressUpdateCallback(`✍️ Altyazı videoya kalıcı olarak gömülüyor (Hardsub: ${subToBurn.label})... Bu işlem sunucunun işlemci gücüne göre birkaç dakika sürebilir.`);
           
           const relativeSubPath = path.relative(process.cwd(), subToBurnPath).replace(/\\/g, '/');
-          const ffmpegCmd = `"${ffmpegPath}" -y -i "${actualFilePath}" -vf "subtitles='${relativeSubPath}'" -c:v libx264 -preset ultrafast -c:a copy "${subbedTempPath}"`;
+          const ffmpegCmd = `"${ffmpegPath}" -y -i "${actualFilePath}" -vf "subtitles='${relativeSubPath}'" -c:v libx264 -preset ultrafast -c:a copy -movflags +faststart -brand mp42 "${subbedTempPath}"`;
           console.log(`[Subtitles] Running hardsub command: ${ffmpegCmd}`);
           
           await new Promise((resolve, reject) => {
@@ -1504,7 +1494,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
             });
           });
         } else {
-          // Softsub (mux ALL subtitles into tracks)
+          // Softsub (tüm dilleri altyazı track'i olarak gömme)
           await progressUpdateCallback(`✍️ Altyazı dosyaları video içine ekleniyor (Softsub - Çoklu Dil)...`);
           
           const subCodec = fileExt.toLowerCase() === '.mkv' ? 'srt' : 'mov_text';
@@ -1524,7 +1514,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
             ffmpegMetadata.push(`-metadata:s:s:${i} title="${title}"`);
           }
           
-          const ffmpegCmd = `"${ffmpegPath}" -y ${ffmpegInputs.join(' ')} -c:v copy -c:a copy -c:s ${subCodec} ${ffmpegMaps.join(' ')} ${ffmpegMetadata.join(' ')} "${subbedTempPath}"`;
+          const ffmpegCmd = `"${ffmpegPath}" -y ${ffmpegInputs.join(' ')} -c:v copy -c:a copy -c:s ${subCodec} -movflags +faststart -brand mp42 ${ffmpegMaps.join(' ')} ${ffmpegMetadata.join(' ')} "${subbedTempPath}"`;
           console.log(`[Subtitles] Running softsub command: ${ffmpegCmd}`);
           
           await new Promise((resolve, reject) => {
@@ -1577,9 +1567,9 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
     botState.sendingTasks.push(sendTaskObj);
 
     try {
-      let finalFilePath = filePath;
-      let finalFileExt = fileExt;
-      let finalMimeType = mimeType;
+      let finalFilePath = actualFilePath;
+      let finalFileExt = path.extname(actualFilePath);
+      let finalMimeType = isVideo ? 'video/mp4' : mimeType;
       let finalTitle = result.title;
 
       const skipZipExts = ['.apk', '.zip', '.rar', '.7z', '.pdf', '.exe', '.iso'];
@@ -1647,7 +1637,7 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
           : path.join(downloadsDir, `${safeTitle}${finalFileExt}.%03d`);
 
         if (isVideo) {
-          const splitCmd = `"${ffmpegPath}" -i "${finalFilePath}" -f segment -segment_time 2700 -segment_format_options movflags=+faststart -c copy -map 0 "${partPattern}"`;
+          const splitCmd = `"${ffmpegPath}" -y -i "${finalFilePath}" -f segment -segment_time 2700 -segment_format_options movflags=+faststart:brand=mp42 -reset_timestamps 1 -c copy -map 0 "${partPattern}"`;
           await new Promise((resolve, reject) => {
             exec(splitCmd, (err) => err ? reject(err) : resolve());
           });
@@ -1739,6 +1729,23 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
         try { if (fs.existsSync(finalFilePath)) fs.unlinkSync(finalFilePath); } catch {}
       }
 
+      if (savedSrtPath && fs.existsSync(savedSrtPath)) {
+        try {
+          console.log(`[Subtitles] Sending companion SRT file to ${recipientJid}: ${savedSrtName}`);
+          await withRetry(() => queueMediaSend(recipientJid, {
+            document: fs.readFileSync(savedSrtPath),
+            mimetype: 'application/x-subrip',
+            fileName: savedSrtName || 'altyazi.srt',
+            caption: `💬 *Altyazı Dosyası (.srt)*\n🎬 ${finalTitle}\n\n💡 _İpucu: Bu dosyayı VLC, MX Player gibi harici oynatıcılarda videoyla birlikte kullanabilirsiniz._`
+          }));
+        } catch (srtSendErr) {
+          console.error(`[Subtitles] Failed to send companion subtitle file:`, srtSendErr.message);
+        } finally {
+          try { if (fs.existsSync(savedSrtPath)) fs.unlinkSync(savedSrtPath); } catch {}
+          savedSrtPath = null;
+        }
+      }
+
       if (taskObject) { taskObject.endTime = Date.now(); }
       addHistory({
         title: finalTitle,
@@ -1754,11 +1761,78 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
       addErrorLog({ title: result.title, url: targetUrl, error: err.message });
       progressUpdateCallback(`❌ *Gönderim Hatası*\n━━━━━━━━━━━━━━━━━━━━\nDosya WhatsApp'a yüklenirken bir hata oluştu: ${err.message}`).catch(() => {});
     } finally {
+      if (savedSrtPath && fs.existsSync(savedSrtPath)) {
+        try { fs.unlinkSync(savedSrtPath); } catch {}
+        savedSrtPath = null;
+      }
       botState.sendingTasks = botState.sendingTasks.filter(t => t.id !== sendTaskObj.id);
     }
   })();
 
   return;
+}
+
+export async function ensureWhatsAppCompatibleMp4(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return filePath;
+  const ext = path.extname(filePath).toLowerCase();
+  const videoExts = ['.mp4', '.mkv', '.webm', '.avi', '.ts'];
+  if (!videoExts.includes(ext)) return filePath;
+
+  try {
+    const probeCmd = `ffprobe -v quiet -print_format json -show_streams -show_format "${filePath}"`;
+    const probeOut = execSync(probeCmd, { timeout: 25000 }).toString();
+    const probe = JSON.parse(probeOut);
+    const vStream = (probe.streams || []).find(s => s.codec_type === 'video');
+    const aStream = (probe.streams || []).find(s => s.codec_type === 'audio');
+
+    const vCodec = (vStream?.codec_name || '').toLowerCase();
+    const aCodec = (aStream?.codec_name || '').toLowerCase();
+
+    // WhatsApp yerel oynatıcısının desteklediği standartlar:
+    // Video: H.264 (AVC)
+    // Audio: AAC
+    // Container: MP4 (moov atomu başta: +faststart, brand: mp42)
+    const isSupportedVCodec = ['h264', 'avc1'].includes(vCodec);
+    const hasAudio = !!aStream;
+    const isSupportedACodec = !hasAudio || ['aac', 'mp4a'].includes(aCodec);
+
+    const targetMp4Path = filePath.replace(new RegExp(`\\${ext}$`, 'i'), '.mp4');
+    const tempSanitized = filePath.replace(new RegExp(`\\${ext}$`, 'i'), '_wa_temp.mp4');
+
+    if (!isSupportedVCodec) {
+      // Desteklenmeyen video formatı (VP9, AV1, HEVC, VP8 vb.) -> H.264 + AAC
+      console.log(`[WhatsApp Sanitizer] Desteklenmeyen video codec (${vCodec}) tespit edildi. WhatsApp için H.264 + AAC'ye dönüştürülüyor...`);
+      execSync(`"${ffmpegPath}" -y -i "${filePath}" -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart -brand mp42 "${tempSanitized}"`, { timeout: 600000 });
+    } else if (!isSupportedACodec) {
+      // Desteklenmeyen ses formatı (Opus, Vorbis, AC3, EAC3, DTS vb.) -> Video kopyalanır, sadece ses AAC yapılır
+      console.log(`[WhatsApp Sanitizer] Desteklenmeyen ses codec (${aCodec}) tespit edildi. Video korunup ses AAC'ye dönüştürülüyor...`);
+      execSync(`"${ffmpegPath}" -y -i "${filePath}" -c:v copy -c:a aac -b:a 128k -movflags +faststart -brand mp42 "${tempSanitized}"`, { timeout: 180000 });
+    } else {
+      // Hem video hem ses uyumlu -> Hızlı remux, moov atomu başa alınır (+faststart)
+      console.log(`[WhatsApp Sanitizer] MP4 başlığı (+faststart, brand mp42) optimize ediliyor...`);
+      const bsfOpt = hasAudio ? '-bsf:a aac_adtstoasc' : '';
+      try {
+        execSync(`"${ffmpegPath}" -y -i "${filePath}" -map 0 -c copy ${bsfOpt} -movflags +faststart -brand mp42 "${tempSanitized}"`, { timeout: 120000 });
+      } catch (remuxErr) {
+        console.warn(`[WhatsApp Sanitizer] BSF remux uyarısı (${remuxErr.message}), ses AAC re-encode deneniyor...`);
+        execSync(`"${ffmpegPath}" -y -i "${filePath}" -map 0:v -map 0:a? -map 0:s? -c:v copy -c:a aac -b:a 128k -c:s copy -movflags +faststart -brand mp42 "${tempSanitized}"`, { timeout: 180000 });
+      }
+    }
+
+    if (fs.existsSync(tempSanitized) && fs.statSync(tempSanitized).size > 0) {
+      if (filePath !== targetMp4Path && fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch {}
+      }
+      fs.renameSync(tempSanitized, targetMp4Path);
+      console.log(`[WhatsApp Sanitizer] MP4 WhatsApp güvenlik ve oynatıcı uyumluluğu sağlandı: ${targetMp4Path}`);
+      return targetMp4Path;
+    }
+  } catch (err) {
+    console.warn(`[WhatsApp Sanitizer] Düzeltme sırasında hata oluştu (${err.message}). Orijinal dosya korunuyor.`);
+    const tempSanitized = filePath.replace(new RegExp(`\\${ext}$`, 'i'), '_wa_temp.mp4');
+    try { if (fs.existsSync(tempSanitized)) fs.unlinkSync(tempSanitized); } catch {}
+  }
+  return filePath;
 }
 
 async function splitFile(filePath, chunkSizeBytes, outputPattern) {

@@ -322,12 +322,12 @@ app.get('/api/extract/:site', async (req, res) => {
 
 // Local API: trigger a download task (accessible publicly)
 app.post('/api/indir', (req, res) => {
-  const { url, jid, title, fileName, caption } = req.body;
+  const { url, jid, title, fileName, caption, audioTrack, burnSubtitles } = req.body;
   if (!url || !jid) return res.status(400).json({ error: 'url ve jid gerekli.' });
 
   try {
     const customTitle = title || fileName || url;
-    const task = addDownloadTask(url, jid, customTitle, null, Boolean(req.body.priority), caption || null);
+    const task = addDownloadTask(url, jid, customTitle, null, Boolean(req.body.priority), caption || null, null, null, audioTrack || null, Boolean(burnSubtitles));
     res.json({ ok: true, taskId: task.id, message: 'Görev kuyruğa eklendi.' });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -894,7 +894,8 @@ app.post('/api/indir-multiple', (req, res) => {
   let skippedCount = 0;
 
   if (batchMerge) {
-    const batchSize = 10;
+    const isSingleZip = Boolean(req.body.singleZip) || Boolean(seriesName && /drama|dizilerim/i.test(seriesName));
+    const batchSize = isSingleZip ? episodes.length : 10;
     const chunks = [];
     for (let i = 0; i < episodes.length; i += batchSize) {
       chunks.push(episodes.slice(i, i + batchSize));

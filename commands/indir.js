@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { addDownloadTask, pendingSelections } from '../queue.js';
 import { getYtDlpCommand, getProxyUrl } from '../config.js';
+import { probeMediaAudioOptions } from '../extractor.js';
 
 function parseAnimecixEpisodeInfo(url) {
   try {
@@ -77,6 +78,7 @@ export default {
     }
 
     const priority = parts.includes('--oncelikli') || parts.includes('--öncelikli');
+    const burnSubtitles = parts.includes('--hardsub') || parts.includes('--gomulu') || parts.includes('--gömülü');
     let urls = parts.filter(p => p.startsWith('http://') || p.startsWith('https://') || p.startsWith('magnet:'));
     if (urls.length === 0) {
       await sock.sendMessage(from, { text: 'Lütfen geçerli bir link belirtin. Örnek: `!indir https://animecix.net/...`' });
@@ -319,7 +321,7 @@ export default {
 
           let replyMsg = `✅ Toplam *${addedCount}* paket (${allEps.length} bölüm) başarıyla sıraya eklendi.`;
           if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer paket atlandı.`;
-          replyMsg += `\n\n_Her paket 10 bölümü tek parça video olarak birleştirip gönderecektir._`;
+          replyMsg += `\n\n_Her paket 10 bölümü bir klasörde toplayıp ZIP arşivi olarak gönderecektir._`;
           replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
           await sock.sendMessage(from, { text: replyMsg });
           return;
@@ -347,46 +349,16 @@ export default {
           const endEp = Math.max(info1.e, info2.e);
           const baseUrl = urls[0].split('?')[0];
 
-          await sock.sendMessage(from, { text: `🎬 *DramaDizilerim Dizi Aralığı Algılandı!*\nSezon: ${season}, Bölümler: ${startEp} ile ${endEp} arası 10'arlı paketler halinde sıraya ekleniyor...` });
+          const sNum = startEp;
+          const eNum = endEp;
+          const bTitle = sNum === eNum ? `DramaDizilerim - Bölüm ${sNum}` : `DramaDizilerim - Bölüm ${sNum}-${eNum}`;
+          const bUrl = `${allEps[0].url}#batch=${sNum}-${eNum}`;
 
-          const allEps = [];
-          for (let ep = startEp; ep <= endEp; ep++) {
-            allEps.push({
-              url: `${baseUrl}?s=${season}&e=${ep}`,
-              name: `Sezon ${season} Bölüm ${ep}`,
-              episode: ep
-            });
-          }
+          addDownloadTask(bUrl, from, bTitle, null, priority, null, allEps);
 
-          const chunks = [];
-          for (let i = 0; i < allEps.length; i += 10) {
-            chunks.push(allEps.slice(i, i + 10));
-          }
-
-          let addedCount = 0;
-          let skipCount = 0;
-
-          for (const chunk of chunks) {
-            const sNum = chunk[0].episode;
-            const eNum = chunk[chunk.length - 1].episode;
-            const bTitle = sNum === eNum ? `DramaDizilerim - Bölüm ${sNum}` : `DramaDizilerim - Bölüm ${sNum}-${eNum}`;
-            const bUrl = `${chunk[0].url}#batch=${sNum}-${eNum}`;
-
-            try {
-              if (chunk.length > 1) {
-                addDownloadTask(bUrl, from, bTitle, null, priority, null, chunk);
-              } else {
-                addDownloadTask(chunk[0].url, from, bTitle, null, priority);
-              }
-              addedCount++;
-            } catch (e) {
-              skipCount++;
-            }
-          }
-
-          let replyMsg = `✅ Toplam *${addedCount}* paket (${allEps.length} bölüm) başarıyla sıraya eklendi.`;
-          if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer paket atlandı.`;
-          replyMsg += `\n\n_Her paket 10 bölümü tek parça video olarak birleştirip gönderecektir._`;
+          let replyMsg = `✅ Toplam *${allEps.length}* bölüm tek bir ZIP paketi olarak başarıyla sıraya eklendi.`;
+          if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+          replyMsg += `\n\n_Tüm bölümler tek klasörde toplanıp ZIP arşivi olarak gönderilecektir._`;
           replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
           await sock.sendMessage(from, { text: replyMsg });
           return;
@@ -831,10 +803,42 @@ export default {
           return;
         }
 
+        const wantsAll = nonUrlParts.some(p => ['hepsi', 'tümü', 'tumu', 'all', 'full', 'oto', 'tamamı'].includes(p.toLowerCase()));
+
+        if (wantsAll || numRange) {
+          let selectedEpisodes = episodes;
+          let label = 'Tüm Bölümler';
+          if (numRange) {
+            const startEp = Math.min(numRange.start, numRange.end);
+            const endEp = Math.max(numRange.start, numRange.end);
+            selectedEpisodes = episodes.filter(ep => {
+              const n = parseInt(ep.episode, 10);
+              return n >= startEp && n <= endEp;
+            });
+            label = `Bölüm ${startEp}-${endEp}`;
+          }
+
+          if (selectedEpisodes.length > 0) {
+            const sNum = selectedEpisodes[0].episode;
+            const eNum = selectedEpisodes[selectedEpisodes.length - 1].episode;
+            const bTitle = sNum === eNum ? `${seriesName} - Bölüm ${sNum}` : `${seriesName} - Bölüm ${sNum}-${eNum}`;
+            const bUrl = `${selectedEpisodes[0].url}#batch=${sNum}-${eNum}`;
+
+            addDownloadTask(bUrl, from, bTitle, null, priority, null, selectedEpisodes);
+
+            let replyMsg = `🎬 *${seriesName}* - *${label}*\n` +
+              `📦 Toplam *${selectedEpisodes.length}* bölüm tek bir ZIP paketi olarak başarıyla sıraya eklendi.\n\n` +
+              `_Tüm bölümler indirilip tek klasörde toplanacak ve ZIP arşivi olarak gönderilecektir._\n` +
+              `Sırayı görmek için: \`!kuyruk\``;
+            await sock.sendMessage(from, { text: replyMsg });
+            return;
+          }
+        }
+
         pendingSelections[from] = {
           type: 'series',
           source: 'dramadizilerim',
-          mergeBatchSize: 10,
+          mergeBatchSize: episodes.length,
           seriesName: seriesName,
           episodes: episodes,
           priority: priority
@@ -842,9 +846,9 @@ export default {
 
         let seasonPrompt = `🎬 *${seriesName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* bölüm bulundu.\n\n` +
           `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
-          `1️⃣ *Tüm Sezonu İndir* (Hepsini indirmek için: *hepsi* veya *1* yazın)\n` +
-          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *1-50* yazarak belirli bölümleri indirebilirsiniz)\n\n` +
-          `ℹ️ _Bölümler 10'arlı paketler halinde birleştirilerek tek parça video olarak indirilecektir._\n` +
+          `1️⃣ *Tüm Sezonu İndir* (Hepsini tek ZIP olarak indirmek için: *hepsi* veya *1* yazın)\n` +
+          `2️⃣ *Bölüm Aralığı İndir* (Örn: *10-20* veya *1-50* yazarak belirli bölümleri tek ZIP olarak indirebilirsiniz)\n\n` +
+          `ℹ️ _Seçtiğiniz tüm bölümler tek bir klasörde toplanıp tek ZIP arşivi olarak indirilecektir._\n` +
           `❌ İptal etmek için *iptal* yazın.`;
         await sock.sendMessage(from, { text: seasonPrompt });
       } catch (err) {
@@ -862,40 +866,105 @@ export default {
         const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
         const ytDlpCmd = getYtDlpCommand();
 
-        exec(`"${ytDlpCmd}" ${proxyArg} -J --no-playlist "${singleUrl}"`, { maxBuffer: 10 * 1024 * 1024 }, async (err, stdout) => {
+        exec(`"${ytDlpCmd}" ${proxyArg} -J --no-playlist "${singleUrl}"`, { maxBuffer: 15 * 1024 * 1024 }, async (err, stdout) => {
           let ytTitle = 'YouTube Video';
           let availableFormats = [];
 
           if (!err && stdout) {
             try {
               const info = JSON.parse(stdout);
-              ytTitle = info.title || 'YouTube Video';
+              ytTitle = (info.title || 'YouTube Video').replace(/[\r\n]+/g, ' ').trim();
               const formats = info.formats || [];
-              const targets = [
-                { height: 1080, label: '1080p (FHD)' },
-                { height: 720, label: '720p (HD)' },
-                { height: 480, label: '480p (SD)' },
-                { height: 360, label: '360p (Mobil)' }
-              ];
+              const duration = info.duration || 0;
 
-              for (const target of targets) {
-                const matched = formats.find(f => f.height === target.height && f.vcodec !== 'none');
-                if (matched) {
-                  const bytes = matched.filesize || matched.filesize_approx || 0;
-                  const sizeStr = bytes > 0 ? ctx.formatBytes(bytes) : 'Bilinmiyor';
-                  availableFormats.push({
-                    format_id: matched.format_id,
-                    label: `${target.label} [${sizeStr}]`,
-                    height: target.height
+              // En yüksek ses akışının boyutunu veya süreden yaklaşık ses boyutunu hesapla
+              const audioFormats = formats.filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none'));
+              const bestAudioSize = audioFormats.reduce((max, f) => {
+                const sz = f.filesize || f.filesize_approx || 0;
+                return sz > max ? sz : max;
+              }, 0);
+              const approxAudioBytes = bestAudioSize > 0 ? bestAudioSize : (duration > 0 ? Math.round((128 * 1024 / 8) * duration) : 0);
+
+              // Standart çözünürlük seviyeleri eşleyici
+              const getStandardTier = (h) => {
+                if (h >= 3800) return { tier: 4320, name: '8K (4320p)' };
+                if (h >= 2000) return { tier: 2160, name: '4K (2160p)' };
+                if (h >= 1350) return { tier: 1440, name: '2K (1440p)' };
+                if (h >= 950)  return { tier: 1080, name: '1080p (FHD)' };
+                if (h >= 650)  return { tier: 720,  name: '720p (HD)' };
+                if (h >= 440)  return { tier: 480,  name: '480p (SD)' };
+                if (h >= 320)  return { tier: 360,  name: '360p (Mobil)' };
+                if (h >= 200)  return { tier: 240,  name: '240p' };
+                return { tier: 144, name: '144p' };
+              };
+
+              const videoFormats = formats.filter(f => f.vcodec && f.vcodec !== 'none');
+              const tierMap = new Map();
+
+              for (const f of videoFormats) {
+                // Hem yatay hem dikey (Shorts) videolar için gerçek çözünürlük kenarı
+                const effectiveHeight = (f.height && f.width) ? Math.min(f.height, f.width) : (f.height || 0);
+                if (!effectiveHeight || effectiveHeight <= 0) continue;
+
+                const { tier, name } = getStandardTier(effectiveHeight);
+                const fps = f.fps || 0;
+                const is60 = fps >= 50;
+                const isHdr = f.dynamic_range && /hdr/i.test(f.dynamic_range);
+
+                if (!tierMap.has(tier)) {
+                  tierMap.set(tier, {
+                    tier,
+                    name,
+                    bestFormat: f,
+                    has60fps: is60,
+                    isHdr: isHdr
                   });
+                } else {
+                  const entry = tierMap.get(tier);
+                  if (is60) entry.has60fps = true;
+                  if (isHdr) entry.isHdr = true;
+                  const currentBest = entry.bestFormat;
+                  const currentScore = (currentBest.ext === 'mp4' ? 100000 : 0) + (currentBest.tbr || 0);
+                  const newScore = (f.ext === 'mp4' ? 100000 : 0) + (f.tbr || 0);
+                  if (newScore > currentScore) {
+                    entry.bestFormat = f;
+                  }
                 }
               }
-            } catch (e) {}
+
+              const sortedTiers = Array.from(tierMap.keys()).sort((a, b) => b - a);
+
+              for (const t of sortedTiers) {
+                const entry = tierMap.get(t);
+                const bf = entry.bestFormat;
+
+                let label = entry.name;
+                if (entry.has60fps && t >= 720) {
+                  label = label.replace(/\b(1080p|720p|1440p|2160p|4K|2K)\b/, '$1 60fps');
+                }
+                if (entry.isHdr) label += ' HDR';
+
+                let videoBytes = bf.filesize || bf.filesize_approx || 0;
+                if (!videoBytes && bf.tbr && duration) {
+                  videoBytes = Math.round((bf.tbr * 1024 / 8) * duration);
+                }
+                const totalBytes = videoBytes > 0 ? (videoBytes + approxAudioBytes) : 0;
+                const sizeStr = totalBytes > 0 ? ctx.formatBytes(totalBytes) : (videoBytes > 0 ? `~${ctx.formatBytes(videoBytes)}` : 'Boyut bilinmiyor');
+
+                availableFormats.push({
+                  format_id: `bestvideo[vcodec^=avc][height<=${t}]+bestaudio[acodec^=mp4a]/bestvideo[height<=${t}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${t}]+bestaudio/best[height<=${t}]`,
+                  label: `${label} [${sizeStr}]`,
+                  height: t
+                });
+              }
+            } catch (e) {
+              console.error('[YouTube Quality Parse Error]:', e.message);
+            }
           }
 
           if (availableFormats.length === 0) {
             availableFormats.push({
-              format_id: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+              format_id: 'bestvideo[vcodec^=avc][ext=mp4]+bestaudio[acodec^=mp4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
               label: 'Varsayılan En İyi Kalite',
               height: 0
             });
@@ -913,20 +982,93 @@ export default {
             formats: availableFormats
           };
 
+          const numEmoji = (idx) => {
+            const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+            return emojis[idx] || `[${idx + 1}]`;
+          };
+
           let optionsText = `🎬 *YOUTUBE KALİTE SEÇİMİ*\n\n🎥 *Video:* ${ytTitle}\n\nLütfen indirmek istediğiniz kaliteyi seçin:\n\n`;
           availableFormats.forEach((f, idx) => {
-            optionsText += `${idx + 1}️⃣ ${f.label}\n`;
+            optionsText += `${numEmoji(idx)} ${f.label}\n`;
           });
-          optionsText += `\n*Seçmek için bu mesaja doğrudan sadece seçeneğin numarasını (Ör: 1) yazarak yanıt verin.*`;
+          optionsText += `\n*Seçmek için bu mesaja doğrudan seçeneğin numarasını (Ör: 1) yazarak yanıt verin.*`;
 
           await sock.sendMessage(from, { text: optionsText });
         });
         return;
       }
 
-      const task = addDownloadTask(singleUrl, from, 'Video Çözümleniyor...', isMp3Cmd ? 'mp3' : null, priority);
+      // Check if user gave an explicit audio preference (e.g. `!indir <url> dublaj` or `tr` or `altyazi` or `dual`)
+      let explicitAudio = null;
+      for (const p of nonUrlParts) {
+        const lp = p.toLowerCase();
+        if (['dublaj', 'tr', 'turkce', 'türkçe', 'tur'].includes(lp)) {
+          explicitAudio = 'tr';
+          break;
+        } else if (['altyazi', 'altyazı', 'altyazili', 'altyazılı', 'orijinal', 'original', 'orig', 'en', 'eng'].includes(lp)) {
+          explicitAudio = 'orig';
+          break;
+        } else if (['dual', 'cift', 'çift', 'ikisi'].includes(lp)) {
+          explicitAudio = 'dual';
+          break;
+        }
+      }
+
+      const isAudioCheckable = !isMp3Cmd && (
+        singleUrl.includes('hdfilmcehennemi') ||
+        singleUrl.includes('filmmodu') ||
+        singleUrl.includes('filmmakinesi') ||
+        singleUrl.includes('fullhdfilmizlesene') ||
+        singleUrl.includes('dizipal') ||
+        singleUrl.includes('yabancidizi') ||
+        singleUrl.includes('sezonlukdizi') ||
+        singleUrl.includes('dizigom') ||
+        singleUrl.includes('dizibox') ||
+        singleUrl.includes('.m3u8')
+      );
+
+      if (isAudioCheckable && !explicitAudio) {
+        try {
+          const probe = await probeMediaAudioOptions(singleUrl);
+          if (probe && probe.hasMultipleAudios && probe.availableAudios && probe.availableAudios.length > 1) {
+            pendingSelections[from] = {
+              type: 'audio_selection',
+              url: singleUrl,
+              title: probe.title || 'Film/Video',
+              availableAudios: probe.availableAudios,
+              priority: priority,
+              burnSubtitles: burnSubtitles
+            };
+
+            const numEmoji = (idx) => {
+              const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+              return emojis[idx] || `[${idx + 1}]`;
+            };
+
+            let optionsText = `🎬 *${probe.title}*\n\n🔊 *Birden fazla ses seçeneği bulundu!*\nLütfen indirmek istediğiniz ses formatını seçin:\n\n`;
+            probe.availableAudios.forEach((a, idx) => {
+              optionsText += `${numEmoji(idx)} *${a.label}*${a.description ? ` - ${a.description}` : ''}\n`;
+            });
+            optionsText += `\n*Seçmek için bu mesaja doğrudan seçeneğin numarasını (Ör: 1) veya adını (dublaj, altyazı, dual) yazarak yanıt verin.*`;
+            optionsText += `\n❌ İptal etmek için: *iptal*`;
+
+            await sock.sendMessage(from, { text: optionsText });
+            return;
+          }
+        } catch (probeErr) {
+          console.warn('[indir.js] Audio probe failed, continuing standard download:', probeErr.message);
+        }
+      }
+
+      const task = addDownloadTask(singleUrl, from, 'Video Çözümleniyor...', isMp3Cmd ? 'mp3' : null, priority, null, null, null, explicitAudio, burnSubtitles);
       const priorityTag = priority ? '🔴 *ÖNCELİKLİ* ' : '';
-      await sock.sendMessage(from, { text: `📥 ${priorityTag}Görev Sıraya Eklendi!\n🎬 *Link:* ${singleUrl}\n🆔 *Görev Numarası:* \`${task.id}\`\n\nKuyruk durumu: \`!kuyruk\`\nİptal etmek için: \`!iptal ${task.id}\`` });
+      let audioNote = '';
+      if (explicitAudio) {
+        const audioName = explicitAudio === 'tr' ? 'Türkçe Dublaj' : (explicitAudio === 'orig' ? 'Orijinal / Altyazılı' : 'Dual Ses');
+        audioNote = `\n🔊 *Seçilen Ses:* ${audioName}`;
+      }
+      const hardsubNote = burnSubtitles ? '\n✍️ *Altyazı:* Videoya kalıcı gömülecek (Hardsub)' : '';
+      await sock.sendMessage(from, { text: `📥 ${priorityTag}Görev Sıraya Eklendi!\n🎬 *Link:* ${singleUrl}${audioNote}${hardsubNote}\n🆔 *Görev Numarası:* \`${task.id}\`\n\nKuyruk durumu: \`!kuyruk\`\nİptal etmek için: \`!iptal ${task.id}\`` });
     } catch (err) {
       await sock.sendMessage(from, { text: `⚠️ *Hata:* ${err.message}` });
     }

@@ -19,7 +19,8 @@ db.exec(`
     priority INTEGER,
     addedTime TEXT,
     episodeBatch TEXT,
-    seriesPack TEXT
+    seriesPack TEXT,
+    audioTrack TEXT
   );
   
   CREATE TABLE IF NOT EXISTS active_tasks (
@@ -32,7 +33,8 @@ db.exec(`
     priority INTEGER,
     addedTime TEXT,
     episodeBatch TEXT,
-    seriesPack TEXT
+    seriesPack TEXT,
+    audioTrack TEXT
   );
 `);
 
@@ -40,6 +42,8 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE active_tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN seriesPack TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE active_tasks ADD COLUMN seriesPack TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN audioTrack TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE active_tasks ADD COLUMN audioTrack TEXT"); } catch (e) {}
 
 export let downloadQueue = [];
 export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...] } }
@@ -67,13 +71,13 @@ export function saveQueueToFile() {
     const deleteActive = db.prepare('DELETE FROM active_tasks');
     
     const insertTask = db.prepare(`
-      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack, audioTrack)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertActive = db.prepare(`
-      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack, audioTrack)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = db.transaction(() => {
@@ -91,7 +95,8 @@ export function saveQueueToFile() {
           t.priority ? 1 : 0,
           new Date(t.addedTime).toISOString(),
           t.episodeBatch ? JSON.stringify(t.episodeBatch) : null,
-          t.seriesPack ? JSON.stringify(t.seriesPack) : null
+          t.seriesPack ? JSON.stringify(t.seriesPack) : null,
+          t.audioTrack || null
         );
       }
 
@@ -106,7 +111,8 @@ export function saveQueueToFile() {
           t.priority ? 1 : 0,
           new Date(t.addedTime).toISOString(),
           t.episodeBatch ? JSON.stringify(t.episodeBatch) : null,
-          t.seriesPack ? JSON.stringify(t.seriesPack) : null
+          t.seriesPack ? JSON.stringify(t.seriesPack) : null,
+          t.audioTrack || null
         );
       }
     });
@@ -144,6 +150,7 @@ function loadQueueFromFile() {
         addedTime: new Date(r.addedTime),
         episodeBatch: epBatch,
         seriesPack: sPack,
+        audioTrack: r.audioTrack || null,
         isCancelled: false,
         startTime: null,
         endTime: null,
@@ -174,6 +181,7 @@ function loadQueueFromFile() {
         addedTime: new Date(r.addedTime),
         episodeBatch: epBatch,
         seriesPack: sPack,
+        audioTrack: r.audioTrack || null,
         isCancelled: false,
         startTime: null,
         endTime: null,
@@ -219,7 +227,7 @@ export const activeTask = {
   }
 };
 
-export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null, episodeBatch = null, seriesPack = null) {
+export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null, episodeBatch = null, seriesPack = null, audioTrack = null, burnSubtitles = false) {
   const isDuplicate = downloadQueue.some(t => t.url === url) || activeTasksList.some(t => t.url === url);
   if (isDuplicate) {
     throw new Error("Bu link zaten indirme kuyrugunda veya su an indiriliyor.");
@@ -244,6 +252,8 @@ export function addDownloadTask(url, recipientJid, title, format = null, priorit
     caption: caption || null,
     episodeBatch: episodeBatch || null,
     seriesPack: seriesPack || null,
+    audioTrack: audioTrack || null,
+    burnSubtitles: !!burnSubtitles,
     addedTime: new Date(),
     startTime: null,
     endTime: null,

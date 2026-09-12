@@ -111,6 +111,13 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
   if (refVal) {
     try { originHeader = new URL(refVal).origin; } catch (e) {}
   }
+  if (playlistUrl.includes('vibeshort.live') || playlistUrl.includes('volcengine')) {
+    originHeader = 'https://www.vibeshort.live';
+    if (headers) {
+      headers.Referer = 'https://www.vibeshort.live/';
+      delete headers.referer;
+    }
+  }
 
   const mergedHeaders = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -161,7 +168,12 @@ async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, cachePr
       args.push('-headers', headerStr);
     }
     
-    args.push('-i', playlistUrl, '-c', 'copy', '-movflags', '+faststart', outputFilePath);
+    let safeOutputFilePath = outputFilePath;
+    if (safeOutputFilePath && !/\.(mp4|mkv|webm|avi|ts|mov|apk|zip|rar|7z|pdf|mp3)$/i.test(safeOutputFilePath)) {
+      safeOutputFilePath = safeOutputFilePath.replace(/\.[a-zA-Z0-9]+$/, '') + '.mp4';
+    }
+    
+    args.push('-i', playlistUrl, '-c', 'copy', '-movflags', '+faststart', safeOutputFilePath);
     
     console.log(`[HLS Downloader] Downloading using FFmpeg spawn...`);
     
@@ -602,13 +614,15 @@ async function downloadDirectVideo(url, outputPath, signal, progressCallback, re
   });
 }
 
-export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, arg7, arg8, audioPlaylistUrlOverride = null) {
+export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
   let signal = null;
   let progressCallback = null;
   let refererOverride = null;
   let cookiesOverride = null;
   let userAgentOverride = null;
   let headersOverride = null;
+  let audioPlaylistUrlOverride = null;
+  let selectedAudioTrack = null;
 
   if (arg3 && typeof arg3 === 'function') {
     progressCallback = arg3;
@@ -616,6 +630,8 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
     cookiesOverride = arg5 || null;
     userAgentOverride = arg6 || null;
     headersOverride = arg7 || null;
+    audioPlaylistUrlOverride = arg8 || null;
+    selectedAudioTrack = arg9 || null;
   } else {
     signal = arg3;
     progressCallback = arg4;
@@ -623,10 +639,17 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
     cookiesOverride = arg6 || null;
     userAgentOverride = arg7 || null;
     headersOverride = arg8 || null;
+    audioPlaylistUrlOverride = arg9 || null;
+    selectedAudioTrack = arg10 || null;
   }
 
   if (signal && signal.aborted) {
     throw new Error("İndirme iptal edildi.");
+  }
+
+  if (outputPath && !/\.(mp4|mkv|webm|avi|ts|mov|apk|zip|rar|7z|pdf|mp3)$/i.test(outputPath)) {
+    console.warn(`[Downloader] Output path has invalid video extension: ${outputPath}, enforcing .mp4`);
+    outputPath = outputPath.replace(/\.[a-zA-Z0-9]+$/, '') + '.mp4';
   }
 
   if (m3u8Url && m3u8Url.includes('?url=http')) {
@@ -650,6 +673,8 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
         const urlObj = new URL(m3u8Url);
         if (m3u8Url.includes('animecix') || m3u8Url.includes('ecchicix') || m3u8Url.includes('ancdn') || m3u8Url.includes('vd-1') || m3u8Url.includes('vd-2') || m3u8Url.includes('vd-3')) {
           referer = 'https://animecix.tv/';
+        } else if (m3u8Url.includes('rapidrame') || m3u8Url.includes('hdfilmcehennemi')) {
+          referer = 'https://www.hdfilmcehennemi.nl/';
         } else if (urlObj.hostname) {
           referer = `${urlObj.protocol}//${urlObj.hostname}/`;
         }
@@ -797,6 +822,7 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
 
     let targetPlaylistUrl = m3u8Url;
     let audioPlaylistUrl = audioPlaylistUrlOverride || null;
+    let muxMode = 'dual';
 
     // Check if it's a master playlist
     if (content.includes('#EXT-X-STREAM-INF')) {
@@ -804,8 +830,7 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
       let bestStreamUrl = '';
       let maxBandwidth = 0;
 
-      let firstAudioPlaylistUrl = null;
-      // Extract Turkish audio playlist URL
+      const audioTracks = [];
       for (const line of lines) {
         if (line.startsWith('#EXT-X-MEDIA:') && line.includes('TYPE=AUDIO')) {
           const langMatch = line.match(/LANGUAGE="([^"]+)"/i);
@@ -814,19 +839,11 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
           if (uriMatch) {
             const val = uriMatch[1];
             const resolved = resolveUrl(m3u8Url, val);
-            if (!firstAudioPlaylistUrl) {
-              firstAudioPlaylistUrl = resolved;
-            }
-            const langValue = (langMatch ? langMatch[1] : (nameMatch ? nameMatch[1] : '')).toLowerCase();
-            if (langValue === 'tr' || langValue === 'tr-tr' || langValue.startsWith('tr') || langValue === 'tur' || langValue === 'turkish' || langValue.includes('türk') || langValue.includes('turk')) {
-              audioPlaylistUrl = resolved;
-            }
+            const lang = (langMatch ? langMatch[1] : '').toLowerCase();
+            const name = (nameMatch ? nameMatch[1] : '').toLowerCase();
+            audioTracks.push({ uri: resolved, lang, name, raw: line });
           }
         }
-      }
-      if (!audioPlaylistUrl && firstAudioPlaylistUrl) {
-        console.log("No Turkish audio track found, falling back to first audio track:", firstAudioPlaylistUrl);
-        audioPlaylistUrl = firstAudioPlaylistUrl;
       }
 
       for (let i = 0; i < lines.length; i++) {
@@ -851,15 +868,62 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
         }
       }
 
+      const sAudio = (selectedAudioTrack || '').toLowerCase();
+
+      if (sAudio === 'tr' || sAudio === 'dublaj') {
+        console.log('[Downloader] Audio preference: Türkçe Dublaj');
+        if (bestStreamUrl.includes('-a2.')) {
+          bestStreamUrl = bestStreamUrl.replace('-a2.', '-a1.');
+        }
+        const trTrack = audioTracks.find(t => t.lang.startsWith('tr') || t.name.includes('turk') || t.name.includes('türk'));
+        if (trTrack && !bestStreamUrl.includes('-a1')) {
+          audioPlaylistUrl = trTrack.uri;
+          muxMode = 'replace_audio';
+        } else {
+          audioPlaylistUrl = null; // -a1 already includes Turkish audio
+        }
+      } else if (sAudio === 'orig' || sAudio === 'en' || sAudio === 'altyazi') {
+        console.log('[Downloader] Audio preference: Orijinal / Altyazılı');
+        if (bestStreamUrl.includes('-a1.')) {
+          bestStreamUrl = bestStreamUrl.replace('-a1.', '-a2.');
+        }
+        const origTrack = audioTracks.find(t => t.lang.startsWith('en') || t.name.includes('eng') || t.name.includes('orig')) || audioTracks.find(t => !t.lang.startsWith('tr') && !t.name.toLowerCase().includes('türk') && !t.name.toLowerCase().includes('turk'));
+        if (origTrack && !bestStreamUrl.includes('-a2')) {
+          audioPlaylistUrl = origTrack.uri;
+          muxMode = 'replace_audio';
+        } else {
+          audioPlaylistUrl = null;
+        }
+      } else if (sAudio === 'dual') {
+        console.log('[Downloader] Audio preference: DUAL (Çift Ses)');
+        muxMode = 'dual';
+        if (!audioPlaylistUrl && audioTracks.length > 1) {
+          const secondTrack = audioTracks.find(t => t.lang.startsWith('en') || t.name.includes('eng') || t.name.includes('orig')) || audioTracks.find(t => !t.lang.startsWith('tr') && !t.name.toLowerCase().includes('türk') && !t.name.toLowerCase().includes('turk')) || audioTracks[1];
+          if (secondTrack) {
+            audioPlaylistUrl = secondTrack.uri;
+          }
+        }
+      } else {
+        // Default behavior if no preference specified
+        if (!audioPlaylistUrl && audioTracks.length > 0) {
+          const trTrack = audioTracks.find(t => t.lang.startsWith('tr') || t.name.includes('turk') || t.name.includes('türk'));
+          if (trTrack) {
+            audioPlaylistUrl = trTrack.uri;
+          } else {
+            audioPlaylistUrl = audioTracks[0].uri;
+          }
+        }
+      }
+
       if (bestStreamUrl) {
         targetPlaylistUrl = resolveUrl(m3u8Url, bestStreamUrl);
       }
     }
 
     if (audioPlaylistUrl) {
-      console.log("Separate Turkish audio track detected. Performing dual HLS stream download...");
-      const tempVideoFile = outputPath.replace('.zip', '_video.ts').replace('.mp4', '_video.ts');
-      const tempAudioFile = outputPath.replace('.zip', '_audio.ts').replace('.mp4', '_audio.ts');
+      console.log(`Performing audio/video dual stream download (mode: ${muxMode})...`);
+      const tempVideoFile = outputPath.replace(/\.[a-zA-Z0-9]+$/, '_video.ts');
+      const tempAudioFile = outputPath.replace(/\.[a-zA-Z0-9]+$/, '_audio.ts');
 
       // 1. Download Video stream (represent 0-50% in progress updates)
       await downloadPlaylistToSingleFile(targetPlaylistUrl, tempVideoFile, 'video', signal, headers, (completed, total) => {
@@ -868,21 +932,33 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
         }
       }, cookieJar);
 
-      // 2. Download Turkish Audio stream (represent 50-100% in progress updates)
+      // 2. Download Secondary Audio stream (represent 50-100% in progress updates)
       await downloadPlaylistToSingleFile(audioPlaylistUrl, tempAudioFile, 'audio', signal, headers, (completed, total) => {
         if (progressCallback) {
           progressCallback(50 + Math.round((completed / total) * 50), 100);
         }
       }, cookieJar);
 
-      console.log("Merging audio and video via FFmpeg (Dual audio mapping)...");
+      const ffmpegMap = muxMode === 'replace_audio'
+        ? '-map 0:v -map 1:a'
+        : '-map 0:v -map 0:a? -map 1:a';
+
+      console.log(`Merging audio and video via FFmpeg (${ffmpegMap} + faststart + mp42)...`);
       await new Promise((resolve) => {
-        exec(`"${ffmpegPath}" -y -i "${tempVideoFile}" -i "${tempAudioFile}" -map 0:v -map 0:a? -map 1:a -c:v copy -c:a copy "${outputPath}"`, (err, stdout, stderr) => {
+        exec(`"${ffmpegPath}" -y -i "${tempVideoFile}" -i "${tempAudioFile}" ${ffmpegMap} -c:v copy -c:a copy -bsf:a aac_adtstoasc -movflags +faststart -brand mp42 "${outputPath}"`, (err, stdout, stderr) => {
           if (err) {
-            console.error("FFmpeg merge failed. Falling back to default video stream (English):", err.message);
+            console.error("FFmpeg merge failed. Falling back to default video stream:", err.message);
             try {
               if (fs.existsSync(tempVideoFile)) {
-                fs.renameSync(tempVideoFile, outputPath); // Keep video with English audio as fallback
+                // If tempVideoFile is .ts, remux to mp4 with faststart and standard aac rather than raw rename
+                exec(`"${ffmpegPath}" -y -i "${tempVideoFile}" -c:v copy -c:a aac -movflags +faststart -brand mp42 "${outputPath}"`, (remuxErr) => {
+                  if (remuxErr && fs.existsSync(tempVideoFile)) {
+                    fs.renameSync(tempVideoFile, outputPath);
+                  }
+                  if (fs.existsSync(tempAudioFile)) fs.unlinkSync(tempAudioFile);
+                  resolve();
+                });
+                return;
               }
               if (fs.existsSync(tempAudioFile)) fs.unlinkSync(tempAudioFile);
             } catch (fallbackErr) {

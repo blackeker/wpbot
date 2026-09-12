@@ -260,7 +260,7 @@ export function getAndUnpack(script) {
 // HENTAIZM DECRYPTER AND RESOLVER FUNCTIONS
 // ==========================================
 // Main extract function
-export async function extractVideoUrl(pageUrl, fromJid = null) {
+export async function extractVideoUrl(pageUrl, fromJid = null, selectedAudio = null) {
   let targetUrl = pageUrl;
   if (targetUrl.includes('cloidmail.ru')) {
     targetUrl = targetUrl.replace('cloidmail.ru', 'cloud.mail.ru');
@@ -435,6 +435,29 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
     else if (targetUrl.includes('filmmodu')) siteName = 'FilmModu';
     return extractDiziSitesi(targetUrl, siteName);
   }
+
+async function verifyStreamUrl(streamUrl, referer) {
+  if (!streamUrl) return false;
+  try {
+    const res = await gotScraping.get({
+      url: streamUrl,
+      headers: {
+        'Referer': referer,
+        'Range': 'bytes=0-1000'
+      },
+      timeout: { request: 5000 }
+    });
+    if (res.statusCode >= 400) return false;
+    const body = typeof res.body === 'string' ? res.body : res.body.toString('utf8');
+    if (body.trim().startsWith('<') && (body.includes('404 Not Found') || body.includes('nginx') || body.includes('<html'))) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
   try {
     const mainUrl = new URL(pageUrl).origin;
     const pageRes = await gotScraping.get({
@@ -483,7 +506,7 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
           let iframeMatch = html.match(/data-src="([^"]+)"/) || html.match(/data-src=\\?"([^"]+)\\?"/);
           if (!iframeMatch) continue;
           let iframe = iframeMatch[1].replace(/\\/g, '');
-          if (iframe.includes('rapidrame')) {
+          if (iframe.includes('/rplayer/')) {
             iframe = `${mainUrl}/rplayer/` + iframe.split('/rplayer/').pop().split('?').shift();
           } else if (iframe.includes('mobi')) {
             const sub$ = cheerio.load(html);
@@ -500,12 +523,42 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
           let scriptText = '';
           iframe$('script').each((_, el) => {
             const content = $(el).html() || '';
-            if (content.includes('sources:')) {
+            if (content.includes('sources:') || content.includes('tracks:')) {
               scriptText = content;
             }
           });
           if (!scriptText) continue;
           const unpacked = getAndUnpack(scriptText);
+
+          // Extract subtitles from this player if any are defined
+          const tracksMatch = (scriptText + ' ' + unpacked).match(/tracks\s*:\s*(\[\s*\{[\s\S]*?\}\s*\])/);
+          if (tracksMatch) {
+            try {
+              const parsedTracks = JSON.parse(tracksMatch[1]);
+              const btnSubs = [];
+              for (const t of parsedTracks) {
+                if (t.file) {
+                  let subUrl = t.file.replace(/\\/g, '');
+                  if (subUrl.startsWith('/')) {
+                    subUrl = `https://hdfilmcehennemi.mobi${subUrl}`;
+                  }
+                  const label = t.label || 'Türkçe';
+                  const isTur = label.toLowerCase().includes('türk') || label.toLowerCase().includes('turk');
+                  btnSubs.push({
+                    url: subUrl,
+                    language: isTur ? 'tur' : 'eng',
+                    label: label
+                  });
+                }
+              }
+              if (btnSubs.length > 0) {
+                const hasVtt = btnSubs.some(s => s.url.includes('/vtt/'));
+                if (hasVtt || foundSubtitles.length === 0) {
+                  foundSubtitles = btnSubs;
+                }
+              }
+            } catch (e) {}
+          }
 
           let decryptedUrl = decryptDynamicVM(unpacked);
           if (!decryptedUrl) {
@@ -545,51 +598,34 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
           }
 
           if (decryptedUrl) {
-            // Extract subtitles if any are defined
-            let subtitles = [];
-            let tracksText = '';
-            const tracksMatch = (scriptText + ' ' + unpacked).match(/tracks\s*:\s*(\[\s*\{[\s\S]*?\}\s*\])/);
-            if (tracksMatch) {
-              try {
-                const parsedTracks = JSON.parse(tracksMatch[1]);
-                for (const t of parsedTracks) {
-                  if (t.file) {
-                    let subUrl = t.file.replace(/\\/g, '');
-                    if (subUrl.startsWith('/')) {
-                      subUrl = `https://hdfilmcehennemi.mobi${subUrl}`;
-                    }
-                    const label = t.label || 'Türkçe';
-                    subtitles.push({
-                      url: subUrl,
-                      language: label.toLowerCase().includes('türk') ? 'tur' : 'eng',
-                      label: label
-                    });
-                  }
-                }
-              } catch (e) {
-                tracksText = tracksMatch[1];
-              }
-            }
-            if (subtitles.length === 0 && tracksText) {
-              const fileMatches = [...tracksText.matchAll(/file\s*:\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
-              const labelMatches = [...tracksText.matchAll(/label\s*:\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
-              for (let k = 0; k < fileMatches.length; k++) {
-                let label = labelMatches[k] || 'Türkçe';
-                subtitles.push({
-                  url: fileMatches[k].replace(/\\/g, ''),
-                  language: label.toLowerCase().includes('türk') ? 'tur' : 'eng',
-                  label: label
-                });
-              }
+            // Canlı ve çalışan bir stream olup olmadığını doğrula (404 ölü linkleri engellemek için)
+            const isAlive = await verifyStreamUrl(decryptedUrl, mainUrl + "/");
+            if (!isAlive) {
+              console.warn(`[HDfilmcehennemi] Stream candidate from ${sourceName} returned dead/404 response (${decryptedUrl}), skipping to next player...`);
+              continue;
             }
 
             if (langCode === 'DUAL') {
               console.log(`[HDfilmcehennemi] DUAL release stream resolved: ${decryptedUrl}`);
+              let finalStreamUrl = decryptedUrl;
+              if (selectedAudio === 'orig' || selectedAudio === 'en' || selectedAudio === 'altyazi') {
+                if (finalStreamUrl.includes('-a1.')) {
+                  finalStreamUrl = finalStreamUrl.replace('-a1.', '-a2.');
+                }
+              }
               return {
                 title,
                 source: sourceName + " (DUAL)",
-                url: decryptedUrl,
-                subtitles: subtitles.length > 0 ? subtitles : foundSubtitles
+                url: finalStreamUrl,
+                referer: mainUrl + "/",
+                headers: { "Referer": mainUrl + "/" },
+                subtitles: foundSubtitles,
+                selectedAudio,
+                availableAudios: [
+                  { id: 'tr', label: '🇹🇷 Türkçe Dublaj', description: 'Yalnızca Türkçe seslendirme ile indir' },
+                  { id: 'orig', label: '🌐 Orijinal Ses / Altyazılı', description: 'Orijinal dil ve varsa altyazı ile indir' },
+                  { id: 'dual', label: '🔀 Dual Ses (Çift Ses)', description: 'Hem Türkçe hem Orijinal ses parçalarını birlikte içerir' }
+                ]
               };
             }
 
@@ -597,19 +633,16 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
               if (!altyaziliUrl) {
                 altyaziliUrl = decryptedUrl;
                 activeSourceName = sourceName;
-                if (subtitles.length > 0) foundSubtitles = subtitles;
               }
             } else if (langCode === 'TR') {
               if (!dublajUrl) {
                 dublajUrl = decryptedUrl;
                 activeSourceName = sourceName;
-                if (subtitles.length > 0 && foundSubtitles.length === 0) foundSubtitles = subtitles;
               }
             } else {
               if (!altyaziliUrl) {
                 altyaziliUrl = decryptedUrl;
                 activeSourceName = sourceName;
-                if (subtitles.length > 0) foundSubtitles = subtitles;
               }
             }
 
@@ -628,14 +661,46 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
     }
 
     if (altyaziliUrl && dublajUrl) {
-      console.log(`[HDfilmcehennemi] Dual streams resolved successfully! Video (Altyazılı): ${altyaziliUrl}, Audio (Dublaj): ${dublajUrl}`);
-      return {
-        title,
-        source: activeSourceName + " DUAL",
-        url: altyaziliUrl,
-        audioUrl: dublajUrl,
-        subtitles: foundSubtitles
-      };
+      if (selectedAudio === 'tr' || selectedAudio === 'dublaj') {
+        console.log(`[HDfilmcehennemi] Selected audio: Türkçe Dublaj -> using dublajUrl: ${dublajUrl}`);
+        return {
+          title,
+          source: activeSourceName + " (Dublaj)",
+          url: dublajUrl,
+          referer: mainUrl + "/",
+          headers: { "Referer": mainUrl + "/" },
+          subtitles: foundSubtitles,
+          selectedAudio: 'tr'
+        };
+      } else if (selectedAudio === 'orig' || selectedAudio === 'en' || selectedAudio === 'altyazi') {
+        console.log(`[HDfilmcehennemi] Selected audio: Orijinal/Altyazılı -> using altyaziliUrl: ${altyaziliUrl}`);
+        return {
+          title,
+          source: activeSourceName + " (Altyazılı)",
+          url: altyaziliUrl,
+          referer: mainUrl + "/",
+          headers: { "Referer": mainUrl + "/" },
+          subtitles: foundSubtitles,
+          selectedAudio: 'orig'
+        };
+      } else {
+        console.log(`[HDfilmcehennemi] Dual streams resolved successfully! Video (Altyazılı): ${altyaziliUrl}, Audio (Dublaj): ${dublajUrl}`);
+        return {
+          title,
+          source: activeSourceName + " DUAL",
+          url: altyaziliUrl,
+          audioUrl: dublajUrl,
+          referer: mainUrl + "/",
+          headers: { "Referer": mainUrl + "/" },
+          subtitles: foundSubtitles,
+          selectedAudio: 'dual',
+          availableAudios: [
+            { id: 'tr', label: '🇹🇷 Türkçe Dublaj', description: 'Yalnızca Türkçe seslendirme ile indir' },
+            { id: 'orig', label: '🌐 Orijinal Ses / Altyazılı', description: 'Orijinal dil ve varsa altyazı ile indir' },
+            { id: 'dual', label: '🔀 Dual Ses (Çift Ses)', description: 'Hem Türkçe hem Orijinal ses parçalarını birlikte içerir' }
+          ]
+        };
+      }
     }
 
     const finalUrl = altyaziliUrl || dublajUrl;
@@ -644,6 +709,8 @@ export async function extractVideoUrl(pageUrl, fromJid = null) {
         title,
         source: activeSourceName,
         url: finalUrl,
+        referer: mainUrl + "/",
+        headers: { "Referer": mainUrl + "/" },
         subtitles: foundSubtitles
       };
     }
@@ -772,4 +839,176 @@ export { extractKalite18 };
 import { extractMaheir } from "./extractors/maheir.js";
 export { extractMaheir };
 import { extractRule34Video } from "./extractors/rule34video.js";
-export { extractRule34Video };
+export { extractRule34Video };
+
+// ==========================================
+// AUDIO TRACK INSPECTION & PROBING
+// ==========================================
+
+export async function inspectM3u8AudioTracks(m3u8Url, headers = {}) {
+  try {
+    const res = await gotScraping.get({
+      url: m3u8Url,
+      headers: {
+        'Range': 'bytes=0-20000',
+        ...headers
+      },
+      responseType: 'text',
+      timeout: { request: 10000 }
+    });
+    let content = typeof res.body === 'string' ? res.body : res.body.toString('utf8');
+    if (!content.includes('#EXTM3U')) return [];
+
+    const lines = content.split('\n');
+    const tracks = [];
+    const seenUris = new Set();
+
+    for (const line of lines) {
+      if (line.startsWith('#EXT-X-MEDIA:') && line.includes('TYPE=AUDIO')) {
+        const langMatch = line.match(/LANGUAGE="([^"]+)"/i);
+        const nameMatch = line.match(/NAME="([^"]+)"/i);
+        const uriMatch = line.match(/URI="([^"]+)"/i);
+
+        let uri = null;
+        if (uriMatch) {
+          try {
+            uri = new URL(uriMatch[1], m3u8Url).href;
+          } catch (e) {
+            uri = uriMatch[1];
+          }
+        }
+        if (uri && seenUris.has(uri)) continue;
+        if (uri) seenUris.add(uri);
+
+        const lang = (langMatch ? langMatch[1] : '').toLowerCase();
+        const name = nameMatch ? nameMatch[1] : (lang ? lang.toUpperCase() : `Ses ${tracks.length + 1}`);
+
+        tracks.push({
+          name,
+          lang,
+          uri
+        });
+      }
+    }
+    return tracks;
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function probeMediaAudioOptions(pageUrl) {
+  try {
+    if (!pageUrl || typeof pageUrl !== 'string') return { hasMultipleAudios: false, availableAudios: [] };
+
+    // 1. HDfilmcehennemi page check
+    if (pageUrl.includes('hdfilmcehennemi')) {
+      const pageRes = await gotScraping.get({
+        url: pageUrl,
+        headerGeneratorOptions: { devices: ['desktop'], locales: ['tr-TR'], operatingSystems: ['windows'] },
+        timeout: { request: 12000 }
+      });
+      const $ = cheerio.load(pageRes.body);
+      const title = $('h1.section-title').text().replace(/izle/i, '').trim() || $('title').text().split('|')[0].replace(/izle/i, '').trim() || 'Film';
+      const altLinks = $('div.alternative-links');
+
+      let hasTr = false;
+      let hasAltyazi = false;
+      let hasDual = false;
+
+      altLinks.each((_, el) => {
+        const lang = ($(el).attr('data-lang') || '').toLowerCase();
+        if (lang === 'tr') hasTr = true;
+        else if (lang === 'altyazi' || lang === 'en') hasAltyazi = true;
+        else if (lang === 'dual') hasDual = true;
+      });
+
+      if (hasDual || (hasTr && hasAltyazi)) {
+        return {
+          title,
+          hasMultipleAudios: true,
+          availableAudios: [
+            { id: 'tr', label: '🇹🇷 Türkçe Dublaj', description: 'Yalnızca Türkçe seslendirme ile indir' },
+            { id: 'orig', label: '🌐 Orijinal Ses / Altyazılı', description: 'Orijinal dil ve varsa altyazı ile indir' },
+            { id: 'dual', label: '🔀 Dual Ses (Çift Ses)', description: 'Hem Türkçe hem Orijinal ses parçalarını birlikte içerir' }
+          ]
+        };
+      }
+    }
+
+    // 2. Generic M3U8 probe for other platforms or single-tab sources
+    const isSupportedVideoPlatform = pageUrl.includes('hdfilmcehennemi') || pageUrl.includes('fullhdfilmizlesene') || pageUrl.includes('filmmodu') || pageUrl.includes('filmmakinesi') || pageUrl.includes('yabancidizi') || pageUrl.includes('sezonlukdizi') || pageUrl.includes('dizipal') || pageUrl.includes('dizigom') || pageUrl.includes('dizibox') || pageUrl.includes('.m3u8');
+
+    if (isSupportedVideoPlatform) {
+      let targetM3u8 = null;
+      let title = 'Film/Dizi';
+      let headers = {};
+
+      if (pageUrl.includes('.m3u8')) {
+        targetM3u8 = pageUrl;
+      } else {
+        try {
+          const extracted = await extractVideoUrl(pageUrl);
+          if (extracted && extracted.url && extracted.url.includes('.m3u8')) {
+            targetM3u8 = extracted.url;
+            title = extracted.title || title;
+            headers = extracted.headers || (extracted.referer ? { Referer: extracted.referer } : {});
+          }
+          if (extracted && extracted.availableAudios && extracted.availableAudios.length > 1) {
+            return {
+              title: extracted.title || title,
+              hasMultipleAudios: true,
+              availableAudios: extracted.availableAudios
+            };
+          }
+        } catch (e) {}
+      }
+
+      if (targetM3u8) {
+        const tracks = await inspectM3u8AudioTracks(targetM3u8, headers);
+        if (tracks && tracks.length > 1) {
+          const trTrack = tracks.find(t => t.lang.startsWith('tr') || t.name.toLowerCase().includes('türk') || t.name.toLowerCase().includes('turk'));
+          const origTrack = tracks.find(t => t !== trTrack);
+
+          let availableAudios = [];
+          if (trTrack && origTrack && tracks.length === 2) {
+            availableAudios = [
+              { id: 'tr', label: '🇹🇷 Türkçe Dublaj', lang: 'tr' },
+              { id: 'orig', label: `🌐 ${origTrack.name || 'Orijinal Ses'} / Altyazılı`, lang: origTrack.lang },
+              { id: 'dual', label: '🔀 Dual Ses (Çift Ses - Türkçe + Orijinal)' }
+            ];
+          } else {
+            availableAudios = tracks.map((t, idx) => {
+              let flag = '🔊';
+              if (t.lang.startsWith('tr')) flag = '🇹🇷';
+              else if (t.lang.startsWith('en')) flag = '🇬🇧';
+              else if (t.lang.startsWith('ja')) flag = '🇯🇵';
+              else if (t.lang.startsWith('de')) flag = '🇩🇪';
+              else if (t.lang.startsWith('fr')) flag = '🇫🇷';
+              else if (t.lang.startsWith('es')) flag = '🇪🇸';
+              else if (t.lang.startsWith('ko')) flag = '🇰🇷';
+              return {
+                id: t.lang || `track_${idx + 1}`,
+                label: `${flag} ${t.name}`,
+                lang: t.lang
+              };
+            });
+            availableAudios.push({
+              id: 'dual',
+              label: '🔀 Dual / Çoklu Ses (Tüm Sesler Bir Arada)'
+            });
+          }
+
+          return {
+            title,
+            hasMultipleAudios: true,
+            availableAudios
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[probeMediaAudioOptions error]:', err.message);
+  }
+  return { hasMultipleAudios: false, availableAudios: [] };
+}
+

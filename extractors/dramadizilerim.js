@@ -77,10 +77,15 @@ export async function extractDramadizilerim(pageUrl) {
         } catch (e) {}
       }
 
+      let referer = 'https://dramadizilerim.com/';
+      if (capturedVideoUrl.includes('vibeshort.live') || capturedVideoUrl.includes('volcengine')) {
+        referer = 'https://www.vibeshort.live/';
+      }
+
       return {
         title: showTitle,
         url: capturedVideoUrl,
-        referer: 'https://dramadizilerim.com/',
+        referer: referer,
         source: 'DramaDizilerim'
       };
     }

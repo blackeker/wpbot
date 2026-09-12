@@ -115,6 +115,76 @@ export async function handleMessage(sock, m) {
   if (pendingSelections[from]) {
     const selection = pendingSelections[from];
     
+    if (selection.type === 'audio_selection') {
+      const input = text.trim().toLowerCase();
+
+      if (input === 'iptal' || input === 'vazgeç' || input === 'cancel') {
+        delete pendingSelections[from];
+        await sock.sendMessage(from, { text: '❌ Ses seçimi ve indirme işlemi iptal edildi.' });
+        return;
+      }
+
+      let chosenAudio = null;
+
+      // 1. Check number selection (1, 2, 3...)
+      const num = parseInt(input, 10);
+      if (!isNaN(num) && num >= 1 && num <= selection.availableAudios.length) {
+        chosenAudio = selection.availableAudios[num - 1];
+      }
+
+      // 2. Check keyword matching
+      if (!chosenAudio) {
+        if (['dublaj', 'tr', 'turkce', 'türkçe', 'tur'].includes(input)) {
+          chosenAudio = selection.availableAudios.find(a => a.id === 'tr' || a.id === 'dublaj') || selection.availableAudios[0];
+        } else if (['altyazi', 'altyazı', 'altyazili', 'altyazılı', 'orijinal', 'original', 'orig', 'en', 'eng'].includes(input)) {
+          chosenAudio = selection.availableAudios.find(a => a.id === 'orig' || a.id === 'en' || a.id === 'altyazi') || selection.availableAudios[1];
+        } else if (['dual', 'cift', 'çift', 'ikisi', 'hepsi'].includes(input)) {
+          chosenAudio = selection.availableAudios.find(a => a.id === 'dual') || selection.availableAudios[selection.availableAudios.length - 1];
+        } else {
+          chosenAudio = selection.availableAudios.find(a => a.label && a.label.toLowerCase().includes(input));
+        }
+      }
+
+      if (chosenAudio) {
+        delete pendingSelections[from];
+        try {
+          const task = addDownloadTask(
+            selection.url,
+            from,
+            selection.title,
+            null,
+            selection.priority || false,
+            null,
+            null,
+            null,
+            chosenAudio.id,
+            selection.burnSubtitles || false
+          );
+
+          const priorityTag = selection.priority ? '🔴 *ÖNCELİKLİ* ' : '';
+          const hardsubNote = selection.burnSubtitles ? '\n✍️ *Altyazı:* Videoya kalıcı gömülecek (Hardsub)' : '';
+          await sock.sendMessage(from, {
+            text: `✅ *${chosenAudio.label}* seçildi!\n\n📥 ${priorityTag}Görev Sıraya Eklendi!\n🎬 *Film/Video:* ${selection.title}${hardsubNote}\n🆔 *Görev Numarası:* \`${task.id}\`\n\nKuyruk durumu: \`!kuyruk\`\nİptal etmek için: \`!iptal ${task.id}\``
+          });
+        } catch (err) {
+          await sock.sendMessage(from, { text: `⚠️ Bir sorun oluştu: ${err.message}` });
+        }
+        return;
+      } else {
+        const numEmoji = (idx) => {
+          const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+          return emojis[idx] || `[${idx + 1}]`;
+        };
+        let prompt = `⚠️ Geçersiz seçim! Lütfen listedeki ses seçeneklerinden birini seçin:\n\n`;
+        selection.availableAudios.forEach((a, idx) => {
+          prompt += `${numEmoji(idx)} *${a.label}*\n`;
+        });
+        prompt += `\n*Seçmek için bu mesaja doğrudan seçeneğin numarasını (Ör: 1) veya adını (dublaj, altyazı, dual) yazarak yanıt verin.*\n❌ İptal etmek için: *iptal*`;
+        await sock.sendMessage(from, { text: prompt });
+        return;
+      }
+    }
+
     if (selection.type === 'multi_season') {
       const input = text.trim().toLowerCase();
 
@@ -258,7 +328,8 @@ export async function handleMessage(sock, m) {
       if (selectedEpisodes.length > 0) {
         delete pendingSelections[from];
 
-        const batchSize = selection.mergeBatchSize || 1;
+        const isDramadizilerim = selection.source === 'dramadizilerim';
+        const batchSize = isDramadizilerim ? selectedEpisodes.length : (selection.mergeBatchSize || 1);
         const shouldBatchMerge = batchSize > 1 && selectedEpisodes.length > 1;
 
         if (shouldBatchMerge) {
@@ -267,10 +338,11 @@ export async function handleMessage(sock, m) {
             chunks.push(selectedEpisodes.slice(i, i + batchSize));
           }
 
-          await sock.sendMessage(from, {
-            text: `🎬 *${selection.seriesName}* - *${label}*\n` +
-                  `📦 Toplam *${selectedEpisodes.length}* bölüm *${chunks.length}* paket (${batchSize}'arlı birleştirme) halinde sıraya ekleniyor...`
-          });
+          const queueIntro = chunks.length === 1
+            ? `🎬 *${selection.seriesName}* - *${label}*\n📦 Toplam *${selectedEpisodes.length}* bölüm tek bir ZIP paketi olarak sıraya ekleniyor...`
+            : `🎬 *${selection.seriesName}* - *${label}*\n📦 Toplam *${selectedEpisodes.length}* bölüm *${chunks.length}* paket halinde ZIP olarak sıraya ekleniyor...`;
+
+          await sock.sendMessage(from, { text: queueIntro });
 
           const getEpNum = (ep, idx) => {
             if (ep.episode && !isNaN(parseInt(ep.episode, 10))) return parseInt(ep.episode, 10);
@@ -308,10 +380,13 @@ export async function handleMessage(sock, m) {
             }
           }
 
-          let replyMsg = `✅ Toplam *${addedCount}* paket (${selectedEpisodes.length} bölüm) başarıyla sıraya eklendi.`;
+          let replyMsg = chunks.length === 1
+            ? `✅ Toplam *${selectedEpisodes.length}* bölüm tek bir ZIP paketi olarak başarıyla sıraya eklendi.`
+            : `✅ Toplam *${addedCount}* paket (${selectedEpisodes.length} bölüm) başarıyla sıraya eklendi.`;
+
           if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer paket atlandı.`;
           if (selection.priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
-          replyMsg += `\n\n_Her paket 10 bölümü tek parça video olarak birleştirip gönderecektir._`;
+          replyMsg += `\n\n_Tüm bölümler tek klasörde toplanıp ZIP arşivi olarak gönderilecektir._`;
           replyMsg += `\nSırayı görmek için: \`!kuyruk\``;
           await sock.sendMessage(from, { text: replyMsg });
           return;

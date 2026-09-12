@@ -536,8 +536,41 @@ export function restoreSession() {
     }
   } catch (err) {
     console.error('[SESSION] Session restore failed:', err.message);
+    return false;
   }
-  return false;
+}
+
+export function cleanCorruptedSessions(dir = sessionPath) {
+  try {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir);
+    let cleaned = 0;
+    for (const f of entries) {
+      // Asla creds.json, config.json veya db dosyalarına dokunma!
+      if (f === 'creds.json' || f === 'config.json' || f.endsWith('.db')) {
+        continue;
+      }
+      const fp = path.join(dir, f);
+      try {
+        const stat = fs.statSync(fp);
+        // 1. Bozulmuş veya şişmiş oturum dosyaları (kullanıcı LIDs veya >3KB olanlar)
+        const isUserSession = f.startsWith('session-23713101676595') || f.startsWith('session-905052761405');
+        const isBloatedSession = f.startsWith('session-') && stat.size > 3000;
+        // 2. Bozulmuş sender-key dosyaları (>5KB)
+        const isBloatedSenderKey = f.startsWith('sender-key-') && stat.size > 5000;
+        if (isUserSession || isBloatedSession || isBloatedSenderKey) {
+          fs.unlinkSync(fp);
+          cleaned++;
+          console.log(`[Session Guard] Bozulmuş oturum anahtarı temizlendi: ${f} (${stat.size} bayt)`);
+        }
+      } catch (e) {}
+    }
+    if (cleaned > 0) {
+      console.log(`[Session Guard] Toplam ${cleaned} bozulmuş anahtar temizlendi. creds.json korundu (oturum açık).`);
+    }
+  } catch (err) {
+    console.error('[Session Guard] cleanCorruptedSessions hatası:', err.message);
+  }
 }
 
 export function validateEnv() {
