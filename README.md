@@ -38,7 +38,7 @@
    - [6.3. Dizi, Film ve Anime Platformları](#63-dizi-film-ve-anime-platformlari)
    - [6.4. APK ve Uygulama Depoları](#64-apk-ve-uygulama-depolari)
    - [6.5. Özel / Yetişkin İçerik Platformları](#65-özel--yetişkin-içerik-platformlari)
-7. [📱 WHATSAPP KOMUT KILAVUZU (28 KOMUTUN TAMAMI)](#7-whatsapp-komut-kilavuzu-28-komutun-tamami)
+7. [📱 WHATSAPP KOMUT KILAVUZU (29 KOMUTUN TAMAMI)](#7-whatsapp-komut-kilavuzu-29-komutun-tamami)
 8. [📡 REST API REFERANS SARTNAMESİ (TAM SPEKTRUM)](#8-rest-api-referans-şartnamesi-tam-spektrum)
    - [8.1. Medya Bağlantısı Ayıklama (Extraction) API](#81-medya-bağlantisi-ayiklama-extraction-api)
    - [8.2. İndirme ve Görev Yönetimi API](#82-indirme-ve-görev-yönetimi-api)
@@ -47,6 +47,7 @@
    - [8.5. Medya Kasa ve Dosya Yönetimi API](#85-medya-kasa-ve-dosya-yönetimi-api)
    - [8.6. Oturum ve Eşleşme (Pairing) API](#86-oturum-ve-eşleşme-pairing-api)
    - [8.7. Sistem Ayarları ve Log Yönetimi API](#87-sistem-ayarlari-ve-log-yönetimi-api)
+   - [8.8. Doğrudan Mesaj Gönderme (Direct Messaging) API](#88-doğrudan-mesaj-gönderme-direct-messaging-api)
 9. [🔌 CANLI TAKİP WEBSOCKET PROTOKOLÜ](#9-canli-takip-websocket-protokolü)
 10. [🛠️ SİSTEM KURULUM VE YAPILANDIRMA REHBERİ](#10-sistem-kurulum-ve-yapilandirma-rehberi)
     - [10.1. Linux (Ubuntu / Debian) Kurulumu](#101-linux-ubuntu--debian-kurulumu)
@@ -80,10 +81,12 @@ Sistemin kalbinde, tüm indirme isteklerini asenkron olarak sıraya sokan, önce
 ### 🤖 WhatsApp Bot Katmanı
 - **Sürdürülebilir Oturum Yönetimi:** `@whiskeysockets/baileys` ile çoklu dosya oturumu saklama (`useMultiFileAuthState`), otomatik yeniden bağlanma ve oturum yedekleme/geri yükleme.
 - **Telefon Numarası İle Eşleşme (Pairing Code):** QR kod taratma zorunluluğunu ortadan kaldıran, WhatsApp Pair Code desteği.
+- **Doğrudan Mesaj Gönderme (`!mesaj`):** İstediğiniz bir telefon numarasına bot üzerinden doğrudan mesaj gönderme ve numara biçimlendirme (`05XXXXXXXXX` -> `905XXXXXXXXX@s.whatsapp.net`).
 - **Dinamik Komut Yükleyici (Dynamic Command Loader):** `./commands/` klasörü altındaki tüm `.js` dosyalarını otomatik algılayarak çalışma zamanında (runtime) sıcak yükleme (hot-reload).
 - **Yönetici ve Yetki Kontrolü:** Sadece belirli yetkili jid/telefon numaralarına özel komut erişim izinleri.
 
 ### 🌐 REST API & Microservice Desteği
+- **Doğrudan Mesaj Gönderme API (`/api/internal/send-text` & `/api/internal/send-media`):** Dış servislerden WhatsApp üzerinden metin ve medya (video, resim, belge) iletme.
 - **Bağımsız Medya Çıkarma API (`/api/extract`):** İndirme başlatmadan sadece medyanın ham direct stream URL'ini alma.
 - **Asenkron İndirme Başlatma API (`/api/indir` & `/api/indir-multiple`):** İstekleri kuyruğa ekleyip benzersiz `taskId` döndürme.
 - **Dizi ve Sezon Çekme API (`/api/fetch-episodes`):** Dizi web sitelerinden sezon ve bölüm yapılarını JSON olarak çekme.
@@ -346,43 +349,44 @@ Sistemde bulunan 25 özel çıkarıcı modülün desteklediği platformlar ve ö
 
 ---
 
-## 7. 📱 WHATSAPP KOMUT KILAVUZU (28 KOMUTUN TAMAMI)
+## 7. 📱 WHATSAPP KOMUT KILAVUZU (29 KOMUTUN TAMAMI)
 
 WhatsApp bot sohbetinde kullanabileceğiniz komutların tam listesi:
 
 ```
-+------------------+---------------------------------------------------+-----------------------------------+
-| Komut            | Açıklama                                          | Kullanım Örneği                   |
-+------------------+---------------------------------------------------+-----------------------------------+
-| !indir <URL>     | Belirtilen bağlantıdan medyayı indirir           | !indir https://instagram.com/p/.. |
-| !durum           | Sistem metriklerini ve aktif görevleri gösterir  | !durum                            |
-| !kuyruk          | Bekleyen ve işlenen kuyruğu listeler             | !kuyruk                           |
-| !iptal <ID>      | Belirtilen görevi iptal eder                     | !iptal task_17245000              |
-| !dur             | İndirme kuyruğunu geçici olarak duraklatır        | !dur                              |
-| !devam           | Duraklatılan kuyruğu devam ettirir               | !devam                            |
-| !temizle         | Bekleyen tüm kuyruğu temizler                    | !temizle                          |
-| !çöz <ID> <KOD>  | Bekleyen Captcha doğrulamasını çözer              | !çöz 1 95821                      |
-| !disk            | Sunucu kullanılabilir disk alanını gösterir       | !disk                             |
-| !gecmis          | Son başarılı indirmelerin geçmişini listeler      | !gecmis                           |
-| !hatalar         | Son oluşan sistem hatalarını listeler             | !hatalar                          |
-| !hiz             | Anlık indirme hızını raporlar                     | !hiz                              |
-| !depo            | İndirilen medya kasasını listeler                 | !depo                             |
-| !cerez           | Kurulmuş olan çerezleri kontrol eder              | !cerez                            |
-| !bancheck        | Numaraya ait yasaklama durumunu sorgular          | !bancheck 905XXXXXXXXX            |
-| !banlar          | Yasaklı kullanıcı listesini gösterir              | !banlar                           |
-| !botkontrol      | Botun aktif ve yanıt verir durumda olduğunu sınar | !botkontrol                       |
-| !bots            | Sistemdeki bağlı bot soketlerini gösterir         | !bots                             |
-| !captcha         | Aktif Captcha durumunu sorgular                   | !captcha                          |
-| !gem             | Sistem performans metriğini raporlar              | !gem                              |
-| !grupsec         | Botun çalışacağı hedef grubu seçer               | !grupsec                          |
-| !guncelle        | Bot yazılımını Git üzerinden günceller           | !guncelle                         |
-| !komutekle       | Özel komut ekler                                  | !komutekle test Merhaba           |
-| !komutlar        | Mevcut tüm komutların listesini döner             | !komutlar                         |
-| !komutsil        | Eklenmiş özel komutu siler                        | !komutsil test                    |
-| !patates         | Sistem yanıt süresini (ping) ölçer                | !patates                          |
-| !pingurl         | Canlılık pingleme adresini ayarlar               | !pingurl https://example.com/ping |
-| !tekrargonder    | Başarısız olan son medyayı tekrar gönderir        | !tekrargonder                     |
-+------------------+---------------------------------------------------+-----------------------------------+
++-------------------+---------------------------------------------------+-----------------------------------+
+| Komut             | Açıklama                                          | Kullanım Örneği                   |
++-------------------+---------------------------------------------------+-----------------------------------+
+| !indir <URL>      | Belirtilen bağlantıdan medyayı indirir           | !indir https://instagram.com/p/.. |
+| !mesaj <No> <Tks> | Belirtilen numaraya özel WhatsApp mesajı atar     | !mesaj 05332624732 Merhaba        |
+| !durum            | Sistem metriklerini ve aktif görevleri gösterir  | !durum                            |
+| !kuyruk           | Bekleyen ve işlenen kuyruğu listeler             | !kuyruk                           |
+| !iptal <ID>       | Belirtilen görevi iptal eder                     | !iptal task_17245000              |
+| !dur              | İndirme kuyruğunu geçici olarak duraklatır        | !dur                              |
+| !devam            | Duraklatılan kuyruğu devam ettirir               | !devam                            |
+| !temizle          | Bekleyen tüm kuyruğu temizler                    | !temizle                          |
+| !çöz <ID> <KOD>   | Bekleyen Captcha doğrulamasını çözer              | !çöz 1 95821                      |
+| !disk             | Sunucu kullanılabilir disk alanını gösterir       | !disk                             |
+| !gecmis           | Son başarılı indirmelerin geçmişini listeler      | !gecmis                           |
+| !hatalar          | Son oluşan sistem hatalarını listeler             | !hatalar                          |
+| !hiz              | Anlık indirme hızını raporlar                     | !hiz                              |
+| !depo             | İndirilen medya kasasını listeler                 | !depo                             |
+| !cerez            | Kurulmuş olan çerezleri kontrol eder              | !cerez                            |
+| !bancheck         | Numaraya ait yasaklama durumunu sorgular          | !bancheck 905XXXXXXXXX            |
+| !banlar           | Yasaklı kullanıcı listesini gösterir              | !banlar                           |
+| !botkontrol       | Botun aktif ve yanıt verir durumda olduğunu sınar | !botkontrol                       |
+| !bots             | Sistemdeki bağlı bot soketlerini gösterir         | !bots                             |
+| !captcha          | Aktif Captcha durumunu sorgular                   | !captcha                          |
+| !gem              | Sistem performans metriğini raporlar              | !gem                              |
+| !grupsec          | Botun çalışacağı hedef grubu seçer               | !grupsec                          |
+| !guncelle         | Bot yazılımını Git üzerinden günceller           | !guncelle                         |
+| !komutekle        | Özel komut ekler                                  | !komutekle test Merhaba           |
+| !komutlar         | Mevcut tüm komutların listesini döner             | !komutlar                         |
+| !komutsil         | Eklenmiş özel komutu siler                        | !komutsil test                    |
+| !patates          | Sistem yanıt süresini (ping) ölçer                | !patates                          |
+| !pingurl          | Canlılık pingleme adresini ayarlar               | !pingurl https://example.com/ping |
+| !tekrargonder     | Başarısız olan son medyayı tekrar gönderir        | !tekrargonder                     |
++-------------------+---------------------------------------------------+-----------------------------------+
 ```
 
 ---
@@ -434,6 +438,77 @@ curl -X GET "http://localhost:7860/api/extract?url=https://www.instagram.com/ree
   "ok": true,
   "taskId": "task_1724500000000_5678",
   "message": "Görev kuyruğa eklendi."
+}
+```
+
+---
+
+### 8.8. Doğrudan Mesaj Gönderme (Direct Messaging) API
+
+Sistem, dış servislerin veya otomasyon araçlarının doğrudan WhatsApp üzerinden herhangi bir telefon numarasına metin veya medya mesajı gönderebilmesi için iki dahili REST API endpoint'i sunar.
+
+#### `POST /api/internal/send-text`
+- **Açıklama:** Belirtilen alıcı JID/telefon numarasına anında düz metin mesajı gönderir.
+- **Body (JSON):**
+  - `recipientJid` (string, zorunlu): Alıcının JID adresi (`905XXXXXXXXX@s.whatsapp.net`) veya telefon numarası (`05332624732`).
+  - `text` (string, zorunlu): Gönderilecek mesaj metni.
+  - `editKey` (object, opsiyonel): Düzenlenecek önceden gönderilmiş mesajın WhatsApp anahtarı (`key`).
+
+**Örnek İstek (cURL):**
+```bash
+curl -X POST "http://localhost:7860/api/internal/send-text" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipientJid": "905332624732@s.whatsapp.net",
+    "text": "Merhaba! Bu mesaj REST API üzerinden otomatik olarak gönderilmiştir."
+  }'
+```
+
+**Başarılı Yanıt (200 OK):**
+```json
+{
+  "ok": true,
+  "key": {
+    "remoteJid": "905332624732@s.whatsapp.net",
+    "fromMe": true,
+    "id": "3EB0BE3267B8A58473C40F"
+  }
+}
+```
+
+---
+
+#### `POST /api/internal/send-media`
+- **Açıklama:** Sunucudaki bir dosya yolunu alıcıya WhatsApp medya (video, resim veya belge) mesajı olarak iletir.
+- **Body (JSON):**
+  - `recipientJid` (string, zorunlu): Alıcının JID adresi veya telefon numarası.
+  - `filePath` (string, zorunlu): Medya dosyasının sunucudaki tam yolu (Örn: `downloads/video.mp4`).
+  - `caption` (string, opsiyonel): Medya altına eklenecek açıklama metni.
+  - `mimetype` (string, opsiyonel): MIME türü (Varsayılan: `video/mp4` veya otomatik tespit).
+  - `fileName` (string, opsiyonel): Dosyanın alıcıya görünecek adı.
+  - `asDocument` (boolean, opsiyonel): `true` ise medya yerine belge (dosya) olarak gönderir.
+
+**Örnek İstek (cURL):**
+```bash
+curl -X POST "http://localhost:7860/api/internal/send-media" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipientJid": "905332624732@s.whatsapp.net",
+    "filePath": "downloads/sample.mp4",
+    "caption": "İndirilen video dosyanız hazır!",
+    "asDocument": false
+  }'
+```
+
+**Başarılı Yanıt (200 OK):**
+```json
+{
+  "ok": true,
+  "key": {
+    "remoteJid": "905332624732@s.whatsapp.net",
+    "fromMe": true,
+    "id": "3EB0CFA78B124C21"
+  }
 }
 ```
 
