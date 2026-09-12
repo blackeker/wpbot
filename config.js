@@ -76,7 +76,7 @@ setInterval(cleanLeftoverCacheFiles, 6 * 60 * 60 * 1000);
 
 // Config file reader/writer helpers with full defaults
 const DEFAULT_CONFIG = {
-  whatsappPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || "905052761405",
+  whatsappPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || "",
   port: parseInt(process.env.PORT || "7860", 10),
   vdsIp: process.env.VDS_IP || "111.235.150.157",
   pingUrl: process.env.PING_URL || "",
@@ -267,7 +267,7 @@ export const botSocketRef = {
 // Shared state for pairing mode (process level)
 export const pairingState = {
   isPairingMode: false,
-  pairingPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || "905052761405"
+  pairingPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || ""
 };
 
 // Main Shared Bot State
@@ -276,7 +276,7 @@ export const botState = {
   qrCodeUrl: null,
   pairingCode: null,
   pairingMode: false,
-  pairingNumber: process.env.WHATSAPP_PHONE_NUMBER || "905052761405",
+  pairingNumber: process.env.WHATSAPP_PHONE_NUMBER || "",
   uptime: new Date(),
   pingUrl: readConfig().pingUrl || process.env.PING_URL || process.env.RENDER_EXTERNAL_URL || '',
   activeTasks: [],
@@ -554,7 +554,7 @@ export function cleanCorruptedSessions(dir = sessionPath) {
       try {
         const stat = fs.statSync(fp);
         // 1. Bozulmuş veya şişmiş oturum dosyaları (kullanıcı LIDs veya >3KB olanlar)
-        const isUserSession = f.startsWith('session-23713101676595') || f.startsWith('session-905052761405');
+        const isUserSession = f.startsWith('session-user-') || f.startsWith('session-90');
         const isBloatedSession = f.startsWith('session-') && stat.size > 3000;
         // 2. Bozulmuş sender-key dosyaları (>5KB)
         const isBloatedSenderKey = f.startsWith('sender-key-') && stat.size > 5000;

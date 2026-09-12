@@ -7,8 +7,8 @@ export default {
     if (args.length < 2) {
       await sock.sendMessage(from, {
         text: '⚠️ *KULLANIM:* `!mesaj <telefon_numarası> <mesaj_metni>`\n━━━━━━━━━━━━━━━━━━━━\n' +
-              '💡 *Örnek:* `!mesaj 05332624732 Merhaba, bu bir test mesajıdır.`\n' +
-              '💡 *Örnek 2:* `!mesaj 905332624732 Deneme mesajı`'
+              '💡 *Örnek:* `!mesaj 05551234567 Merhaba, bu bir test mesajıdır.`\n' +
+              '💡 *Örnek 2:* `!mesaj 905551234567 Deneme mesajı`'
       });
       return;
     }
@@ -18,7 +18,7 @@ export default {
 
     if (!targetRaw || targetRaw.length < 10) {
       await sock.sendMessage(from, {
-        text: '❌ *Hata:* Geçersiz telefon numarası. Lütfen en az 10 haneli geçerli bir numara girin (Örn: `05332624732`).'
+        text: '❌ *Hata:* Geçersiz telefon numarası. Lütfen en az 10 haneli geçerli bir numara girin (Örn: `05551234567`).'
       });
       return;
     }

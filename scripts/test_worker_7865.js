@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -10,8 +10,8 @@ const PORT = 7865;
 const QUEUE_DB_NAME = 'queue_test.db';
 const dbPath = path.join(sessionPath, QUEUE_DB_NAME);
 const PRIMARY_BOT_URL = 'http://127.0.0.1:7860';
-const TARGET_PHONE = '05332624732';
-const TARGET_JID = '905332624732@s.whatsapp.net';
+const TARGET_PHONE = '05551234567';
+const TARGET_JID = '905551234567@s.whatsapp.net';
 
 process.on('uncaughtException', (err) => {
   console.error('[Test Worker Uncaught Exception]:', err.message);
@@ -262,3 +262,4 @@ const server = app.listen(PORT, async () => {
   // Trigger processing
   processTestQueue();
 });
+

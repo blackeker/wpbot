@@ -171,7 +171,9 @@ export function startCaptchaPoller() {
               channelId: cap.channelId 
             });
 
-            const targetJid = '905332624732@s.whatsapp.net';
+            const cfg = readConfig();
+            const adminNum = cfg.adminJids?.[0] || cfg.whatsappPhoneNumber;
+            const targetJid = adminNum ? (adminNum.includes('@') ? adminNum : `${adminNum}@s.whatsapp.net`) : '';
 
             let infoText = `⚠️ *YENİ CAPTCHA BELİRDİ! (Poller)* ⚠️\n\n`;
             infoText += `👤 *Hesap:* ${cap.username} (${cap.account === 'main' ? 'Ana Hesap' : 'Yan Hesap'})\n`;
@@ -948,7 +950,9 @@ app.post('/api/notify-captcha', async (req, res) => {
   const durumKodu = String(captchaCounter);
   activeCaptchasMap.set(durumKodu, { messageId, username, accountType, token, channelId });
 
-  const targetJid = '905332624732@s.whatsapp.net';
+  const cfg = readConfig();
+  const adminNum = cfg.adminJids?.[0] || cfg.whatsappPhoneNumber;
+  const targetJid = adminNum ? (adminNum.includes('@') ? adminNum : `${adminNum}@s.whatsapp.net`) : '';
 
   let infoText = `⚠️ *YENİ CAPTCHA BELİRDİ!* ⚠️\n\n`;
   infoText += `👤 *Hesap:* ${username} (${accountType === 'main' ? 'Ana Hesap' : 'Yan Hesap'})\n`;

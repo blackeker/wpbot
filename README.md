@@ -358,7 +358,7 @@ WhatsApp bot sohbetinde kullanabileceğiniz komutların tam listesi:
 | Komut             | Açıklama                                          | Kullanım Örneği                   |
 +-------------------+---------------------------------------------------+-----------------------------------+
 | !indir <URL>      | Belirtilen bağlantıdan medyayı indirir           | !indir https://instagram.com/p/.. |
-| !mesaj <No> <Tks> | Belirtilen numaraya özel WhatsApp mesajı atar     | !mesaj 05332624732 Merhaba        |
+| !mesaj <No> <Tks> | Belirtilen numaraya özel WhatsApp mesajı atar     | !mesaj 05551234567 Merhaba        |
 | !durum            | Sistem metriklerini ve aktif görevleri gösterir  | !durum                            |
 | !kuyruk           | Bekleyen ve işlenen kuyruğu listeler             | !kuyruk                           |
 | !iptal <ID>       | Belirtilen görevi iptal eder                     | !iptal task_17245000              |
@@ -450,7 +450,7 @@ Sistem, dış servislerin veya otomasyon araçlarının doğrudan WhatsApp üzer
 #### `POST /api/internal/send-text`
 - **Açıklama:** Belirtilen alıcı JID/telefon numarasına anında düz metin mesajı gönderir.
 - **Body (JSON):**
-  - `recipientJid` (string, zorunlu): Alıcının JID adresi (`905XXXXXXXXX@s.whatsapp.net`) veya telefon numarası (`05332624732`).
+  - `recipientJid` (string, zorunlu): Alıcının JID adresi (`905XXXXXXXXX@s.whatsapp.net`) veya telefon numarası (`05551234567`).
   - `text` (string, zorunlu): Gönderilecek mesaj metni.
   - `editKey` (object, opsiyonel): Düzenlenecek önceden gönderilmiş mesajın WhatsApp anahtarı (`key`).
 
@@ -459,7 +459,7 @@ Sistem, dış servislerin veya otomasyon araçlarının doğrudan WhatsApp üzer
 curl -X POST "http://localhost:7860/api/internal/send-text" \
   -H "Content-Type: application/json" \
   -d '{
-    "recipientJid": "905332624732@s.whatsapp.net",
+    "recipientJid": "905551234567@s.whatsapp.net",
     "text": "Merhaba! Bu mesaj REST API üzerinden otomatik olarak gönderilmiştir."
   }'
 ```
@@ -469,7 +469,7 @@ curl -X POST "http://localhost:7860/api/internal/send-text" \
 {
   "ok": true,
   "key": {
-    "remoteJid": "905332624732@s.whatsapp.net",
+    "remoteJid": "905551234567@s.whatsapp.net",
     "fromMe": true,
     "id": "3EB0BE3267B8A58473C40F"
   }
@@ -493,7 +493,7 @@ curl -X POST "http://localhost:7860/api/internal/send-text" \
 curl -X POST "http://localhost:7860/api/internal/send-media" \
   -H "Content-Type: application/json" \
   -d '{
-    "recipientJid": "905332624732@s.whatsapp.net",
+    "recipientJid": "905551234567@s.whatsapp.net",
     "filePath": "downloads/sample.mp4",
     "caption": "İndirilen video dosyanız hazır!",
     "asDocument": false
@@ -505,7 +505,7 @@ curl -X POST "http://localhost:7860/api/internal/send-media" \
 {
   "ok": true,
   "key": {
-    "remoteJid": "905332624732@s.whatsapp.net",
+    "remoteJid": "905551234567@s.whatsapp.net",
     "fromMe": true,
     "id": "3EB0CFA78B124C21"
   }

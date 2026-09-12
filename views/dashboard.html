@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
@@ -1105,7 +1105,7 @@
 
             <div class="form-group">
               <label class="form-label" for="input-quick-phone">Gönderilecek WhatsApp Numarası</label>
-              <input type="text" id="input-quick-phone" class="glass-input" value="905052761405" placeholder="905XXXXXXXXX" required>
+              <input type="text" id="input-quick-phone" class="glass-input" value="905551234567" placeholder="905XXXXXXXXX" required>
             </div>
 
             <div style="display:grid; grid-template-columns:1fr; gap:12px; margin-bottom:18px;">
@@ -1226,7 +1226,7 @@
           <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-top:14px;">
             <div>
               <label class="form-label">Gönderilecek WhatsApp Numarası</label>
-              <input type="text" id="series-target-phone" class="glass-input" value="905052761405">
+              <input type="text" id="series-target-phone" class="glass-input" value="905551234567">
             </div>
             <div style="display:flex; align-items:flex-end;">
               <button class="btn-primary" id="series-bulk-download-btn" onclick="downloadSelectedSeriesEpisodes()" style="width:100%;">
@@ -1306,7 +1306,7 @@
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:14px; background:rgba(0,0,0,0.25); padding:14px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); margin-bottom:20px;">
           <div>
             <label class="form-label">Gönderilecek WhatsApp Numarası veya Grup JID</label>
-            <input type="text" id="hentai-target-phone" class="glass-input" placeholder="Örn: 905052761405 veya 120363xxx@g.us (Boşsa ayardaki kullanılır)">
+            <input type="text" id="hentai-target-phone" class="glass-input" placeholder="Örn: 905551234567 veya 120363xxx@g.us (Boşsa ayardaki kullanılır)">
           </div>
           <div style="display:flex; align-items:center; gap:10px; margin-top:24px;">
             <input type="checkbox" id="hentai-priority-check" style="width:18px; height:18px; accent-color:var(--accent-rose); cursor:pointer;">
@@ -1405,7 +1405,7 @@
             <span>🔑 Telefon No İle Pairing Kodu İste</span>
           </div>
           <div style="display:flex; gap:10px;">
-            <input type="text" id="pairing-phone-input" class="glass-input" value="905052761405" placeholder="905XXXXXXXXX" style="flex:1;">
+            <input type="text" id="pairing-phone-input" class="glass-input" value="905551234567" placeholder="905XXXXXXXXX" style="flex:1;">
             <button class="btn-primary" onclick="requestNewPairingCode()" style="width:auto; padding:0 20px;">Kod İste 🔑</button>
           </div>
         </div>
@@ -1548,13 +1548,13 @@
             
             <div class="form-group">
               <label class="form-label">Yönetici WhatsApp Numaraları (Whitelist)</label>
-              <input type="text" id="settings-admin-jids" class="glass-input" placeholder="Virgülle ayırın: 905052761405, 905332624732">
+              <input type="text" id="settings-admin-jids" class="glass-input" placeholder="Virgülle ayırın: 905551234567, 905551234567">
               <p style="font-size:0.72rem; color:var(--text-muted); margin-top:4px; line-height:1.4;">Eğer doldurulursa bot sadece bu numaralardan gelen indirme ve kontrol taleplerini işler. Boş bırakılırsa tüm kullanıcılara yanıt verir.</p>
             </div>
 
             <div class="form-group">
               <label class="form-label">🔞 Hentai Paket Gönderim Grubu / JID</label>
-              <input type="text" id="settings-hentai-group-jid" class="glass-input" placeholder="Örn: 120363xxx@g.us veya 905052761405@s.whatsapp.net">
+              <input type="text" id="settings-hentai-group-jid" class="glass-input" placeholder="Örn: 120363xxx@g.us veya 905551234567@s.whatsapp.net">
               <p style="font-size:0.72rem; color:var(--text-muted); margin-top:4px; line-height:1.4;">Hentai anime paketleri tamamlandığında otomatik bu gruba gönderilir. Boşsa indirmeyi başlatan numaraya gider.</p>
             </div>
 
@@ -3235,3 +3235,4 @@
   <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleMobileSidebar(false)"></div>
 </body>
 </html>
+
