@@ -23,6 +23,7 @@ export default {
 • *!deprem* ➔ Kandilli Rasathanesi son depremler.
 
 🧰 *FAYDALI ARAÇLAR:*
+• *!mesaj <numara> <metin>* ➔ Belirtilen numaraya özel mesaj gönderir (Örn: \`!mesaj 05332624732 Selam\`).
 • *!hatirlat <süre> <not>* ➔ Hatırlatıcı kurar (Örn: \`!hatirlat 10dk su iç\`).
 • *!qr <metin/link>* ➔ Anında QR kod resmi oluşturur.
 • *!kisalt <link>* ➔ Uzun linkleri kısaltır.
