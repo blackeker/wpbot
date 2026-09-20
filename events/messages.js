@@ -568,6 +568,15 @@ export async function handleMessage(sock, m) {
       args = text.trim().split(/\s+/).slice(1);
     } else if (['hhelp', 'hentaihelp', 'h-help', 'hyardim', 'hentaiyardim', 'hentai yardım', 'hentai yardim'].includes(ltext)) {
       commandName = 'hhelp';
+    } else if (['kahvalti', 'kahvaltı', 'sabah', 'sabahyemegi', 'sabahyemeği'].includes(ltext) || ltext.startsWith('kahvalti ') || ltext.startsWith('kahvaltı ')) {
+      commandName = 'kahvalti';
+      args = text.trim().split(/\s+/).slice(1);
+    } else if (['aksam', 'akşam', 'aksamyemegi', 'akşamyemeği'].includes(ltext) || ltext.startsWith('aksam ') || ltext.startsWith('akşam ')) {
+      commandName = 'aksam';
+      args = text.trim().split(/\s+/).slice(1);
+    } else if (['yemek', 'yemekler', 'gunlukyemek', 'yemekhane'].includes(ltext) || ltext.startsWith('yemek ') || ltext.startsWith('yemekler ')) {
+      commandName = 'yemek';
+      args = text.trim().split(/\s+/).slice(1);
     }
   }
 
