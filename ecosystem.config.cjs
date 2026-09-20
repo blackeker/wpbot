@@ -2,7 +2,9 @@ module.exports = {
   apps: [
     {
       name: 'wpbot',
+      cwd: '/datam/projeler/wpbot',
       script: 'bot.js',
+      exec_mode: 'fork',
       instances: 1,
       autorestart: true,
       watch: false,
