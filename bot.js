@@ -58,6 +58,9 @@ import { startServer, startCaptchaPoller } from './server.js';
 import { handleConnectionUpdate } from './events/connection.js';
 import { handleMessage } from './events/messages.js';
 
+import { getModuleLogger } from './utils/logger.js';
+const appLogger = getModuleLogger('bot');
+
 const logger = pino({ level: 'silent' });
 const PORT = process.env.PORT || 7860;
 
@@ -97,11 +100,11 @@ async function loadCommands() {
           }
         }
       } catch (err) {
-        console.error(`[LOADER] Failed to load command: ${file}`, err.message);
+        appLogger.error({ file, err: err.message }, '[LOADER] Failed to load command');
       }
     }
   }
-  console.log(`[LOADER] Loaded ${commands.size} command handlers/aliases.`);
+  appLogger.info({ count: commands.size }, `[LOADER] Loaded ${commands.size} command handlers/aliases.`);
 }
 
 // Setup keep-alive ping
@@ -111,12 +114,12 @@ async function startBot() {
   // Auto-update yt-dlp on startup in the background
   (async () => {
     const ytDlpCmd = getYtDlpCommand();
-    console.log(`[STARTUP] Checking for yt-dlp updates using: ${ytDlpCmd}`);
+    appLogger.info({ cmd: ytDlpCmd }, `[STARTUP] Checking for yt-dlp updates`);
     exec(`"${ytDlpCmd}" -U`, (err, stdout, stderr) => {
       if (err) {
-        console.error(`[STARTUP] yt-dlp update failed: ${err.message}`);
+        appLogger.error({ err: err.message }, `[STARTUP] yt-dlp update failed`);
       } else {
-        console.log(`[STARTUP] yt-dlp update result: ${stdout.trim()}`);
+        appLogger.info({ output: stdout.trim() }, `[STARTUP] yt-dlp update result`);
       }
     });
   })();

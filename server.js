@@ -9,6 +9,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { gotScraping } from 'got-scraping';
 import { exec, execSync } from 'child_process';
 
+import { getModuleLogger } from './utils/logger.js';
+const logger = getModuleLogger('server');
+
 import { 
   botState, 
   downloadsDir, 
@@ -142,66 +145,7 @@ app.use((req, res, next) => {
   basicAuth(req, res, next);
 });
 
-// Captcha management state
-export const activeCaptchasMap = new Map();
-let captchaCounter = 0;
-export const sentCaptchasSet = new Set();
-
-// Start background captcha poller
-export function startCaptchaPoller() {
-  setInterval(async () => {
-    try {
-      if (!botSocketRef.current) return;
-
-      const response = await axios.get('http://127.0.0.1:8181/api/captcha');
-      const data = response.data;
-      if (data.success && data.captchas && data.captchas.length > 0) {
-        for (const cap of data.captchas) {
-          if (!sentCaptchasSet.has(cap.messageId)) {
-            sentCaptchasSet.add(cap.messageId);
-
-            captchaCounter++;
-            const durumKodu = String(captchaCounter);
-
-            activeCaptchasMap.set(durumKodu, { 
-              messageId: cap.messageId, 
-              username: cap.username, 
-              accountType: cap.account, 
-              token: cap.token, 
-              channelId: cap.channelId 
-            });
-
-            const cfg = readConfig();
-            const adminNum = cfg.adminJids?.[0] || cfg.whatsappPhoneNumber;
-            const targetJid = adminNum ? (adminNum.includes('@') ? adminNum : `${adminNum}@s.whatsapp.net`) : '';
-
-            let infoText = `⚠️ *YENİ CAPTCHA BELİRDİ! (Poller)* ⚠️\n\n`;
-            infoText += `👤 *Hesap:* ${cap.username} (${cap.account === 'main' ? 'Ana Hesap' : 'Yan Hesap'})\n`;
-            infoText += `🔑 *Durum Kodu (Sıra No):* *${durumKodu}*\n\n`;
-            infoText += `💬 *Çözmek için:* \n\`!çöz ${durumKodu} KOD\` yazıp gönderin.`;
-
-            if (cap.localImageUrl) {
-              const imgUrl = `http://127.0.0.1:8181${cap.localImageUrl}`;
-              const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer' }).catch(() => null);
-              if (imgRes && imgRes.status === 200) {
-                await botSocketRef.current.sendMessage(targetJid, { 
-                  image: Buffer.from(imgRes.data), 
-                  caption: infoText 
-                });
-              } else {
-                await botSocketRef.current.sendMessage(targetJid, { text: infoText + `\n\n⚠️ Resim indirilemedi.` });
-              }
-            } else {
-              await botSocketRef.current.sendMessage(targetJid, { text: infoText });
-            }
-          }
-        }
-      }
-    } catch (err) {
-      // Ignore network errors with Discord bot offline
-    }
-  }, 19000);
-}
+export { activeCaptchasMap, sentCaptchasSet, startCaptchaPoller } from './server/captchaPoller.js';
 
 // Site-specific direct link extraction API endpoints
 app.get('/api/extract', async (req, res) => {
@@ -1370,34 +1314,7 @@ function matchCron(cronExpr, date = new Date()) {
          parseCronField(parts[4], dow);
 }
 
-import { cleanOldDownloads } from './config.js';
-
-export function startCronScheduler() {
-  console.log('[CRON] Zamanlanmış otomasyon motoru başlatıldı.');
-  setInterval(() => {
-    try {
-      const config = readConfig();
-      const schedules = config.cronSchedules || [];
-      const now = new Date();
-      
-      for (const sched of schedules) {
-        if (sched.active && matchCron(sched.cron, now)) {
-          console.log(`[CRON] Zamanlanmış görev tetiklendi: ${sched.name} (${sched.action})`);
-          if (sched.action === 'cleanup') {
-            try {
-              cleanOldDownloads();
-              console.log(`[CRON] ${sched.name} başarıyla tamamlandı.`);
-            } catch (err) {
-              console.error(`[CRON] ${sched.name} yürütülürken hata oluştu:`, err.message);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error('[CRON Scheduler Loop Error]', e.message);
-    }
-  }, 60000); // Check every minute
-}
+export { startCronScheduler } from './server/cronScheduler.js';
 
 export function startServer(PORT, startBotCallback) {
   onResetRequest = startBotCallback;
@@ -1405,7 +1322,7 @@ export function startServer(PORT, startBotCallback) {
   const server = http.createServer(app);
   setupWebSocketServer(server);
   
-  startCronScheduler(); // Start cron studio background loop
+  startCronScheduler();
 
   setQueueUpdateCallback(() => {
     if (wsBroadcast) {
@@ -1428,6 +1345,6 @@ export function startServer(PORT, startBotCallback) {
   });
 
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Web Dashboard is running at http://0.0.0.0:${PORT}`);
+    logger.info(`Web Dashboard is running at http://0.0.0.0:${PORT}`);
   });
 }

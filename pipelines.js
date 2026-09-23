@@ -2,104 +2,18 @@ import fs from 'fs';
 import { Transform } from 'stream';
 import path from 'path';
 import { exec, execSync } from 'child_process';
-import ffmpegStaticPath from 'ffmpeg-static';
-
-let ffmpegPath = ffmpegStaticPath;
-try {
-  const sysFfmpeg = execSync('which ffmpeg 2>/dev/null || true').toString().trim();
-  if (sysFfmpeg && fs.existsSync(sysFfmpeg)) {
-    ffmpegPath = sysFfmpeg;
-  }
-} catch (e) {
-  ffmpegPath = ffmpegStaticPath;
-}
 import { extractVideoUrl, gotScraping } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
 import { notifyQueueUpdate } from './queue.js';
 import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig, getProxyUrl } from './config.js';
 import WebTorrent from 'webtorrent';
 import { getCachedResult, saveToCache, deleteFromCache } from './cache.js';
+import { getModuleLogger } from './utils/logger.js';
+import { ffmpegPath, replaceTurkishChars, getMediaStreamInfo, convertVttToSrt, withRetry } from './pipelines/helpers.js';
 
-function replaceTurkishChars(str) {
-  if (!str) return '';
-  return str
-    .replace(/Ğ/g, 'G')
-    .replace(/ğ/g, 'g')
-    .replace(/Ü/g, 'U')
-    .replace(/ü/g, 'u')
-    .replace(/Ş/g, 'S')
-    .replace(/ş/g, 's')
-    .replace(/İ/g, 'I')
-    .replace(/ı/g, 'i')
-    .replace(/Ö/g, 'O')
-    .replace(/ö/g, 'o')
-    .replace(/Ç/g, 'C')
-    .replace(/ç/g, 'c');
-}
+export { convertVttToSrt };
 
-function getMediaStreamInfo(filePath) {
-  try {
-    const raw = execSync(`ffprobe -v error -show_entries stream=codec_type,codec_name,width,height,sample_rate,channels -of json "${filePath}"`, { timeout: 10000 }).toString();
-    const data = JSON.parse(raw);
-    const video = data.streams?.find(s => s.codec_type === 'video');
-    const audio = data.streams?.find(s => s.codec_type === 'audio');
-    return {
-      vCodec: video?.codec_name || '',
-      width: Number(video?.width) || 0,
-      height: Number(video?.height) || 0,
-      aCodec: audio?.codec_name || '',
-      sampleRate: audio?.sample_rate ? String(audio.sample_rate) : '',
-      channels: Number(audio?.channels) || 0
-    };
-  } catch (e) {
-    return null;
-  }
-}
-
-export function convertVttToSrt(vttText) {
-  if (!vttText) return '';
-  let srt = vttText
-    .replace(/^WEBVTT[^\r\n]*\r?\n/i, '')
-    .replace(/NOTE[^\r\n]*\r?\n([\s\S]*?\r?\n\r?\n)/gi, '')
-    .replace(/(\d{2}):(\d{2}):(\d{2})\.(\d{3})/g, '$1:$2:$3,$4')
-    .replace(/(\d{2}):(\d{2})\.(\d{3})/g, '00:$1:$2,$3')
-    .replace(/<[^>]+>/g, '')
-    .trim();
-
-  const blocks = srt.split(/\r?\n\r?\n+/);
-  const numberedBlocks = [];
-  let seq = 1;
-  for (let block of blocks) {
-    block = block.trim();
-    if (!block) continue;
-    const lines = block.split(/\r?\n/);
-    if (!/^\d+$/.test(lines[0])) {
-      numberedBlocks.push(`${seq}\n${block}`);
-    } else {
-      numberedBlocks.push(block);
-    }
-    seq++;
-  }
-  return numberedBlocks.join('\n\n');
-}
-
-// ─── Retry Yardımcısı ───
-async function withRetry(fn, retries = 3, delayMs = 3000) {
-  let lastError;
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (err.message === 'İndirme iptal edildi.') throw err; // İptal edilmişse retry etme
-      if (attempt < retries) {
-        console.warn(`[RETRY] Deneme ${attempt}/${retries} başarısız: ${err.message}. ${delayMs/1000}sn sonra tekrar...`);
-        await new Promise(r => setTimeout(r, delayMs));
-      }
-    }
-  }
-  throw lastError;
-}
+const logger = getModuleLogger('pipelines');
 
 // Global media sending queue with concurrency support
 let activeUploadsCount = 0;

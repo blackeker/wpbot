@@ -3,6 +3,9 @@ import { executeDownloadPipeline } from './pipelines.js';
 import fs from 'fs';
 import path from 'path';
 import Database from 'better-sqlite3';
+import { getModuleLogger } from './utils/logger.js';
+
+const logger = getModuleLogger('queue');
 
 const dbPath = path.join(sessionPath, process.env.QUEUE_DB_NAME || 'queue.db');
 const db = new Database(dbPath);
@@ -202,9 +205,9 @@ function loadQueueFromFile() {
     }
     taskIdCounter = maxId + 1;
 
-    console.log(`[QUEUE] SQLite veri tabanından ${downloadQueue.length} adet bekleyen/yarıda kalmış görev geri yüklendi.`);
+    logger.info({ count: downloadQueue.length }, `[QUEUE] SQLite veri tabanından ${downloadQueue.length} adet bekleyen/yarıda kalmış görev geri yüklendi.`);
   } catch (err) {
-    console.error('Kuyruk veri tabanından yüklenemedi:', err.message);
+    logger.error({ err: err.message }, 'Kuyruk veri tabanından yüklenemedi');
   }
 }
 

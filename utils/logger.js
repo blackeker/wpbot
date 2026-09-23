@@ -17,12 +17,24 @@ const streams = [
 
 export const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  timestamp: pino.stdTimeFunctions.isoTime
+  timestamp: pino.stdTimeFunctions.isoTime,
+  serializers: {
+    err: pino.stdSerializers.err,
+    error: pino.stdSerializers.err
+  }
 }, pino.multistream(streams));
 
 export const fileLogger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  timestamp: pino.stdTimeFunctions.isoTime
+  timestamp: pino.stdTimeFunctions.isoTime,
+  serializers: {
+    err: pino.stdSerializers.err,
+    error: pino.stdSerializers.err
+  }
 }, fs.createWriteStream(logFile, { flags: 'a' }));
+
+export function getModuleLogger(moduleName) {
+  return logger.child({ module: moduleName });
+}
 
 export default logger;

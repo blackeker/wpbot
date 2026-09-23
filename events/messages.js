@@ -43,6 +43,23 @@ export async function handleMessage(sock, m) {
 
   console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}"`);
 
+  // --- WhatsApp Captcha Resmine Yanıt Verme (Reply) Yakalayıcı ---
+  const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+  if (quotedMsg && text) {
+    const quotedCaption = (quotedMsg.conversation || quotedMsg.imageMessage?.caption || quotedMsg.extendedTextMessage?.text || '').toLowerCase();
+    if (quotedCaption.includes('captcha') || quotedCaption.includes('durduruldu') || quotedCaption.includes('hesap')) {
+      const code = text.replace(/^!coz\s*/i, '').trim();
+      if (code) {
+        console.log(`[CAPTCHA REPLIED] Captcha görseline yanıt verildi. Gönderilen kod: "${code}"`);
+        const cozCmd = commands.get('coz');
+        if (cozCmd) {
+          await cozCmd.execute(sock, msg, from, [code], { text: `!coz ${code}`, ltext: `!coz ${code}` });
+          return;
+        }
+      }
+    }
+  }
+
   if (msg.key.fromMe) {
     if (config.groupJid && from !== config.groupJid) {
       return;

@@ -25,8 +25,11 @@ export default {
 • *!namaz [şehir]* ➔ Namaz vakitleri & kalan zaman geri sayımı.
 • *!deprem* ➔ Kandilli Rasathanesi son depremler.
 
-🧰 *FAYDALI ARAÇLAR:*
-• *!mesaj <numara> <metin>* ➔ Belirtilen numaraya özel mesaj gönderir (Örn: \`!mesaj 05551234567 Selam\`).
+🧰 *FAYDALI ARAÇLAR & CAPTCHA AI:*
+• *!otocoz* / *!cozai* ➔ Bekleyen Discord Captchalarını AI OCR ile otomatik çözer ve iletir.
+• *!captcha* ➔ Kilitli veya çözülmeyi bekleyen Captchaları ve görsellerini listeler.
+• *!coz <KOD>* ➔ Manuel Captcha çözümü gönderir.
+• *!mesaj <numara> <metin>* ➔ Belirtilen numaraya özel mesaj gönderir (Örn: `!mesaj 05551234567 Selam`).
 • *!hatirlat <süre> <not>* ➔ Hatırlatıcı kurar (Örn: \`!hatirlat 10dk su iç\`).
 • *!qr <metin/link>* ➔ Anında QR kod resmi oluşturur.
 • *!kisalt <link>* ➔ Uzun linkleri kısaltır.

@@ -1,14 +1,14 @@
 import axios from 'axios';
 
-const DISCORD_API_BASE = 'http://127.0.0.1:8181';
+const DISCORD_API_BASE = 'http://127.0.0.1:3000';
 
 export async function getDiscordCaptchas() {
-  const res = await axios.get(`${DISCORD_API_BASE}/api/captcha`);
+  const res = await axios.get(`${DISCORD_API_BASE}/api/status`);
   return res.data;
 }
 
 export async function solveDiscordCaptcha(payload) {
-  const res = await axios.post(`${DISCORD_API_BASE}/api/control/solve`, payload);
+  const res = await axios.post(`${DISCORD_API_BASE}/api/send-captcha`, payload);
   return res.data;
 }
 
