@@ -10,7 +10,8 @@
     "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop wpbot",
     "pm2:restart": "pm2 restart wpbot",
-    "pm2:logs": "pm2 logs wpbot"
+    "pm2:logs": "pm2 logs wpbot",
+    "menu": "node menu-cli.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",

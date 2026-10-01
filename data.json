@@ -1,11 +1,35 @@
 [
   {
-    "tarih": "14.09.2026",
-    "gun": "Pazartesi",
+    "tarih": "01.10.2026",
+    "gun": "Perşembe",
     "kahvalti": [
-      "Sade Omlet",
+      "Haşlanmış Yumurta",
+      "Patates Kavurması",
+      "Karışık Pizza",
+      "Kaşar Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Mercimek Çorbası / Şehriye Çorbası",
+      "Tavuk Döner  / Karışık Sebze Graten",
+      "Pirinç Pilavı",
+      "Mevsim Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "02.10.2026",
+    "gun": "Cuma",
+    "kahvalti": [
+      "Menemen",
       "Patates Kızartması",
-      "Simit",
+      "Çikolatalı Kek",
       "Beyaz Peynir",
       "Siyah/Yeşil Zeytin",
       "Çeyrek Ekmek",
@@ -14,24 +38,24 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Süzme Çorba / Sebze Çorba",
-      "Izgara Köfte / Karışık Kızartma",
-      "Soslu Makarna",
-      "Mevsim Salata",
-      "Meyve Suyu / Ayran",
+      "Domates Çorbası / Yayla Çorbası",
+      "Etsiz Kuru Fasulye / Kabak Kalye (Sulu) / Tavuk Fajita",
+      "Şehriyeli Bulgur Pilavı",
+      "Haydari",
       "Çeyrek Ekmek",
-      "500 ml Su"
+      "500 ml Su",
+      "Puding"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "15.09.2026",
-    "gun": "Salı",
+    "tarih": "03.10.2026",
+    "gun": "Cumartesi",
     "kahvalti": [
       "Haşlanmış Yumurta",
-      "Menemen",
-      "Zeytinli/Peynirli Açma",
-      "Kaşar Peyniri",
+      "Karışık Kızartma",
+      "Simit",
+      "Labne Peynir",
       "Siyah/Yeşil Zeytin",
       "Çeyrek Ekmek",
       "500 ml Su",
@@ -39,19 +63,66 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ayran Aşı Çorba / Mercimek Çorba",
-      "Sebzeli Tavuk Sote / Yoğurtlu Mantı",
-      "Şehriyeli Pirinç Pilavı",
-      "Ezme",
-      "Meyve Suyu / Ayran",
+      "Tarhana Çorbası / Düğün Çorbası",
+      "Tas kebabı / Şinitzel / İmam Bayıldı",
+      "Pirinç Pilavı",
+      "Mevsim Salata",
+      "Çey",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "04.10.2026",
+    "gun": "Pazar",
+    "kahvalti": [
+      "Sade Omlet",
+      "Salçalı Sosis",
+      "Peynirli Börek",
+      "Beyaz Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Ezogelin Çorbası / Tutmaç Çorbası",
+      "Fırında Tavuk Biftek / Mücver / Etli Dolma",
+      "Salçalı Makarna",
+      "Tarator",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "16.09.2026",
-    "gun": "Çarşamba",
+    "tarih": "05.10.2026",
+    "gun": "Pazartesi",
+    "kahvalti": [
+      "Haşlanmış Yumurta",
+      "Patates Kızartması",
+      "Zeytinli/Peynirli Açma",
+      "Kaşar Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Terbiyeli Sebze Çorbası / Domates",
+      "Çiftlik Köfte / Nugget / Taze Fasulye",
+      "Yeşil Mercimekli Bulgur Pilavı",
+      "Şekerpare",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "06.10.2026",
+    "gun": "Salı",
     "kahvalti": [
       "Kaşarlı Omlet",
       "Patates Salatası",
@@ -64,48 +135,22 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ezogelin Çorba / Domates Çorba",
-      "Sebzeli Köfte / Taze Fasulye",
-      "Soslu Makarna",
-      "Browni",
-      "Meyve Suyu / Ayran",
+      "Mercimek Çorbası / Ayran Aşı",
+      "Tavuk Kavurma / Mantı / Arap Tava",
+      "Nohutlu Pirinç Pilavı",
+      "Mevsim Salata",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "17.09.2026",
-    "gun": "Perşembe",
+    "tarih": "07.10.2026",
+    "gun": "Çarşamba",
     "kahvalti": [
       "Haşlanmış Yumurta",
       "Sosis Kızartma",
-      "Peynirli/Ispanaklı Börek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Süzme Çorba / Tarhana Çorba",
-      "Tavuk Kavurma / Dolma",
-      "Şehriyeli Bulgur Pilavı",
-      "Elma",
-      "Meyve Suyu / Ayran",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "18.09.2026",
-    "gun": "Cuma",
-    "kahvalti": [
-      "Sucuklu Yumurta",
-      "Patates Kızartması",
-      "Simit",
+      "Ispanaklı Börek",
       "Labne Peynir",
       "Siyah/Yeşil Zeytin",
       "Çeyrek Ekmek",
@@ -114,24 +159,22 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Mercimek Çorba / Domates Çorba",
-      "Etli Kuru Fasulye / Soslu Karışık Kızartma / Sebzeli Tavuk Biftek",
-      "Şehriyeli Pirinç Pilavı",
-      "Mevsim Salata",
-      "Şekerpare",
-      "Meyve Suyu / Ayran",
+      "Şehriye Çorbası / Yayla Çorbası",
+      "Karnıyarık / Tavuk Tantuni / Karışık Kızartma",
+      "Fırın Makarna",
+      "Cacık",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "19.09.2026",
-    "gun": "Cumartesi",
+    "tarih": "08.10.2026",
+    "gun": "Perşembe",
     "kahvalti": [
-      "Haşlanmış Yumurta",
+      "Sucuklu Omlet",
       "Karışık Kızartma",
-      "Pişi + Reçel",
+      "Kakaolu Kek",
       "Beyaz Peynir",
       "Siyah/Yeşil Zeytin",
       "Çeyrek Ekmek",
@@ -140,24 +183,23 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Süzme Çorba / Şehriyeli Yayla Çorba",
-      "Tavuk Sote / 100 gr. Kemikli Tavuk / Sebzeli Orman Kebabı",
-      "Makarna Salatası",
-      "Karpuz / Kavun",
-      "Meyve Suyu / Ayran",
+      "Düğün Çorbası / Şehriye Çorbası",
+      "Fırın Tavuk Baget / Kabak Kalye / Etli Taze Fasülye",
+      "Sebzeli Bulgur Pilavı",
+      "Sütlaç",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "20.09.2026",
-    "gun": "Pazar",
+    "tarih": "09.10.2026",
+    "gun": "Cuma",
     "kahvalti": [
-      "Peynirli Omlet",
-      "Patates Kavurması",
-      "Çikolatalı Kek",
-      "Kaşar Peynir",
+      "Haşlanmış Yumurta",
+      "Patates Kızartması",
+      "Kek + Bal + Tereyağı",
+      "Beyaz Peynir",
       "Siyah/Yeşil Zeytin",
       "Çeyrek Ekmek",
       "500 ml Su",
@@ -165,19 +207,42 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ezogelin Çorba / Yeşil Mercimek Çorba",
-      "Patlıcan Parmak Kebabı / Bezelye Yemeği",
-      "Sebzeli Bulgur Pilavı",
-      "Yoğurt",
-      "Meyve Suyu / Ayran",
+      "Tarhana Çorbası / Mısır Çorbası",
+      "Orman Kebabı / Tavuk Şiş / Yoğurtlu Mantı",
+      "Pirinç Pilavı",
+      "Pembe Sultan",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "21.09.2026",
-    "gun": "Pazartesi",
+    "tarih": "10.10.2026",
+    "gun": "Cumartesi",
+    "kahvalti": [
+      "Peynirli Omlet",
+      "Patates Kavurması",
+      "Peynirli Börek",
+      "Labne Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Süzme Mercimek Çorbası / Yayla Çorbası",
+      "Çıtır Tavuk+Patates Kızartması / Mücver / Fırında Dizme Köfte",
+      "Domates Soslu Makarna",
+      "Mevsim Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "11.10.2026",
+    "gun": "Pazar",
     "kahvalti": [
       "Haşlanmış Yumurta",
       "Patates Kızartması",
@@ -190,23 +255,22 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Tarhana Çorba / Şehriyeli Yayla Çorba",
-      "Tavuk Döner / Taze Fasulye",
-      "Nohutlu Pirinç Pilavı",
-      "Mevsim Salata",
-      "Meyve Suyu / Ayran",
+      "Terbiyeli Sebze Çorbası / Şehriye Çorbası",
+      "Etsiz Kuru Fasülye / Karışık Dolma / Tavuk Baget Kızartma",
+      "Erişte Pilavı",
+      "Cevizli Baklava",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "22.09.2026",
-    "gun": "Salı",
+    "tarih": "12.10.2026",
+    "gun": "Pazartesi",
     "kahvalti": [
       "Sade Omlet",
-      "Sosis Kızartma",
-      "Sade Poğaça",
+      "Patates Kızartması",
+      "Çikolatalı Kek",
       "Kaşar Peynir",
       "Siyah/Yeşil Zeytin",
       "Çeyrek Ekmek",
@@ -215,22 +279,45 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ayran Aşı Çorba / Mercimek Çorba",
-      "Kavurma / Sulu Nohut",
-      "Şehriyeli Pirinç Pilavı",
-      "Mevsim Salata",
-      "Meyve Suyu / Ayran",
+      "Mercimek Çorbası / Ayran Aşı",
+      "Kavurma / Sulu Nohut / Tavuk Çöp Şiş",
+      "Pirinç Pilavı",
+      "Karışık Salata",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "23.09.2026",
-    "gun": "Çarşamba",
+    "tarih": "13.10.2026",
+    "gun": "Salı",
     "kahvalti": [
       "Haşlanmış Yumurta",
-      "Patates Kızartması",
+      "Salçalı Sosis",
+      "Sade Poğaça",
+      "Beyaz Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Tarhana Çorbası / Domates Çorbası",
+      "Fırında Tavuk Baget / Karışık Sebze Graten / Patlıcan Musakka",
+      "Nohutlu Pirinç Pilavı",
+      "Mevsim Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "14.10.2026",
+    "gun": "Çarşamba",
+    "kahvalti": [
+      "Kaşarlı Omlet",
+      "Karışık Kızartma",
       "Zeytinli/Peynirli Açma",
       "Beyaz Peynir",
       "Siyah/Yeşil Zeytin",
@@ -240,21 +327,69 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ezogelin Çorba / Dövme Çorba",
-      "Tavuk Çöp Şiş / Yoğurtlu Kabak",
+      "Ezogelin Çorbası / Tutmaç Çorbası",
+      "Hamburger Köfte + Patates / Tavuk Burger / Bezelye Yemeği",
       "Soslu Makarna",
-      "Puding",
-      "Meyve Suyu / Ayran",
+      "Ayran",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "24.09.2026",
+    "tarih": "15.10.2026",
     "gun": "Perşembe",
     "kahvalti": [
-      "Kaşarlı Omlet",
+      "Haşlanmış Yumurta",
+      "Patates Salatası",
+      "Sürülebilir Çikolata + Kek",
+      "Labne Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Mercimek Çorba / Mısır Çorba",
+      "Tavuk Fajita / Yoğurtlu Mantı / Kilis Tava",
+      "Yeşil Mercimekli Bulgur Pilavı",
+      "Çoban Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "16.10.2026",
+    "gun": "Cuma",
+    "kahvalti": [
+      "Menemen",
+      "Patates Kızartması",
+      "Simit",
+      "Krem Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Ayran Aşı Çorba / Ezogelin Çorbası",
+      "Etsiz Kuru Fasülye / Mevsim Soslu Karışık Kızartma / Tavuk Külbastı",
+      "Mısırlı Pirinç Pilavı",
+      "Rus Salatası",
+      "Revani",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "17.10.2026",
+    "gun": "Cumartesi",
+    "kahvalti": [
+      "Haşlanmış Yumurta",
       "Karışık Kızartma",
       "Peynirli Börek",
       "Beyaz Peynir",
@@ -265,96 +400,20 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Süzme Çorba / Mahluta Çorba",
-      "Etsiz Kuru Fasulye / Mevsim Soslu Karışık Kızartma / Tavuk Külbastı",
-      "Erişte Pilavı",
-      "Baklava (Cevizli)",
-      "Meyve Suyu / Ayran",
+      "Sebze Çorbası / Tarhana Çorbası",
+      "Tavuk Tantuni / Bezelye Yemeği / Patlıcan Musakka",
+      "Salçalı Makarna",
+      "Ayran",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "25.09.2026",
-    "gun": "Cuma",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Salatası",
-      "Pankek + Bal",
-      "Kaşar Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Mercimek Çorba / Tarhana Çorba",
-      "Karnıyarık / Mevsim Türlü",
-      "Sebzeli Bulgur Pilavı",
-      "Cacık",
-      "Meyve Suyu / Ayran",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "26.09.2026",
-    "gun": "Cumartesi",
-    "kahvalti": [
-      "Menemen",
-      "Salçalı Sosis",
-      "Simit",
-      "Krem Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Domates Çorba / Süzme Çorba",
-      "Tavuk Sote / Dolma",
-      "Fırın Makarna",
-      "Elma",
-      "Meyve Suyu / Ayran",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "27.09.2026",
+    "tarih": "18.10.2026",
     "gun": "Pazar",
     "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Kızartması",
-      "Peynirli/Ispanaklı Börek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Tarhana Çorba / Şehriyeli Yayla Çorba",
-      "Orman Kebabı / Yoğurtlu Mantı",
-      "Şehriyeli Pirinç Pilavı",
-      "Mevsim Salata",
-      "Meyve Suyu / Ayran",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "28.09.2026",
-    "gun": "Pazartesi",
-    "kahvalti": [
-      "Sucuklu Yumurta",
+      "Sucuklu Omlet",
       "Patates Kavurması",
       "Dere Otlu Poğaça",
       "Beyaz Peynir",
@@ -365,23 +424,22 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Mercimek Çorba / Mahluta Çorba",
-      "Hamburger Köfte + Patates / Bezelye Yemeği",
-      "Sebzeli Makarna",
-      "Mercimek Köfte",
-      "Meyve Suyu / Ayran",
+      "Ayran Aşı Çorbası / Mercimek Çorbası",
+      "Güveç / Ispanak Kavurma",
+      "Şehriyeli Bulgur Pilavı",
+      "Cacık",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "29.09.2026",
-    "gun": "Salı",
+    "tarih": "19.10.2026",
+    "gun": "Pazartesi",
     "kahvalti": [
       "Haşlanmış Yumurta",
-      "Karışık Kızartma",
-      "Pişi + Sürülebilir Çikolata",
+      "Sosis Kızartma",
+      "Reçel",
       "Kaşar Peynir",
       "Siyah/Yeşil Zeytin",
       "Çeyrek Ekmek",
@@ -390,23 +448,23 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ezogelin Çorba / Ayran Aşı Çorba",
-      "Çıtır Tavuk + Patates / Soslu Karışık Kızartma",
-      "Şehriyeli Bulgur Pilavı",
+      "Tarhana Çorbası / Mercimek Çorbası",
+      "Tavuk Kavurma / Karışık Sebze Kızartma / Çiftlik Köfte",
+      "Fırın Makarna",
       "Mevsim Salata",
-      "Meyve Suyu / Ayran",
       "Çeyrek Ekmek",
-      "500 ml Su"
+      "500 ml Su",
+      "Cevizli Baklava"
     ],
     "aksam_yemegi_kaynak": "[cite: 1]"
   },
   {
-    "tarih": "30.09.2026",
-    "gun": "Çarşamba",
+    "tarih": "20.10.2026",
+    "gun": "Salı",
     "kahvalti": [
       "Peynirli Omlet",
-      "Salçalı Sosis",
-      "Sade Poğaça",
+      "Patates Kızartması",
+      "Karışık Pizza",
       "Beyaz Peynir",
       "Siyah/Yeşil Zeytin",
       "Çeyrek Ekmek",
@@ -415,11 +473,276 @@
     ],
     "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Süzme Çorba / Domates Çorba",
-      "Çiftlik Kebabı / Sulu Nohut",
-      "Şehriyeli Pirinç Pilavı",
-      "Islak Kek",
-      "Meyve Suyu / Ayran",
+      "Ezogelin Çorbası / Sebze Çorbasu",
+      "Hamburger Köfte + Patates / Tavuk Burger / Taze Fasulye",
+      "Pirinç Pilavı",
+      "Ayran",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "21.10.2026",
+    "gun": "Çarşamba",
+    "kahvalti": [
+      "Haşlanmış Yumurta",
+      "Karışık Kızartma",
+      "Sade Poğaça",
+      "Labne Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Sebze Çorbası / Mercimek Çorbası",
+      "Fırında Sebzeli Tavuk Izgara / Mevsim Türlü / Etli Dolma",
+      "Soslu Makarna",
+      "Karışık Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "22.10.2026",
+    "gun": "Perşembe",
+    "kahvalti": [
+      "Sade Omlet",
+      "Patates Salatası",
+      "Çikolatalı Kek",
+      "Beyaz Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Yayla Çorbası / Şehriye Çorbası",
+      "Etli Kuru Fasulye / Mevsim Soslu Karışık Kızartma / Tavuk Çöp Şiş",
+      "Bulgur Pilavı",
+      "Haydari",
+      "Tahin Helva",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "23.10.2026",
+    "gun": "Cuma",
+    "kahvalti": [
+      "Haşlanmış Yumurta",
+      "Patates Kızartması",
+      "Peynirli Börek",
+      "Beyaz Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Ezogelin / Domates Çorbası",
+      "Patlıcan Musakka / Nugget / Yoğurtlu Kabak",
+      "Soslu Makarna",
+      "Karışık Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "24.10.2026",
+    "gun": "Cumartesi",
+    "kahvalti": [
+      "Kaşarlı Omlet",
+      "Karışık Kızartma",
+      "Sucuklu Yumurta",
+      "Krem Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Ayran Aşı Çorbası / Tarhana Çorbası",
+      "Şinitzel / Rosto Köfte / Sulu Patates",
+      "Erişte Pilavı",
+      "Şekerpare",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "25.10.2026",
+    "gun": "Pazar",
+    "kahvalti": [
+      "Haşlanmış Yumurta",
+      "Sosis Kızartma",
+      "Simit",
+      "Beyaz Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Mahluta Çorbası / Sebze Çorbası",
+      "Patlıcan Parmak Kebabı / Fırında Tavuk / Tavuk Baget Kızartma",
+      "Bulgur Pilavı",
+      "eZME",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "26.10.2026",
+    "gun": "Pazartesi",
+    "kahvalti": [
+      "Sucuklu Omlet",
+      "Patates Salatası",
+      "Dere Otlu Poğaça",
+      "Krem Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Şehriye Çorbası / Mercimek Çorbası",
+      "Tavuk Döner  / Karışık Sebze Graten",
+      "Pirinç Pilavı",
+      "Karışık Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "27.10.2026",
+    "gun": "Salı",
+    "kahvalti": [
+      "Haşlanmış Yumurta",
+      "Patates Kızartması",
+      "Kek + Bal + Tereyağı",
+      "Beyaz Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Sebze Çorbası / Tarhana Çorbası",
+      "Etsiz Kuru Fasulye / Mevsim Soslu Karışık Kızartma / Nugget",
+      "Erişte Pilavı",
+      "Yoğurt",
+      "Browni",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "28.10.2026",
+    "gun": "Çarşamba",
+    "kahvalti": [
+      "Sucuklu Omlet",
+      "Patates Kavurması",
+      "Zeytinli/Peynirli Açma",
+      "Kaşar Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Mercimek Çorbası / Domates Çorbası",
+      "Kuşbaşı Tavuklu Kebap / Tavuk Kavurma / Bezelye Yemeği",
+      "Şehriyeli Bulgur Pilavı",
+      "Çoban Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "29.10.2026",
+    "gun": "Perşembe",
+    "kahvalti": [
+      "Menemen",
+      "Karışık Kızartma",
+      "Mozaik Kek",
+      "Beyaz Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Ezogelin Çorba / Tarhana Çorbası",
+      "Tavuk Tantuni / Mücver / Kıymalı Ispanak",
+      "Makarna Salatası",
+      "Ayran",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "30.10.2026",
+    "gun": "Cuma",
+    "kahvalti": [
+      "Sade Omlet",
+      "Patates Kızartması",
+      "Simit",
+      "Beyaz Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Mercimek Çorbası / Yayla Çorbası",
+      "Ekmek Arası Köfte / Tavuk Sote / Yoğurtlu Mantı",
+      "Nohutlu Pirinç Pilavı Pirinç Pilavı",
+      "Mevsim Salata",
+      "Çeyrek Ekmek",
+      "500 ml Su"
+    ],
+    "aksam_yemegi_kaynak": "[cite: 1]"
+  },
+  {
+    "tarih": "31.10.2026",
+    "gun": "Cumartesi",
+    "kahvalti": [
+      "Haşlanmış Yumurta",
+      "Salçalı Sosis",
+      "Ispanaklı Börek",
+      "Labne Peynir",
+      "Siyah/Yeşil Zeytin",
+      "Çeyrek Ekmek",
+      "500 ml Su",
+      "Çay/Bitki Çayı"
+    ],
+    "kahvalti_kaynak": "[cite: 2]",
+    "aksam_yemegi": [
+      "Dövme Çorba / Domates Çorbası",
+      "Orman Kebabı/ Ispanaklı Yemeği / Tavuk Şiş",
+      "Bulgur Pilavı",
+      "Sütlaç",
       "Çeyrek Ekmek",
       "500 ml Su"
     ],
