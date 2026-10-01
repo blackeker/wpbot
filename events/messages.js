@@ -625,18 +625,15 @@ async function processSingleMessage(sock, msg) {
   }
 
   // Help / Menu check
-  const isMenuRequest = [
-    'menü', 'menu', 'merhaba', 'selam', 'sa', 'hey', 'hi',
-    'ne yapabilirsin', 'ne yaparsın', 'yardım', 'yardim',
-    '!yardım', '!yardim', '!help', 'help', '!menu', '!menü'
-  ].includes(ltext);
+  const menuMatch = ltext.match(/^(?:!?(?:menü|menu|yardım|yardim|help|rehber)|merhaba|selam|sa|hey|hi|ne yapabilirsin|ne yaparsın)(?:\s+(.*))?$/i);
 
-  if (isMenuRequest) {
+  if (menuMatch) {
     const yardimCmd = commands.get('yardim');
     if (yardimCmd) {
       console.log(`[COMMAND] Executing 'yardim' for ${from}...`);
       try {
-        await yardimCmd.execute(sock, msg, from, [], { text });
+        const menuArgs = menuMatch[1] ? menuMatch[1].trim().split(/\s+/) : [];
+        await yardimCmd.execute(sock, msg, from, menuArgs, { text, ltext });
         console.log(`[COMMAND] Finished 'yardim' for ${from}`);
       } catch (err) {
         console.error('[Yardım Komutu] Hata:', err.message);
@@ -728,6 +725,9 @@ async function processSingleMessage(sock, msg) {
     } else if (['sinav', 'sınav', 'sayac', 'sayaç', 'sınavlar', 'sinavlar', 'sınav sayacı'].includes(ltext)) {
       commandName = 'takvim';
       args = ['sayac'];
+    } else if (/^(?:ciz|çiz|imagine|airesim|aiciz)(?:\s+.*)?$/i.test(ltext)) {
+      commandName = 'ciz';
+      args = text.trim().split(/\s+/).slice(1);
     }
   }
 
