@@ -21,6 +21,7 @@ export default {
 • *!kahvalti [gün/tarih]* ➔ Günün kahvaltı menüsü (Örn: \`!kahvalti yarin\`).
 • *!aksam [gün/tarih]* ➔ Günün akşam yemeği menüsü (Örn: \`!aksam\`).
 • *!yemek [gün/tarih]* ➔ Günlük kahvaltı + akşam tam menüsü.
+• *!adres* ➔ Ahmet Kabaklı Öğrenci Yurdu adresini gönderir.
 • *!haber* ➔ Son dakika gündem haberleri.
 • *!namaz [şehir]* ➔ Namaz vakitleri & kalan zaman geri sayımı.
 • *!deprem* ➔ Kandilli Rasathanesi son depremler.

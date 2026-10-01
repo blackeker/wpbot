@@ -859,9 +859,91 @@ export default {
 
     // Tekil Video / Link İndirme
     try {
-      const isPlaylist = /[?&]list=/.test(singleUrl) && !/[?&]v=/.test(singleUrl);
+      const isPlaylist = /[?&]list=([a-zA-Z0-9_-]+)/i.test(singleUrl);
+
+      // ── YouTube Playlist Desteği ──
+      if (isYouTubeUrl && isPlaylist) {
+        const { getYouTubePlaylistVideos } = await import('../extractor.js');
+        await sock.sendMessage(from, { text: '🔍 YouTube oynatma listesi taranıyor, lütfen bekleyin...' });
+        try {
+          const { playlistTitle, videos } = await getYouTubePlaylistVideos(singleUrl);
+          if (!videos || videos.length === 0) {
+            await sock.sendMessage(from, { text: '❌ Bu oynatma listesinde video bulunamadı veya liste gizli/boş.' });
+            return;
+          }
+
+          // Direct auto-download if user specified 'hepsi', 'tümü', 'full', 'all', 'oto'
+          const wantsAll = nonUrlParts.some(p => ['hepsi', 'tümü', 'tumu', 'all', 'full', 'oto', 'tamamı'].includes(p.toLowerCase()));
+          if (wantsAll) {
+            const formatLabel = isMp3Cmd ? '🎵 MP3 (Ses)' : '🎬 MP4 (Video)';
+            await sock.sendMessage(from, {
+              text: `🎵 *${playlistTitle}*\n📦 Toplam *${videos.length}* video doğrudan sıraya ekleniyor...\nFormat: ${formatLabel}`
+            });
+            let addedCount = 0;
+            let skipCount = 0;
+            for (const v of videos) {
+              try {
+                addDownloadTask(v.url, from, `${playlistTitle} - ${v.number}. ${v.title}`, isMp3Cmd ? 'mp3' : null, priority);
+                addedCount++;
+              } catch (e) {
+                skipCount++;
+              }
+            }
+            let replyMsg = `✅ Toplam *${addedCount}* video başarıyla sıraya eklendi.`;
+            if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+            if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+            replyMsg += `\n\nSırayı görmek için: \`!kuyruk\``;
+            await sock.sendMessage(from, { text: replyMsg });
+            return;
+          }
+
+          // Direct auto-download if user specified a range like "1-12"
+          if (numRange) {
+            const rangeVideos = videos.filter(v => v.number >= numRange.start && v.number <= numRange.end);
+            if (rangeVideos.length > 0) {
+              const formatLabel = isMp3Cmd ? '🎵 MP3 (Ses)' : '🎬 MP4 (Video)';
+              await sock.sendMessage(from, {
+                text: `🎵 *${playlistTitle}* - Video ${numRange.start}-${numRange.end}\n📦 Toplam *${rangeVideos.length}* video sıraya ekleniyor...\nFormat: ${formatLabel}`
+              });
+              let addedCount = 0;
+              for (const v of rangeVideos) {
+                try {
+                  addDownloadTask(v.url, from, `${playlistTitle} - ${v.number}. ${v.title}`, isMp3Cmd ? 'mp3' : null, priority);
+                  addedCount++;
+                } catch (e) {}
+              }
+              await sock.sendMessage(from, { text: `✅ Toplam *${addedCount}* video başarıyla sıraya eklendi.\nSırayı görmek için: \`!kuyruk\`` });
+              return;
+            }
+          }
+
+          pendingSelections[from] = {
+            type: 'youtube_playlist',
+            playlistTitle,
+            videos,
+            isMp3: isMp3Cmd,
+            priority
+          };
+
+          const formatLabel = isMp3Cmd ? '🎵 *Format:* MP3 (Ses Dosyası)' : '🎬 *Format:* MP4 (Video)';
+          let prompt = `🎵 *${playlistTitle}* (YouTube Oynatma Listesi)\n` +
+            `📦 Toplam *${videos.length}* video bulundu.\n` +
+            `${formatLabel}\n\n` +
+            `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
+            `1️⃣ *Tüm Oynatma Listesini İndir:* *hepsi* (veya *1*)\n` +
+            `2️⃣ *Video Aralığı İndir:* *başlangıç-bitiş* (Örn: *1-10* veya *5-25*)\n` +
+            `3️⃣ *Tek Video İndir:* Sadece video numarasını yazın (Örn: *5*)\n\n` +
+            `❌ İptal etmek için: *iptal*`;
+
+          await sock.sendMessage(from, { text: prompt });
+          return;
+        } catch (err) {
+          await sock.sendMessage(from, { text: `❌ YouTube oynatma listesi alınırken hata oluştu: ${err.message}` });
+          return;
+        }
+      }
       
-      if (isYouTubeUrl && !isPlaylist && !isMp3Cmd) {
+      if (isYouTubeUrl && !isMp3Cmd) {
         const activeProxy = getProxyUrl();
         const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
         const ytDlpCmd = getYtDlpCommand();

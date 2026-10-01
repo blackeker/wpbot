@@ -229,6 +229,82 @@ async function processSingleMessage(sock, msg) {
       }
     }
 
+    if (selection.type === 'youtube_playlist') {
+      const input = text.trim().toLowerCase();
+
+      if (input === 'iptal' || input === 'vazgeç' || input === 'cancel') {
+        delete pendingSelections[from];
+        await sock.sendMessage(from, { text: '❌ YouTube oynatma listesi indirme işlemi iptal edildi.' });
+        return;
+      }
+
+      let selectedVideos = [];
+      let label = '';
+
+      // 1. All videos
+      if (input === 'hepsi' || input === '1' || input === 'tümü' || input === 'full' || input === 'all' || input === 'liste') {
+        selectedVideos = selection.videos;
+        label = `Tüm Liste (${selectedVideos.length} Video)`;
+      } else {
+        // 2. Video range (e.g. 1-10, 5 15, 1-50)
+        const rangeMatch = input.match(/^(\d+)\s*[-to–—\s]\s*(\d+)$/i) || input.match(/^(\d+)\s+(\d+)$/);
+        const singleMatch = input.match(/^(\d+)$/);
+
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          const minNum = Math.min(start, end);
+          const maxNum = Math.max(start, end);
+          selectedVideos = selection.videos.filter(v => v.number >= minNum && v.number <= maxNum);
+          if (selectedVideos.length > 0) {
+            label = `${minNum} ile ${maxNum} arası videolar`;
+          }
+        } else if (singleMatch) {
+          const vNum = parseInt(singleMatch[1], 10);
+          const foundV = selection.videos.find(v => v.number === vNum);
+          if (foundV) {
+            selectedVideos = [foundV];
+            label = `${vNum}. Video`;
+          }
+        }
+      }
+
+      if (selectedVideos.length > 0) {
+        delete pendingSelections[from];
+        const formatLabel = selection.isMp3 ? '🎵 MP3' : '🎬 MP4';
+        await sock.sendMessage(from, {
+          text: `🎵 *${selection.playlistTitle}* - *${label}*\n📦 Toplam *${selectedVideos.length}* video sıraya ekleniyor...\nFormat: ${formatLabel}`
+        });
+
+        let addedCount = 0;
+        let skipCount = 0;
+        for (const v of selectedVideos) {
+          try {
+            addDownloadTask(v.url, from, `${selection.playlistTitle} - ${v.number}. ${v.title}`, selection.isMp3 ? 'mp3' : null, selection.priority);
+            addedCount++;
+          } catch (e) {
+            skipCount++;
+          }
+        }
+
+        let replyMsg = `✅ Toplam *${addedCount}* video başarıyla sıraya eklendi.`;
+        if (skipCount > 0) replyMsg += `\n⚠️ *${skipCount}* adet mükerrer link atlandı.`;
+        if (selection.priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+        replyMsg += `\n\nSırayı görmek için: \`!kuyruk\``;
+        await sock.sendMessage(from, { text: replyMsg });
+        return;
+      } else {
+        await sock.sendMessage(from, {
+          text: `⚠️ Geçersiz seçim! Lütfen şunlardan birini yazın:\n\n` +
+                `- Tüm videolar için: *hepsi* (veya *1*)\n` +
+                `- Belirli video aralığı için: *başlangıç-bitiş* (Örn: *1-10* veya *5-25*)\n` +
+                `- Tek video için: video numarasını yazın (Örn: *3*)\n` +
+                `- İptal etmek için: *iptal*`
+        });
+        return;
+      }
+    }
+
     if (selection.type === 'multi_season') {
       const input = text.trim().toLowerCase();
 

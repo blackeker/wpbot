@@ -43,14 +43,30 @@ export default {
         'https://hentaizm2.com/',
         'https://www.hentaizm.fun/',
         'https://hentaizm.fun/',
-        'https://www.hentaizm.com/'
+        'https://www.hentaizm.com/',
+        'https://hentaizm.com/'
       ];
       let parsedCount = 0;
+      let sessionTokenDetected = null;
 
-      // 1. Try JSON Format
-      if (inputArg.startsWith('[') || inputArg.startsWith('{')) {
+      const cleanInput = inputArg.replace(/^["']|["']$/g, '').trim();
+
+      // 1. Try Direct Session ID / PHPSESSID Token Format (e.g. "aa2a423eabef2f8b23f48330e59ff0b7")
+      const directTokenMatch = cleanInput.match(/^(?:PHPSESSID=)?([a-zA-Z0-9_-]{16,128})$/i);
+      if (directTokenMatch) {
+        const sessId = directTokenMatch[1];
+        sessionTokenDetected = sessId;
+        for (const d of domains) {
+          const c1 = Cookie.parse(`PHPSESSID=${sessId}; Path=/`);
+          if (c1) jar.setCookieSync(c1, d);
+        }
+        parsedCount = 1;
+      }
+
+      // 2. Try JSON Format
+      if (parsedCount === 0 && (cleanInput.startsWith('[') || cleanInput.startsWith('{'))) {
         try {
-          const json = JSON.parse(inputArg);
+          const json = JSON.parse(cleanInput);
           if (Array.isArray(json)) {
             for (const item of json) {
               if (item.name && item.value) {
@@ -70,9 +86,9 @@ export default {
         } catch (e) {}
       }
 
-      // 2. Netscape & Header String Formats
+      // 3. Netscape & Header String Formats
       if (parsedCount === 0) {
-        const lines = inputArg.split(/[\r\n]+/);
+        const lines = cleanInput.split(/[\r\n]+/);
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed || trimmed.startsWith('#')) continue;
@@ -106,12 +122,11 @@ export default {
                 const k = pair.slice(0, eqIdx).trim();
                 const v = pair.slice(eqIdx + 1).trim();
                 if (k && v && !['path', 'domain', 'expires', 'max-age', 'samesite', 'httponly', 'secure'].includes(k.toLowerCase())) {
-                  const cookieString = `${k}=${v}; Domain=hentaizm2.com; Path=/`;
-                  const c = Cookie.parse(cookieString);
-                  if (c) {
-                    for (const d of domains) jar.setCookieSync(c, d);
-                    parsedCount++;
+                  for (const d of domains) {
+                    const c = Cookie.parse(`${k}=${v}; Path=/`);
+                    if (c) jar.setCookieSync(c, d);
                   }
+                  parsedCount++;
                 }
               }
             }
@@ -121,12 +136,17 @@ export default {
 
       if (parsedCount > 0) {
         writeConfig({ hentaizmCookies: jar.toJSON() });
+        const detailMsg = sessionTokenDetected
+          ? `🔑 *PHPSESSID:* \`${sessionTokenDetected}\`\n\n`
+          : `📦 *Toplam:* ${parsedCount} adet çerez\n\n`;
+
         await sock.sendMessage(from, { 
-          text: `✅ *Başarılı!* Toplam *${parsedCount}* adet Hentaizm çerezi başarıyla kaydedildi!\n\n` +
-                ` artık oturum gerektiren Hentaizm indirmelerini engelsiz bir şekilde yapabilirsiniz.` 
+          text: `✅ *Başarılı!* Hentaizm çerezi başarıyla kaydedildi!\n\n` +
+                detailMsg +
+                `Artık oturum gerektiren Hentaizm indirmelerini engelsiz bir şekilde yapabilirsiniz.` 
         });
       } else {
-        await sock.sendMessage(from, { text: '❌ *Hata:* Gönderilen çerez metni çözümlenemedi. Geçerli bir Header Cookie string veya Netscape çerez metni yapıştırın.' });
+        await sock.sendMessage(from, { text: '❌ *Hata:* Gönderilen çerez metni çözümlenemedi. Geçerli bir Session ID (Örn: `!cookie aa2a423eabef2f8b23f48330e59ff0b7`), Header Cookie string veya Netscape çerez metni yapıştırın.' });
       }
     } catch (err) {
       console.error('[Çerez Ekle] Hata:', err.message);

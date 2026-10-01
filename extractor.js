@@ -1011,4 +1011,47 @@ export async function probeMediaAudioOptions(pageUrl) {
   }
   return { hasMultipleAudios: false, availableAudios: [] };
 }
+
+export async function getYouTubePlaylistVideos(playlistUrl) {
+  const { exec } = await import('child_process');
+  const { getYtDlpCommand, getProxyUrl } = await import('./config.js');
+  
+  const ytDlpCmd = getYtDlpCommand();
+  const activeProxy = getProxyUrl();
+  const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
+
+  return new Promise((resolve, reject) => {
+    exec(`"${ytDlpCmd}" ${proxyArg} --flat-playlist -J "${playlistUrl}"`, { maxBuffer: 25 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error(`YouTube playlist alınamadı: ${stderr || err.message}`));
+      }
+      try {
+        const info = JSON.parse(stdout);
+        const playlistTitle = (info.title || 'YouTube Oynatma Listesi').replace(/[\r\n]+/g, ' ').trim();
+        const entries = info.entries || [];
+        const videos = entries.map((e, idx) => {
+          const videoTitle = (e.title || `Video ${idx + 1}`).replace(/[\r\n]+/g, ' ').trim();
+          const videoId = e.id || '';
+          const videoUrl = e.url || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : null);
+          return {
+            name: videoTitle,
+            title: videoTitle,
+            url: videoUrl,
+            id: videoId,
+            number: idx + 1,
+            duration: e.duration || 0
+          };
+        }).filter(v => v.url);
+
+        resolve({
+          playlistTitle,
+          videos,
+          totalCount: videos.length
+        });
+      } catch (parseErr) {
+        reject(new Error(`YouTube playlist verisi ayrıştırılamadı: ${parseErr.message}`));
+      }
+    });
+  });
+}
 
