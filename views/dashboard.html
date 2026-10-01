@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
@@ -969,6 +969,10 @@
           <span class="nav-icon">💬</span>
           <span>Özel Bot Komutları</span>
         </a>
+        <a class="nav-item" onclick="switchNavTab('group-permissions')">
+          <span class="nav-icon">🛡️</span>
+          <span>Grup İzinleri & Yasaklar</span>
+        </a>
         <a class="nav-item" onclick="switchNavTab('cron-station')">
           <span class="nav-icon">⏱️</span>
           <span>Cron Zamanlayıcı</span>
@@ -1664,6 +1668,144 @@
     </section>
 
     <!-- ==========================================================================
+         SEKME: GRUP İZİNLERİ VE KOMUT KISITLAMA (GROUP PERMISSIONS)
+         ========================================================================== -->
+    <section id="view-group-permissions" class="tab-view">
+      <!-- 1. Grup İzin Formu (Ekle / Düzenle) -->
+      <div class="glass-panel" style="margin-bottom: 24px;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🛡️</span>
+            <span id="group-form-title">Grup Kuralı Ekle veya Düzenle</span>
+          </div>
+          <button class="btn-secondary" onclick="resetGroupPermissionForm()">Formu Temizle 🔄</button>
+        </div>
+
+        <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:20px;">
+          Belirli WhatsApp gruplarında çalışmasını istemediğiniz veya izin vermek istediğiniz komut ve kategorileri buradan yönetebilirsiniz.
+        </p>
+
+        <!-- WhatsApp Gruplarından Seçim Kutusu -->
+        <div style="margin-bottom:20px; padding:16px; background:linear-gradient(135deg, rgba(99,102,241,0.12), rgba(6,182,212,0.06)); border-radius:var(--radius-md); border:1px solid rgba(99,102,241,0.25);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <label class="form-label" style="font-size:0.9rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+              <span>👥 Botun Bulunduğu WhatsApp Grupları:</span>
+              <span id="gp-wa-groups-count" style="background:var(--accent-primary); color:#fff; font-size:0.75rem; padding:2px 8px; border-radius:10px; font-weight:700;">0 Grup</span>
+            </label>
+            <button type="button" class="btn-secondary" onclick="fetchWhatsAppGroupsAction()" style="padding:5px 12px; font-size:0.78rem;">
+              <span>🔄 Grupları Yeniden Çek</span>
+            </button>
+          </div>
+          <select id="gp-whatsapp-group-select" class="glass-input" onchange="onSelectWhatsAppGroup()" style="font-size:0.92rem; font-weight:600; cursor:pointer;">
+            <option value="">⏳ Botun bulunduğu gruplar taranıyor...</option>
+          </select>
+          <span style="font-size:0.78rem; color:var(--text-secondary); display:block; margin-top:6px;">
+            💡 <em>Botun üye olduğu bir grubu seçtiğinizde JID ve grup adı otomatik yüklenir; varsa gruba özel mevcut yasaklar/izinler forma getirilir.</em>
+          </span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:20px;">
+          <div>
+            <label class="form-label" style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-secondary);">Grup JID (WhatsApp Grup Kimliği) *</label>
+            <input type="text" id="gp-group-jid" class="glass-input" placeholder="Örn: 120363045678901234@g.us" style="font-family:monospace;">
+          </div>
+          <div>
+            <label class="form-label" style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-secondary);">Grup Başlığı / Açıklaması</label>
+            <input type="text" id="gp-group-name" class="glass-input" placeholder="Örn: Fırat Üniversitesi Sınıf Grubu">
+          </div>
+          <div>
+            <label class="form-label" style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-secondary);">Çalışma Modu</label>
+            <select id="gp-mode" class="glass-input" onchange="toggleGpModeHelp()">
+              <option value="blacklist" selected>🛡️ Kara Liste (Tüm komutlar açık, seçilenler engellenir)</option>
+              <option value="whitelist">🔒 Beyaz Liste (Tüm komutlar kapalı, yalnızca seçilenler çalışır)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Kategori Seçicileri -->
+        <div style="margin-bottom:20px;">
+          <label id="gp-categories-label" class="form-label" style="display:block; margin-bottom:10px; font-size:0.88rem; font-weight:700; color:var(--text-main);">
+            ⛔ Engellenecek Kategoriler:
+          </label>
+          <div id="gp-categories-container" style="display:flex; flex-wrap:wrap; gap:10px;">
+            <!-- Dinamik Kategori Kutuları JS ile doldurulacak -->
+          </div>
+        </div>
+
+        <!-- Özel Komut Girişi -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:20px;">
+          <div>
+            <label id="gp-commands-label" class="form-label" style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-secondary);">
+              ⛔ Engellenecek Özel Komutlar (Virgülle ayırın)
+            </label>
+            <input type="text" id="gp-disabled-commands" class="glass-input" placeholder="Örn: ciz, namaz, otocoz, hava">
+            <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-top:4px;">Bir komut kapatıldığında tüm takma adları (alias) da otomatik kapatılır.</span>
+          </div>
+          <div id="gp-allowed-commands-box" style="display:none;">
+            <label class="form-label" style="display:block; margin-bottom:6px; font-size:0.85rem; font-weight:600; color:var(--text-secondary);">
+              ✅ İzin Verilecek Ek Komutlar (Beyaz Liste için)
+            </label>
+            <input type="text" id="gp-allowed-commands" class="glass-input" placeholder="Örn: uniyemek, takvim, 22">
+          </div>
+        </div>
+
+        <!-- İndirme ve Ek Seçenekler Switch'leri -->
+        <div style="display:flex; flex-wrap:wrap; gap:20px; padding:16px; background:var(--bg-glass-input); border-radius:var(--radius-md); border:1px solid var(--border-subtle); margin-bottom:20px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.88rem;">
+            <input type="checkbox" id="gp-allow-links" checked style="width:18px; height:18px; accent-color:var(--accent-primary);">
+            <span>📥 Otomatik Link İndirmeye İzin Ver</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.88rem;">
+            <input type="checkbox" id="gp-allow-adult" style="width:18px; height:18px; accent-color:var(--accent-rose);">
+            <span>🔞 Yetişkin (+18) Link İndirmeye İzin Ver</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.88rem;">
+            <input type="checkbox" id="gp-silent" style="width:18px; height:18px; accent-color:var(--accent-amber);">
+            <span>🔇 Sessiz Mod (Engellendiğinde uyarı mesajı gönderme)</span>
+          </label>
+        </div>
+
+        <div style="display:flex; gap:12px;">
+          <button class="btn-primary" onclick="saveGroupPermissionAction()" style="width:auto; padding:12px 28px;">
+            <span>Grup Kuralını Kaydet 💾</span>
+          </button>
+          <button class="btn-secondary" onclick="resetGroupPermissionForm()" style="width:auto; padding:12px 20px;">
+            <span>İptal / Temizle</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Kayıtlı Gruplar Listesi / Tablosu -->
+      <div class="glass-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>📋</span>
+            <span>Kayıtlı Grup Kısıtlamaları</span>
+          </div>
+          <button class="btn-secondary" onclick="loadGroupPermissionsAction()">Yenile 🔄</button>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="group-permissions-table">
+            <thead>
+              <tr>
+                <th>Grup / JID</th>
+                <th>Çalışma Modu</th>
+                <th>Kategori Kısıtlamaları</th>
+                <th>Özel Komutlar</th>
+                <th>Link İndirme</th>
+                <th style="width:160px;">İşlemler</th>
+              </tr>
+            </thead>
+            <tbody id="group-permissions-tbody">
+              <!-- Dinamik grup satırları -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================================
          SEKME 7: CRON STUDIO (CRON STATION)
          ========================================================================== -->
     <section id="view-cron-station" class="tab-view">
@@ -1808,6 +1950,7 @@
         'queue-manager': { title: 'Görev Kuyruğu & Monitör', sub: 'Bekleyen indirmeler, öncelik sıralaması ve paralel işlem limitleri.' },
         'settings-station': { title: 'Sistem & Proxy Yapılandırması', sub: 'LRU kota limitleri, bildirim webhookları ve proxy havuzu.' },
         'commands-station': { title: 'Özel Komutlar', sub: 'WhatsApp botuna özel dinamik şablon komutları düzenleyin.' },
+        'group-permissions': { title: 'Grup İzinleri & Komut Kısıtlama', sub: 'Gruplara özel komut açma/kapatma, kategori kısıtlamaları ve indirme izinleri.' },
         'cron-station': { title: 'Cron Zamanlayıcı Stüdyosu', sub: 'Zamanlanmış otomatik arka plan görevlerini yapılandırın.' },
         'system-health': { title: 'Sistem Sağlığı & Teşhis', sub: 'FFmpeg, yt-dlp, disk ve socket sağlığını denetleyin.' },
         'terminal-logs': { title: 'Canlı Konsol & Terminal Logları', sub: 'Gerçek zamanlı sunucu ve indirme log akışı.' }
@@ -1823,6 +1966,7 @@
       if (tabName === 'settings-station' || tabName === 'queue-manager') loadSettingsAction();
       if (tabName === 'hentai-bulk') loadHentaiDefaults();
       if (tabName === 'commands-station') loadCommandsAction();
+      if (tabName === 'group-permissions') loadGroupPermissionsAction();
       if (tabName === 'cron-station') loadCronAction();
 
       // Close mobile drawer if open and scroll to top
@@ -2948,6 +3092,335 @@
         if (data.success) {
           showToast('Başarılı', 'Özel komut şablonları kaydedildi.', 'success');
           loadCommandsAction();
+        } else {
+          showToast('Hata', data.error, 'error');
+        }
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    // =========================================================================
+    // GRUP İZİNLERİ VE KISITLAMA YÖNETİMİ (GROUP PERMISSIONS)
+    // =========================================================================
+    let cachedGpCategories = null;
+    let cachedGpGroups = {};
+    let cachedWhatsAppGroups = [];
+
+    async function loadGroupPermissionsAction() {
+      const tbody = document.getElementById('group-permissions-tbody');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Grup izinleri ve bot grupları yükleniyor...</td></tr>';
+
+      try {
+        // 1. Kategorileri Yükle
+        if (!cachedGpCategories) {
+          const catRes = await fetch('/api/permissions/categories');
+          const catData = await catRes.json();
+          if (catData.success && catData.categories) {
+            cachedGpCategories = catData.categories;
+            renderGpCategoryCheckboxes(cachedGpCategories);
+          }
+        } else {
+          renderGpCategoryCheckboxes(cachedGpCategories);
+        }
+
+        // 2. WhatsApp Gruplarını Çek
+        await fetchWhatsAppGroupsAction(false);
+
+        // 3. Grupları Yükle
+        const groupRes = await fetch('/api/permissions/groups');
+        const groupData = await groupRes.json();
+        if (groupData.success) {
+          cachedGpGroups = groupData.groupPermissions || {};
+          renderGroupPermissionsTable(cachedGpGroups);
+        }
+      } catch (e) {
+        showToast('Hata', 'Grup izinleri yüklenemedi: ' + e.message, 'error');
+      }
+    }
+
+    async function fetchWhatsAppGroupsAction(notify = true) {
+      const select = document.getElementById('gp-whatsapp-group-select');
+      const countBadge = document.getElementById('gp-wa-groups-count');
+      if (select) {
+        select.innerHTML = '<option value="">⏳ WhatsApp grupları taranıyor...</option>';
+      }
+
+      try {
+        const res = await fetch('/api/permissions/whatsapp-groups');
+        const data = await res.json();
+        if (data.success) {
+          cachedWhatsAppGroups = data.groups || [];
+          if (countBadge) countBadge.innerText = `${cachedWhatsAppGroups.length} Grup`;
+
+          if (select) {
+            select.innerHTML = '<option value="">-- Bir WhatsApp Grubu Seçin veya Manuel Girin --</option>';
+            
+            if (cachedWhatsAppGroups.length === 0) {
+              select.innerHTML = '<option value="">(Bağlı WhatsApp grubu bulunamadı veya oturum kapalı)</option>';
+            } else {
+              cachedWhatsAppGroups.forEach(g => {
+                const customTag = g.hasCustomRules ? ' ★ [Özel Kural Var]' : '';
+                const memberTag = g.participantsCount ? ` (${g.participantsCount} Üye)` : '';
+                const opt = document.createElement('option');
+                opt.value = g.jid;
+                opt.innerText = `👥 ${g.name || g.jid}${memberTag}${customTag}`;
+                select.appendChild(opt);
+              });
+            }
+          }
+
+          if (notify) {
+            showToast('Gruplar Güncellendi', `Toplam ${cachedWhatsAppGroups.length} WhatsApp grubu çekildi.`, 'success');
+          }
+        }
+      } catch (err) {
+        if (select) select.innerHTML = '<option value="">⚠️ Gruplar çekilemedi</option>';
+        if (notify) showToast('Hata', 'Gruplar çekilemedi: ' + err.message, 'error');
+      }
+    }
+
+    function onSelectWhatsAppGroup() {
+      const select = document.getElementById('gp-whatsapp-group-select');
+      const jid = select.value;
+      if (!jid) return;
+
+      const found = cachedWhatsAppGroups.find(g => g.jid === jid);
+      if (found) {
+        document.getElementById('gp-group-jid').value = found.jid;
+        document.getElementById('gp-group-name').value = found.name || '';
+      }
+
+      if (cachedGpGroups[jid]) {
+        editGroupPermission(jid);
+      } else {
+        resetGroupPermissionForm(false);
+        document.getElementById('gp-group-jid').value = found ? found.jid : jid;
+        document.getElementById('gp-group-name').value = found ? (found.name || '') : '';
+        document.getElementById('group-form-title').innerText = `Grup Kuralı Ekle (${found ? found.name : jid})`;
+      }
+    }
+
+    function renderGpCategoryCheckboxes(categories) {
+      const container = document.getElementById('gp-categories-container');
+      container.innerHTML = '';
+      for (const [key, cat] of Object.entries(categories)) {
+        if (key === 'genel' || key === 'admin') continue;
+        const label = document.createElement('label');
+        label.style.cssText = 'display:inline-flex; align-items:center; gap:8px; padding:8px 14px; background:var(--bg-glass-input); border:1px solid var(--border-subtle); border-radius:var(--radius-md); cursor:pointer; font-size:0.85rem; user-select:none;';
+        label.innerHTML = `
+          <input type="checkbox" value="${key}" class="gp-category-checkbox" style="width:16px; height:16px; accent-color:var(--accent-rose);">
+          <span>${cat.icon} <strong>${cat.name}</strong> <small style="color:var(--text-muted);">(${key})</small></span>
+        `;
+        container.appendChild(label);
+      }
+    }
+
+    function toggleGpModeHelp() {
+      const mode = document.getElementById('gp-mode').value;
+      const catLabel = document.getElementById('gp-categories-label');
+      const cmdLabel = document.getElementById('gp-commands-label');
+      const allowedBox = document.getElementById('gp-allowed-commands-box');
+
+      if (mode === 'whitelist') {
+        catLabel.innerHTML = '✅ <span style="color:var(--accent-emerald);">İzin Verilecek Kategoriler</span> (Diğer her şey engellenir):';
+        cmdLabel.innerHTML = '⛔ İstisna Engellenecek Komutlar (Varsa)';
+        allowedBox.style.display = 'block';
+      } else {
+        catLabel.innerHTML = '⛔ <span style="color:var(--accent-rose);">Engellenecek Kategoriler</span> (Diğer her şey serbest kalır):';
+        cmdLabel.innerHTML = '⛔ Engellenecek Özel Komutlar (Virgülle ayırın)';
+        allowedBox.style.display = 'none';
+      }
+    }
+
+    function renderGroupPermissionsTable(groups) {
+      const tbody = document.getElementById('group-permissions-tbody');
+      tbody.innerHTML = '';
+
+      const jids = Object.keys(groups);
+      if (jids.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align:center; color:var(--text-muted); padding:30px;">
+              🛡️ Henüz özel yapılandırılmış grup bulunmuyor.<br>
+              <small style="color:var(--text-secondary);">Tüm gruplar varsayılan güvenlik modundadır (+18 Hentai içerikler kapalı, genel komutlar serbest).</small>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      jids.forEach(jid => {
+        const item = groups[jid];
+        const tr = document.createElement('tr');
+        const modeBadge = item.mode === 'whitelist'
+          ? '<span style="background:rgba(16,185,129,0.15); color:var(--accent-emerald); padding:4px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; border:1px solid rgba(16,185,129,0.3);">🔒 Beyaz Liste</span>'
+          : '<span style="background:rgba(99,102,241,0.15); color:var(--accent-primary); padding:4px 10px; border-radius:20px; font-size:0.75rem; font-weight:700; border:1px solid rgba(99,102,241,0.3);">🛡️ Kara Liste</span>';
+
+        let catsDisplay = '-';
+        if (item.mode === 'whitelist') {
+          catsDisplay = item.allowedCategories?.length 
+            ? item.allowedCategories.map(c => `<code style="background:rgba(16,185,129,0.15); color:var(--accent-emerald); padding:2px 6px; border-radius:4px; font-size:0.78rem;">+${c}</code>`).join(' ')
+            : '<span style="color:var(--text-muted); font-size:0.8rem;">Hiçbiri</span>';
+        } else {
+          catsDisplay = item.disabledCategories?.length 
+            ? item.disabledCategories.map(c => `<code style="background:rgba(244,63,94,0.15); color:var(--accent-rose); padding:2px 6px; border-radius:4px; font-size:0.78rem;">-${c}</code>`).join(' ')
+            : '<span style="color:var(--accent-emerald); font-size:0.8rem;">Tümü Açık</span>';
+        }
+
+        let cmdsDisplay = '-';
+        if (item.disabledCommands?.length) {
+          cmdsDisplay = item.disabledCommands.map(c => `<code style="background:rgba(244,63,94,0.15); color:var(--accent-rose); padding:2px 6px; border-radius:4px; font-size:0.78rem;">!${c}</code>`).join(' ');
+        } else if (item.mode === 'whitelist' && item.allowedCommands?.length) {
+          cmdsDisplay = item.allowedCommands.map(c => `<code style="background:rgba(16,185,129,0.15); color:var(--accent-emerald); padding:2px 6px; border-radius:4px; font-size:0.78rem;">!${c}</code>`).join(' ');
+        } else {
+          cmdsDisplay = '<span style="color:var(--text-muted); font-size:0.8rem;">-</span>';
+        }
+
+        const linkPill = item.allowLinks 
+          ? '<span style="color:var(--accent-emerald); font-size:0.8rem; font-weight:600;">✅ Link Açık</span>' 
+          : '<span style="color:var(--accent-rose); font-size:0.8rem; font-weight:600;">❌ Link Kapalı</span>';
+        
+        const adultPill = item.allowAdultLinks 
+          ? '<br><span style="color:var(--accent-rose); font-size:0.75rem;">🔞 +18 Açık</span>' 
+          : '<br><span style="color:var(--text-muted); font-size:0.75rem;">🔞 +18 Kapalı</span>';
+
+        const foundWa = cachedWhatsAppGroups.find(g => g.jid === jid);
+        const memberCountBadge = foundWa && foundWa.participantsCount 
+          ? `<span style="background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:4px; font-size:0.72rem; color:var(--text-secondary); margin-left:6px;">${foundWa.participantsCount} Üye</span>` 
+          : '';
+
+        tr.innerHTML = `
+          <td>
+            <div style="font-weight:700; color:var(--text-main); font-size:0.92rem; display:flex; align-items:center;">
+              <span>${item.name || 'Grup'}</span>
+              ${memberCountBadge}
+            </div>
+            <div style="font-family:monospace; font-size:0.76rem; color:var(--text-muted);">${jid}</div>
+          </td>
+          <td>${modeBadge}</td>
+          <td>${catsDisplay}</td>
+          <td>${cmdsDisplay}</td>
+          <td>${linkPill}${adultPill}</td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <button class="btn-secondary" style="padding:6px 10px; font-size:0.8rem;" onclick="editGroupPermission('${jid}')">Düzenle ✏️</button>
+              <button class="btn-danger" style="padding:6px 10px; font-size:0.8rem;" onclick="deleteGroupPermissionAction('${jid}')">Sıfırla 🗑️</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function editGroupPermission(jid) {
+      const item = cachedGpGroups[jid];
+      if (!item) return;
+
+      document.getElementById('group-form-title').innerText = `Grup Kuralını Düzenle (${item.name || jid})`;
+      document.getElementById('gp-group-jid').value = jid;
+      document.getElementById('gp-group-name').value = item.name || '';
+      document.getElementById('gp-mode').value = item.mode || 'blacklist';
+      document.getElementById('gp-disabled-commands').value = (item.disabledCommands || []).join(', ');
+      document.getElementById('gp-allowed-commands').value = (item.allowedCommands || []).join(', ');
+      document.getElementById('gp-allow-links').checked = item.allowLinks !== false;
+      document.getElementById('gp-allow-adult').checked = Boolean(item.allowAdultLinks);
+      document.getElementById('gp-silent').checked = Boolean(item.silent);
+
+      toggleGpModeHelp();
+
+      const activeCategories = item.mode === 'whitelist' 
+        ? (item.allowedCategories || [])
+        : (item.disabledCategories || []);
+
+      document.querySelectorAll('.gp-category-checkbox').forEach(cb => {
+        cb.checked = activeCategories.includes(cb.value);
+      });
+
+      const sectionEl = document.getElementById('view-group-permissions');
+      if (sectionEl) {
+        window.scrollTo({ top: sectionEl.offsetTop - 20, behavior: 'smooth' });
+      }
+    }
+
+    function resetGroupPermissionForm(resetSelect = true) {
+      document.getElementById('group-form-title').innerText = 'Grup Kuralı Ekle veya Düzenle';
+      document.getElementById('gp-group-jid').value = '';
+      document.getElementById('gp-group-name').value = '';
+      document.getElementById('gp-mode').value = 'blacklist';
+      document.getElementById('gp-disabled-commands').value = '';
+      document.getElementById('gp-allowed-commands').value = '';
+      document.getElementById('gp-allow-links').checked = true;
+      document.getElementById('gp-allow-adult').checked = false;
+      document.getElementById('gp-silent').checked = false;
+      if (resetSelect && document.getElementById('gp-whatsapp-group-select')) {
+        document.getElementById('gp-whatsapp-group-select').value = '';
+      }
+      toggleGpModeHelp();
+
+      document.querySelectorAll('.gp-category-checkbox').forEach(cb => {
+        cb.checked = cb.value === 'hentai';
+      });
+    }
+
+    async function saveGroupPermissionAction() {
+      const jid = document.getElementById('gp-group-jid').value.trim();
+      if (!jid) {
+        return showToast('Eksik Bilgi', 'Lütfen Grup JID alanını doldurun (Örn: 120363045678901234@g.us).', 'warn');
+      }
+
+      const name = document.getElementById('gp-group-name').value.trim();
+      const mode = document.getElementById('gp-mode').value;
+      const disabledCommands = document.getElementById('gp-disabled-commands').value.split(',').map(s => s.trim().toLowerCase().replace(/^[!/.]/, '')).filter(Boolean);
+      const allowedCommands = document.getElementById('gp-allowed-commands').value.split(',').map(s => s.trim().toLowerCase().replace(/^[!/.]/, '')).filter(Boolean);
+      const allowLinks = document.getElementById('gp-allow-links').checked;
+      const allowAdultLinks = document.getElementById('gp-allow-adult').checked;
+      const silent = document.getElementById('gp-silent').checked;
+
+      const checkedCategories = Array.from(document.querySelectorAll('.gp-category-checkbox:checked')).map(cb => cb.value);
+
+      const payload = {
+        name,
+        mode,
+        disabledCommands,
+        allowedCommands,
+        disabledCategories: mode === 'blacklist' ? checkedCategories : [],
+        allowedCategories: mode === 'whitelist' ? checkedCategories : [],
+        allowLinks,
+        allowAdultLinks,
+        silent
+      };
+
+      try {
+        const res = await fetch(`/api/permissions/groups/${encodeURIComponent(jid)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Başarılı', `${name || jid} grup kuralları kaydedildi.`, 'success');
+          resetGroupPermissionForm();
+          loadGroupPermissionsAction();
+        } else {
+          showToast('Hata', data.error || 'Kaydedilemedi.', 'error');
+        }
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
+      }
+    }
+
+    async function deleteGroupPermissionAction(jid) {
+      if (!confirm(`Bu grup (${jid}) için özel kuralları sıfırlamak istediğinize emin misiniz?`)) return;
+
+      try {
+        const res = await fetch(`/api/permissions/groups/${encodeURIComponent(jid)}`, {
+          method: 'DELETE'
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Sıfırlandı', 'Grup izinleri varsayılana döndürüldü.', 'info');
+          loadGroupPermissionsAction();
         } else {
           showToast('Hata', data.error, 'error');
         }

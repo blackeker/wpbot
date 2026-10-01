@@ -55,6 +55,12 @@ import {
 
 import { executeDownloadPipeline, queueMediaSend } from './pipelines.js';
 import { getAnimecixSeasonEpisodes, getHdfilmcehennemiSeasonEpisodes, getHdkoreSeasonEpisodes, extractVideoUrl } from './extractor.js';
+import { 
+  CATEGORIES, 
+  getGroupConfig, 
+  updateGroupConfig, 
+  resetGroupConfig 
+} from './utils/permissionManager.js';
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -799,6 +805,94 @@ app.post('/api/cron', (req, res) => {
     }
     writeConfig({ cronSchedules });
     res.json({ success: true, message: 'Zamanlanmış görevler başarıyla kaydedildi.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Group Permissions & Restriction APIs
+app.get('/api/permissions/whatsapp-groups', async (req, res) => {
+  try {
+    const sock = botSocketRef.current;
+    let groups = [];
+    const config = readConfig();
+    const savedPermissions = config.groupPermissions || {};
+
+    if (sock && typeof sock.groupFetchAllParticipating === 'function') {
+      try {
+        const participating = await sock.groupFetchAllParticipating();
+        groups = Object.values(participating || {}).map(g => ({
+          jid: g.id,
+          name: g.subject || g.id,
+          participantsCount: g.participants?.length || g.size || 0,
+          creation: g.creation,
+          owner: g.owner,
+          hasCustomRules: Boolean(savedPermissions[g.id])
+        }));
+      } catch (err) {
+        console.warn('[GROUPS API] groupFetchAllParticipating error:', err.message);
+      }
+    }
+
+    // Include any groups that have custom rules in config even if not currently fetched from socket
+    for (const [jid, perm] of Object.entries(savedPermissions)) {
+      if (!groups.some(g => g.jid === jid)) {
+        groups.push({
+          jid,
+          name: perm.name || jid,
+          participantsCount: 0,
+          hasCustomRules: true,
+          isDisconnectedOrSaved: true
+        });
+      }
+    }
+
+    // Sort: groups with custom rules first, then alphabetically by name
+    groups.sort((a, b) => {
+      if (a.hasCustomRules !== b.hasCustomRules) return a.hasCustomRules ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    res.json({
+      success: true,
+      connected: Boolean(sock),
+      totalGroups: groups.length,
+      groups
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/permissions/categories', (req, res) => {
+  res.json({ success: true, categories: CATEGORIES });
+});
+
+app.get('/api/permissions/groups', (req, res) => {
+  const config = readConfig();
+  res.json({ success: true, groupPermissions: config.groupPermissions || {} });
+});
+
+app.get('/api/permissions/groups/:jid', (req, res) => {
+  const jid = req.params.jid;
+  res.json({ success: true, groupConfig: getGroupConfig(jid) });
+});
+
+app.post('/api/permissions/groups/:jid', (req, res) => {
+  try {
+    const jid = req.params.jid;
+    const updated = updateGroupConfig(jid, req.body);
+    res.json({ success: true, message: 'Grup izinleri güncellendi.', groupConfig: updated });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/permissions/groups/:jid', (req, res) => {
+  try {
+    const jid = req.params.jid;
+    resetGroupConfig(jid);
+    res.json({ success: true, message: 'Grup izinleri varsayılana sıfırlandı.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

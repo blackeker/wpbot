@@ -26,6 +26,12 @@ import {
 import { getDiskUsage } from '../config.js';
 import { commands } from '../bot.js';
 import { isReplyDownloadTrigger, handleReplyDownload } from '../utils/quotedHandler.js';
+import { 
+  checkCommandPermission, 
+  checkLinkPermission, 
+  isGroupAdminOrOwner, 
+  isBotOwner 
+} from '../utils/permissionManager.js';
 
 function unwrapMessage(message) {
   if (!message) return null;
@@ -93,16 +99,15 @@ async function processSingleMessage(sock, msg) {
     }
   }
 
-  // Whitelist check
-  if (!msg.key.fromMe && config.adminJids) {
-    const adminList = config.adminJids.split(',').map(num => num.trim().toLowerCase()).filter(Boolean);
-    if (adminList.length > 0) {
-      const sender = msg.key.participant || from;
-      const senderNumber = sender.split('@')[0];
-      const isAllowed = adminList.some(num => senderNumber.includes(num));
-      if (!isAllowed) {
-        return; // Ignore silently
-      }
+  const sender = msg.key.participant || from;
+  const senderNumber = sender.split('@')[0];
+  const isOwner = isBotOwner(msg, senderNumber);
+  const isAdmin = await isGroupAdminOrOwner(sock, msg, from);
+
+  // Private DM Whitelist check
+  if (!msg.key.fromMe && config.adminJids && !from.endsWith('@g.us')) {
+    if (!isOwner) {
+      return; // Ignore silently in private messages if admin list is set
     }
   }
 
@@ -612,6 +617,13 @@ async function processSingleMessage(sock, msg) {
   const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
   const hasQuoted = Boolean(contextInfo?.quotedMessage || contextInfo?.stanzaId);
   if (isReplyDownloadTrigger(text, hasQuoted)) {
+    const perm = checkCommandPermission('indir', from, { isOwner, isAdmin });
+    if (!perm.allowed) {
+      if (!perm.silent && perm.message) {
+        await sock.sendMessage(from, { text: perm.message });
+      }
+      return;
+    }
     const handled = await handleReplyDownload(sock, msg, from, text, {
       text,
       ltext,
@@ -619,7 +631,9 @@ async function processSingleMessage(sock, msg) {
       botState,
       activeCaptchasMap: global.activeCaptchasMap || new Map(),
       downloadsDir,
-      formatBytes
+      formatBytes,
+      isOwner,
+      isAdmin
     });
     if (handled) return;
   }
@@ -628,12 +642,19 @@ async function processSingleMessage(sock, msg) {
   const menuMatch = ltext.match(/^(?:!?(?:menü|menu|yardım|yardim|help|rehber)|merhaba|selam|sa|hey|hi|ne yapabilirsin|ne yaparsın)(?:\s+(.*))?$/i);
 
   if (menuMatch) {
+    const perm = checkCommandPermission('yardim', from, { isOwner, isAdmin });
+    if (!perm.allowed) {
+      if (!perm.silent && perm.message) {
+        await sock.sendMessage(from, { text: perm.message });
+      }
+      return;
+    }
     const yardimCmd = commands.get('yardim');
     if (yardimCmd) {
       console.log(`[COMMAND] Executing 'yardim' for ${from}...`);
       try {
         const menuArgs = menuMatch[1] ? menuMatch[1].trim().split(/\s+/) : [];
-        await yardimCmd.execute(sock, msg, from, menuArgs, { text, ltext });
+        await yardimCmd.execute(sock, msg, from, menuArgs, { text, ltext, isOwner, isAdmin });
         console.log(`[COMMAND] Finished 'yardim' for ${from}`);
       } catch (err) {
         console.error('[Yardım Komutu] Hata:', err.message);
@@ -732,6 +753,14 @@ async function processSingleMessage(sock, msg) {
   }
 
   if (commandName && commands.has(commandName)) {
+    const perm = checkCommandPermission(commandName, from, { isOwner, isAdmin });
+    if (!perm.allowed) {
+      if (!perm.silent && perm.message) {
+        await sock.sendMessage(from, { text: perm.message });
+      }
+      return;
+    }
+
     const cmd = commands.get(commandName);
     console.log(`[COMMAND] Executing '${commandName}' for ${from}...`);
     try {
@@ -742,7 +771,9 @@ async function processSingleMessage(sock, msg) {
         botState,
         activeCaptchasMap: global.activeCaptchasMap || new Map(),
         downloadsDir,
-        formatBytes
+        formatBytes,
+        isOwner,
+        isAdmin
       });
       console.log(`[COMMAND] Finished '${commandName}' for ${from}`);
     } catch (err) {
@@ -754,6 +785,14 @@ async function processSingleMessage(sock, msg) {
 
   // Treat as download if supported link
   if (isSupportedLink || isTorrentUrl) {
+    const perm = checkLinkPermission(text, from, { isOwner, isAdmin });
+    if (!perm.allowed) {
+      if (!perm.silent && perm.message) {
+        await sock.sendMessage(from, { text: perm.message });
+      }
+      return;
+    }
+
     const cmd = commands.get('indir');
     if (cmd) {
       try {
@@ -764,7 +803,9 @@ async function processSingleMessage(sock, msg) {
           botState,
           activeCaptchasMap: global.activeCaptchasMap || new Map(),
           downloadsDir,
-          formatBytes
+          formatBytes,
+          isOwner,
+          isAdmin
         });
       } catch (err) {
         console.error(`Download execution error:`, err.message);

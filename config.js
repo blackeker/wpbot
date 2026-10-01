@@ -97,6 +97,7 @@ const DEFAULT_CONFIG = {
   depotGroupJid: "",
   groupJid: "",
   hentaiGroupJid: "",
+  groupPermissions: {},
   cronSchedules: [
     { id: "cleanup", name: "Disk Temizliği", cron: "0 4 * * *", action: "cleanup", active: true }
   ]

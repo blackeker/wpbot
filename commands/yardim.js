@@ -77,11 +77,14 @@ export default {
       return;
     }
 
-    // 5. SİSTEM & DURUM
-    if (['5', 'sistem', 'durum', 'sunucu'].includes(rawCategory)) {
+    // 5. SİSTEM & YÖNETİM
+    if (['5', 'sistem', 'durum', 'sunucu', 'admin', 'yetki', 'izin'].includes(rawCategory)) {
       const text = 
-`📊 *SİSTEM VE SUNUCU KOMUTLARI*
+`📊 *SİSTEM VE YÖNETİM KOMUTLARI*
 ━━━━━━━━━━━━━━━━━━━━
+• *!izin* / *!yetki* ➔ Grup izinlerini ve kapalı komutları yönetir.
+• *!izin kapat <komut|kategori>* ➔ Komutu/kategoriyi bu grupta kapatır.
+• *!izin ac <komut|kategori>* ➔ Komutu/kategoriyi bu grupta açar.
 • *!durum* ➔ Bot aktifliği ve çalışma süresi.
 • *!disk* ➔ Sunucu depolama ve boş alan durumu.
 • *!hiz* ➔ Anlık indirme hızı.
@@ -102,7 +105,7 @@ export default {
 🎓 *Üniversite:* \`!uniyemek\`, \`!kahvalti\`, \`!aksam\`, \`!yemek\`, \`!takvim\`, \`!vize\`, \`!final\`, \`!but\`, \`!tatil\`, \`!22\`, \`!adres\`
 🌤️ *Günlük:* \`!hava\`, \`!eczane\`, \`!namaz\`, \`!doviz\`, \`!altin\`, \`!btc\`, \`!haber\`, \`!deprem\`
 🧰 *Araçlar & AI:* \`!ciz\`, \`!otocoz\`, \`!captcha\`, \`!coz\`, \`!hatirlat\`, \`!qr\`, \`!kisalt\`, \`!sozluk\`, \`!wiki\`, \`!mesaj\`
-📊 *Sistem:* \`!durum\`, \`!disk\`, \`!hiz\`, \`!gecmis\`, \`!guncelle\`
+📊 *Sistem & İzin:* \`!durum\`, \`!disk\`, \`!hiz\`, \`!gecmis\`, \`!izin\`, \`!guncelle\`
 ━━━━━━━━━━━━━━━━━━━━`;
       await sock.sendMessage(from, { text });
       return;
@@ -119,9 +122,10 @@ _(Örn: \`!yardim 1\` veya \`!yardim uni\`)_
 2️⃣ *Üniversite & Yurt* (\`!yardim 2\`)
 3️⃣ *Günlük & Finans* (\`!yardim 3\`)
 4️⃣ *Araçlar & AI* (\`!yardim 4\`)
-5️⃣ *Sistem & Durum* (\`!yardim 5\`)
+5️⃣ *Sistem & Grup İzinleri* (\`!yardim 5\`)
 ━━━━━━━━━━━━━━━━━━━━
-💡 _Hepsini tek seferde görmek için: \`!yardim hepsi\`_`;
+💡 _Hepsini tek seferde görmek için: \`!yardim hepsi\`_
+🛡️ _Grup komut kısıtlamalarını yönetmek için: \`!izin\`_`;
 
     await sock.sendMessage(from, { text: helpMenu });
   }
