@@ -74,12 +74,6 @@ export default {
         endPage = parseInt(singlePageMatch[1], 10);
       }
 
-      await sock.sendMessage(from, { 
-        text: `🔍 *Hentaizm Liste Sayfası Taranıyor...*\n` +
-              `📄 Sayfalar: *${startPage} - ${endPage}*\n` +
-              `🔗 ${firstUrl}\n\n_Animeler ayıklanıyor, lütfen bekleyin..._` 
-      });
-
       try {
         const { pageTitle, animeList } = await extractHentaizmListingPage(firstUrl, startPage, endPage);
 
@@ -140,10 +134,6 @@ export default {
 
     let addedCount = 0;
     let skippedCount = 0;
-
-    await sock.sendMessage(from, {
-      text: `⏳ *${hentaizmUrls.length}* adet Hentaizm linki işleniyor ve kuyruğa alınıyor...`
-    });
 
     // Queue anime series packs
     for (const u of animeUrls) {

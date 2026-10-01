@@ -70,7 +70,6 @@ export default {
 
     // If numbers requested but store is empty, auto-fetch page 1 of favorites
     if (requestedNumbers.size > 0 && hentaiFavStore.size() === 0) {
-      await sock.sendMessage(from, { text: `⏳ Favoriler listesi taranıyor, lütfen bekleyin...` });
       try {
         const res = await extractHentaizmListingPage('https://www.hentaizm2.com/?tab=fav&page=1', 1, 1);
         const items = res.items || res.animeList || [];

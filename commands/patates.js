@@ -5,7 +5,6 @@ export default {
   aliases: ['patatesat'],
   async execute(sock, msg, from, args, ctx) {
     try {
-      await sock.sendMessage(from, { text: '⏳ Yan hesaplardan patates gönderimi tetikleniyor...' });
       const res = await triggerPotato();
       if (res.success) {
         await sock.sendMessage(from, { text: '🥔 Patates gönderimi başarıyla başlatıldı!' });

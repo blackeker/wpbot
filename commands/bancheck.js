@@ -5,7 +5,6 @@ export default {
   aliases: ['bankontrol'],
   async execute(sock, msg, from, args, ctx) {
     try {
-      await sock.sendMessage(from, { text: '⏳ Yan hesaplar ban durumu taranıyor...' });
       const res = await checkBans();
       const results = res.results || {};
       let reply = `📋 *BAN TARAMA SONUÇLARI* 📋\n\n`;

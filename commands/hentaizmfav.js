@@ -14,10 +14,6 @@ export default {
       }
     }
 
-    await sock.sendMessage(from, {
-      text: `⏳ *Hentaizm Favoriler (Sayfa ${page})* taranıyor, lütfen bekleyin...`
-    });
-
     try {
       const pageUrl = `https://www.hentaizm2.com/?tab=fav&page=${page}`;
       const result = await extractHentaizmListingPage(pageUrl, page, page);

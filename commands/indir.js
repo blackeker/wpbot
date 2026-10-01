@@ -524,7 +524,6 @@ export default {
 
     if (isAnimecixSeasonOrShow) {
       const { getAnimecixSeasonEpisodes } = await import('../extractor.js');
-      await sock.sendMessage(from, { text: '🔍 Sezon bölümleri alınıyor, lütfen bekleyin...' });
       try {
         const result = await getAnimecixSeasonEpisodes(singleUrl);
         const { animeName, episodes, skippedCount: preSkipped, isMultiSeason, seasons } = result;
@@ -660,7 +659,6 @@ export default {
 
     if (isHentaizmAnime) {
       const { getHentaizmSeasonEpisodes } = await import('../extractor.js');
-      await sock.sendMessage(from, { text: '🔍 Hentaizm anime bölümleri taranıyor, lütfen bekleyin...' });
       try {
         const { seriesName, posterUrl, description, episodes } = await getHentaizmSeasonEpisodes(singleUrl);
 
@@ -711,7 +709,6 @@ export default {
 
     if (isHdfSeries) {
       const { getHdfilmcehennemiSeasonEpisodes } = await import('../extractor.js');
-      await sock.sendMessage(from, { text: '🔍 HDfilmcehennemi yayınlanan sezon bölümleri taranıyor...' });
       try {
         const { seriesName, episodes } = await getHdfilmcehennemiSeasonEpisodes(singleUrl);
 
@@ -747,7 +744,6 @@ export default {
 
     if (isHdkoreSeriesCandidate) {
       const { getHdkoreSeasonEpisodes } = await import('../extractor.js');
-      await sock.sendMessage(from, { text: '🔍 HDKore yayınlanan dizi bölümleri taranıyor...' });
       try {
         const { seriesName, episodes } = await getHdkoreSeasonEpisodes(singleUrl);
 
@@ -794,7 +790,6 @@ export default {
       }
       
       const { getDramadizilerimSeasonEpisodes } = await import('../extractor.js');
-      await sock.sendMessage(from, { text: '🔍 Dramadizilerim yayınlanan dizi bölümleri taranıyor...' });
       try {
         const { seriesName, episodes } = await getDramadizilerimSeasonEpisodes(targetDiziUrl);
 
@@ -864,7 +859,6 @@ export default {
       // ── YouTube Playlist Desteği ──
       if (isYouTubeUrl && isPlaylist) {
         const { getYouTubePlaylistVideos } = await import('../extractor.js');
-        await sock.sendMessage(from, { text: '🔍 YouTube oynatma listesi taranıyor, lütfen bekleyin...' });
         try {
           const { playlistTitle, videos } = await getYouTubePlaylistVideos(singleUrl);
           if (!videos || videos.length === 0) {

@@ -710,6 +710,24 @@ async function processSingleMessage(sock, msg) {
     } else if (['uniyemek', 'uni yemek', 'üniversite yemek', 'universite yemek', 'fırat yemek', 'firat yemek', 'üniversite yemeği'].includes(ltext) || ltext.startsWith('uniyemek ') || ltext.startsWith('firatyemek ')) {
       commandName = 'uniyemek';
       args = text.trim().split(/\s+/).slice(1);
+    } else if (['takvim', 'akademik', 'akademiktakvim', 'akademik takvim'].includes(ltext)) {
+      commandName = 'takvim';
+      args = text.trim().split(/\s+/).slice(1);
+    } else if (['vize', 'vizeler', 'vizesayac', 'vize sayacı', 'vize sayac'].includes(ltext)) {
+      commandName = 'takvim';
+      args = ['vize'];
+    } else if (['final', 'finaller', 'finalsayac', 'final sayacı', 'final sayac'].includes(ltext)) {
+      commandName = 'takvim';
+      args = ['final'];
+    } else if (['but', 'büt', 'bütünleme', 'butunleme', 'butsayac', 'büt sayacı'].includes(ltext)) {
+      commandName = 'takvim';
+      args = ['but'];
+    } else if (['tatil', 'tatiller', 'resmitatil', 'resmi tatil', 'resmi tatiller'].includes(ltext)) {
+      commandName = 'takvim';
+      args = ['tatil'];
+    } else if (['sinav', 'sınav', 'sayac', 'sayaç', 'sınavlar', 'sinavlar', 'sınav sayacı'].includes(ltext)) {
+      commandName = 'takvim';
+      args = ['sayac'];
     }
   }
 

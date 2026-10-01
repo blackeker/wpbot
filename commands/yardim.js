@@ -3,52 +3,33 @@ export default {
   aliases: ['help', 'menu', 'menü', 'yardım', 'rehber'],
   async execute(sock, msg, from, args, ctx) {
     const helpText = 
-`🤖 *WP-BOT KULLANIM VE KOMUT REHBERİ*
+`🤖 *WP-BOT KOMUT MERKEZİ*
 ━━━━━━━━━━━━━━━━━━━━
 
-📥 *İNDİRME VE KUYRUK:*
-• *!indir <link>* ➔ Video/Film/Anime/Dosya indirir.
-• *!indir <link1> <link2>* ➔ Otomatik dizi aralığı indirir.
-• *!kuyruk* ➔ İndirme kuyruğunu ve kalan süreleri gösterir.
-• *!iptal <id>* ➔ Belirtilen indirme görevini iptal eder.
-• *!dur* / *!devam* ➔ İndirme kuyruğunu durdurur / devam ettirir.
-• *!temizle* ➔ Tamamlanmış / iptal edilmiş kuyruğu temizler.
+📥 *İndirme:*
+• \`!indir <link>\` ➔ Video/Film/Dizi/MP3/Torrent indirir
+• \`!kuyruk\` | \`!dur\` | \`!devam\` | \`!iptal <id>\` | \`!temizle\`
 
-🌤️ *GÜNLÜK BİLGİ VE FİNANS:*
-• *!hava [şehir]* ➔ Canlı hava durumu (Varsayılan: Elazığ).
-• *!doviz* / *!dolar* / *!altin* / *!btc* ➔ Canlı kurlar & altın fiyatları.
-• *!eczane [şehir]* ➔ Nöbetçi eczaneler (Varsayılan: Elazığ).
-• *!kahvalti [gün/tarih]* ➔ Günün kahvaltı menüsü (Örn: \`!kahvalti yarin\`).
-• *!aksam [gün/tarih]* ➔ Günün akşam yemeği menüsü (Örn: \`!aksam\`).
-• *!yemek [gün/tarih]* ➔ Günlük kahvaltı + akşam tam menüsü.
-• *!uniyemek* ➔ Fırat Üniversitesi yemekhanesi günün menüsü (unievi.firat.edu.tr).
-• *!adres* ➔ Ahmet Kabaklı Öğrenci Yurdu adresini gönderir.
-• *!22* / *!otobus* ➔ 22 numara otobüs saatlerini ve sıradaki seferi gösterir.
-• *!haber* ➔ Son dakika gündem haberleri.
-• *!namaz [şehir]* ➔ Namaz vakitleri & kalan zaman geri sayımı.
-• *!deprem* ➔ Kandilli Rasathanesi son depremler.
+🎓 *Üniversite & Yurt:*
+• \`!uniyemek\` ➔ Fırat Üni yemekhane menüsü
+• \`!kahvalti\` | \`!aksam\` | \`!yemek\` ➔ KYK yemek menüsü
+• \`!takvim\` | \`!vize\` | \`!final\` | \`!but\` | \`!tatil\` ➔ Sınav/Tatil sayaçları
+• \`!22\` ➔ 22 numara otobüs saatleri & geri sayım
+• \`!adres\` ➔ Ahmet Kabaklı KYK Yurdu konumu
 
-🧰 *FAYDALI ARAÇLAR & CAPTCHA AI:*
-• *!otocoz* / *!cozai* ➔ Bekleyen Discord Captchalarını AI OCR ile otomatik çözer ve iletir.
-• *!captcha* ➔ Kilitli veya çözülmeyi bekleyen Captchaları ve görsellerini listeler.
-• *!coz <KOD>* ➔ Manuel Captcha çözümü gönderir.
-• *!mesaj <numara> <metin>* ➔ Belirtilen numaraya özel mesaj gönderir (Örn: `!mesaj 05551234567 Selam`).
-• *!hatirlat <süre> <not>* ➔ Hatırlatıcı kurar (Örn: \`!hatirlat 10dk su iç\`).
-• *!qr <metin/link>* ➔ Anında QR kod resmi oluşturur.
-• *!kisalt <link>* ➔ Uzun linkleri kısaltır.
-• *!sozluk <kelime>* ➔ TDK Türkçe sözlük anlamı.
-• *!wiki <konu>* ➔ Vikipedi özet arama.
+🌤️ *Günlük & Finans:*
+• \`!hava\` | \`!eczane\` | \`!namaz\` ➔ Şehir/Elazığ bilgileri
+• \`!doviz\` | \`!altin\` | \`!btc\` | \`!haber\` | \`!deprem\`
 
-📊 *SİSTEM VE DURUM:*
-• *!durum* ➔ Bot aktiflik ve sunucu durumu.
-• *!disk* ➔ Sunucu disk ve depolama kullanımı.
-• *!gecmis* ➔ Tamamlanan son 10 indirme kaydı.
-• *!hiz* ➔ Anlık indirme hızı.
-• *!hatalar* ➔ Son oluşan işlem hataları.
-• *!guncelle* ➔ Bot dosyalarını en son sürüme günceller.
+🧰 *Araçlar & AI:*
+• \`!otocoz\` | \`!captcha\` | \`!coz <kod>\` ➔ Captcha AI çözücü
+• \`!hatirlat <süre> <not>\` | \`!qr <link>\` | \`!kisalt <link>\`
+• \`!sozluk <kelime>\` | \`!wiki <konu>\` | \`!mesaj <no> <metin>\`
 
+📊 *Sistem:*
+• \`!durum\` | \`!disk\` | \`!hiz\` | \`!gecmis\` | \`!guncelle\`
 ━━━━━━━━━━━━━━━━━━━━
-💡 _İpucu: Herhangi bir desteklenen linki doğrudan mesaja yapıştırarak da indirmeyi başlatabilirsiniz!_`;
+💡 _Desteklenen linkleri doğrudan göndererek de indirme başlatabilirsiniz._`;
 
     await sock.sendMessage(from, { text: helpText });
   }

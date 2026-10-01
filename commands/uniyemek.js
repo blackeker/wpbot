@@ -1,4 +1,3 @@
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 
 export default {
@@ -6,19 +5,22 @@ export default {
   aliases: ['uniyemekleri', 'firatyemek', 'üniversiteyemek', 'üniversiteyemeği', 'universiteyemek', 'firatmenu', 'unimenu'],
   async execute(sock, msg, from, args, ctx) {
     try {
-      await sock.sendMessage(from, { text: '⏳ Fırat Üniversitesi yemek menüsü alınıyor...' });
-
       const url = 'https://unievi.firat.edu.tr';
-      const res = await axios.get(url, {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const res = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
         },
-        timeout: 10000
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
-      const $ = cheerio.load(res.data);
+      const html = await res.text();
+      const $ = cheerio.load(html);
       const foodDate = $('.university-food .food-date').first().text().trim().replace(/\s+/g, ' ') || 'Günün Menüsü';
       
       const foodItems = [];
