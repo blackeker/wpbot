@@ -330,7 +330,7 @@ Açıklamanın içine \`dikey\` veya \`kare\` yazabilirsiniz.
         style: catInfo.style,
         provider: 'auto',
         shape: shape
-      }, { timeout: 45000 });
+      }, { timeout: 90000 });
 
       if (apiRes.data && apiRes.data.success && apiRes.data.url) {
         const fullImgUrl = apiRes.data.url.startsWith('http') 
@@ -355,6 +355,22 @@ Açıklamanın içine \`dikey\` veya \`kare\` yazabilirsiniz.
         elapsed = result.elapsed;
       } catch (hordeErr) {
         console.error('[OMNIART HORDE ERROR]:', hordeErr.message);
+      }
+    }
+
+    // 3. Fallback: Pollinations Hızlı Motor (Sıfır Hata Garantisi)
+    if (!imageBuffer) {
+      try {
+        const polliModel = catInfo.apiCat === 'anime' ? 'flux-anime' : 'flux';
+        const polliUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(englishPrompt)}?width=${hordeW}&height=${hordeH}&model=${polliModel}&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
+        const polliRes = await axios.get(polliUrl, { responseType: 'arraybuffer', timeout: 30000 });
+        if (polliRes.status === 200) {
+          imageBuffer = Buffer.from(polliRes.data);
+          usedModel = `POLLINATIONS (${polliModel})`;
+          elapsed = '5.0';
+        }
+      } catch (polliErr) {
+        console.error('[OMNIART POLLINATIONS ERROR]:', polliErr.message);
       }
     }
 
