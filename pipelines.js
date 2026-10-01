@@ -319,28 +319,30 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
         if (!fs.existsSync(finalPath)) {
           throw new Error(`İndirilen dosya bulunamadı: ${finalPath}`);
         }
-        const fileStream = fs.createReadStream(finalPath);
-        fileStream.on('error', (err) => console.error('[YouTube Stream Error]:', err.message));
-        let lastWaUpdate = 0;
-        const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
-          const now = Date.now();
-          if (taskObject) {
-            taskObject.status = `Yükleniyor... %${percent}`;
-            notifyQueueUpdate();
-          }
-          if (now - lastWaUpdate > 5000) {
-            lastWaUpdate = now;
-            const bar = getProgressBar(percent);
-            progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 *Durum:* WhatsApp'a yükleniyor (*%${percent}*)\n\`[${bar}]\`\n📦 *Boyut:* ${finalSizeStr}`).catch(() => {});
-          }
-        });
-        fileStream.pipe(progressStream);
+        await withRetry(() => queueMediaSend(recipientJid, () => {
+          const fileStream = fs.createReadStream(finalPath);
+          fileStream.on('error', (err) => console.error('[YouTube Stream Error]:', err.message));
+          let lastWaUpdate = 0;
+          const progressStream = new ProgressStream(finalSize, (uploaded, percent) => {
+            const now = Date.now();
+            if (taskObject) {
+              taskObject.status = `Yükleniyor... %${percent}`;
+              notifyQueueUpdate();
+            }
+            if (now - lastWaUpdate > 5000) {
+              lastWaUpdate = now;
+              const bar = getProgressBar(percent);
+              progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n🚀 *Durum:* WhatsApp'a yükleniyor (*%${percent}*)\n\`[${bar}]\`\n📦 *Boyut:* ${finalSizeStr}`).catch(() => {});
+            }
+          });
+          fileStream.pipe(progressStream);
 
-        await queueMediaSend(recipientJid, {
-          document: { stream: progressStream },
-          mimetype: finalMime,
-          fileName: finalSafeTitle
-        });
+          return {
+            document: { stream: progressStream },
+            mimetype: finalMime,
+            fileName: finalSafeTitle
+          };
+        }));
         await progressUpdateCallback(`🎬 *${title}*\n━━━━━━━━━━━━━━━━━━━━\n✅ Başarıyla Gönderildi! (${finalSizeStr})\n\n🔗 *Canlı İzleme (VDS):*\n${watchUrl}`);
         // Depo grubuna gönder ve diskten temizle
         await sendToDepot(finalPath, finalSafeTitle, finalMime, title, recipientJid);
@@ -1686,6 +1688,15 @@ export async function executeDownloadPipeline(targetUrl, recipientJid, progressU
   return;
 }
 
+function runCommandAsync(cmd, timeoutMs = 180000) {
+  return new Promise((resolve, reject) => {
+    exec(cmd, { timeout: timeoutMs, maxBuffer: 15 * 1024 * 1024 }, (err, stdout) => {
+      if (err) return reject(err);
+      resolve(stdout ? stdout.toString() : '');
+    });
+  });
+}
+
 export async function ensureWhatsAppCompatibleMp4(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return filePath;
   const ext = path.extname(filePath).toLowerCase();
@@ -1694,7 +1705,7 @@ export async function ensureWhatsAppCompatibleMp4(filePath) {
 
   try {
     const probeCmd = `ffprobe -v quiet -print_format json -show_streams -show_format "${filePath}"`;
-    const probeOut = execSync(probeCmd, { timeout: 25000 }).toString();
+    const probeOut = await runCommandAsync(probeCmd, 25000);
     const probe = JSON.parse(probeOut);
     const vStream = (probe.streams || []).find(s => s.codec_type === 'video');
     const aStream = (probe.streams || []).find(s => s.codec_type === 'audio');
@@ -1716,20 +1727,20 @@ export async function ensureWhatsAppCompatibleMp4(filePath) {
     if (!isSupportedVCodec) {
       // Desteklenmeyen video formatı (VP9, AV1, HEVC, VP8 vb.) -> H.264 + AAC
       console.log(`[WhatsApp Sanitizer] Desteklenmeyen video codec (${vCodec}) tespit edildi. WhatsApp için H.264 + AAC'ye dönüştürülüyor...`);
-      execSync(`"${ffmpegPath}" -y -i "${filePath}" -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart -brand mp42 "${tempSanitized}"`, { timeout: 600000 });
+      await runCommandAsync(`"${ffmpegPath}" -y -i "${filePath}" -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart -brand mp42 "${tempSanitized}"`, 600000);
     } else if (!isSupportedACodec) {
       // Desteklenmeyen ses formatı (Opus, Vorbis, AC3, EAC3, DTS vb.) -> Video kopyalanır, sadece ses AAC yapılır
       console.log(`[WhatsApp Sanitizer] Desteklenmeyen ses codec (${aCodec}) tespit edildi. Video korunup ses AAC'ye dönüştürülüyor...`);
-      execSync(`"${ffmpegPath}" -y -i "${filePath}" -c:v copy -c:a aac -b:a 128k -movflags +faststart -brand mp42 "${tempSanitized}"`, { timeout: 180000 });
+      await runCommandAsync(`"${ffmpegPath}" -y -i "${filePath}" -c:v copy -c:a aac -b:a 128k -movflags +faststart -brand mp42 "${tempSanitized}"`, 180000);
     } else {
       // Hem video hem ses uyumlu -> Hızlı remux, moov atomu başa alınır (+faststart)
       console.log(`[WhatsApp Sanitizer] MP4 başlığı (+faststart, brand mp42) optimize ediliyor...`);
       const bsfOpt = hasAudio ? '-bsf:a aac_adtstoasc' : '';
       try {
-        execSync(`"${ffmpegPath}" -y -i "${filePath}" -map 0 -c copy ${bsfOpt} -movflags +faststart -brand mp42 "${tempSanitized}"`, { timeout: 120000 });
+        await runCommandAsync(`"${ffmpegPath}" -y -i "${filePath}" -map 0 -c copy ${bsfOpt} -movflags +faststart -brand mp42 "${tempSanitized}"`, 120000);
       } catch (remuxErr) {
         console.warn(`[WhatsApp Sanitizer] BSF remux uyarısı (${remuxErr.message}), ses AAC re-encode deneniyor...`);
-        execSync(`"${ffmpegPath}" -y -i "${filePath}" -map 0:v -map 0:a? -map 0:s? -c:v copy -c:a aac -b:a 128k -c:s copy -movflags +faststart -brand mp42 "${tempSanitized}"`, { timeout: 180000 });
+        await runCommandAsync(`"${ffmpegPath}" -y -i "${filePath}" -map 0:v -map 0:a? -map 0:s? -c:v copy -c:a aac -b:a 128k -c:s copy -movflags +faststart -brand mp42 "${tempSanitized}"`, 180000);
       }
     }
 

@@ -27,18 +27,45 @@ import { getDiskUsage } from '../config.js';
 import { commands } from '../bot.js';
 import { isReplyDownloadTrigger, handleReplyDownload } from '../utils/quotedHandler.js';
 
-export async function handleMessage(sock, m) {
-  const msg = m.messages[0];
-  if (!msg.message) return;
+function unwrapMessage(message) {
+  if (!message) return null;
+  if (message.ephemeralMessage?.message) return unwrapMessage(message.ephemeralMessage.message);
+  if (message.viewOnceMessage?.message) return unwrapMessage(message.viewOnceMessage.message);
+  if (message.viewOnceMessageV2?.message) return unwrapMessage(message.viewOnceMessageV2.message);
+  if (message.documentWithCaptionMessage?.message) return unwrapMessage(message.documentWithCaptionMessage.message);
+  return message;
+}
 
-  if (sentMessageIds.has(msg.key.id)) return;
+export async function handleMessage(sock, m) {
+  if (!m?.messages || !Array.isArray(m.messages)) return;
+  for (const msg of m.messages) {
+    try {
+      await processSingleMessage(sock, msg);
+    } catch (err) {
+      console.error('[MSG PROCESSING ERROR]:', err?.message || err);
+    }
+  }
+}
+
+async function processSingleMessage(sock, msg) {
+  if (!msg?.message) return;
+
+  if (sentMessageIds.has(msg.key?.id)) return;
 
   const from = msg.key.remoteJid;
   const config = readConfig();
 
-  const text = (msg.message.conversation ||
-    msg.message.extendedTextMessage?.text ||
-    '').trim();
+  const content = unwrapMessage(msg.message);
+  if (!content) return;
+
+  const text = (
+    content.conversation ||
+    content.extendedTextMessage?.text ||
+    content.imageMessage?.caption ||
+    content.videoMessage?.caption ||
+    content.documentMessage?.caption ||
+    ''
+  ).trim();
   const ltext = text.toLowerCase().trim();
 
   console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}"`);
@@ -531,7 +558,14 @@ export async function handleMessage(sock, m) {
   if (isMenuRequest) {
     const yardimCmd = commands.get('yardim');
     if (yardimCmd) {
-      await yardimCmd.execute(sock, msg, from, [], { text });
+      console.log(`[COMMAND] Executing 'yardim' for ${from}...`);
+      try {
+        await yardimCmd.execute(sock, msg, from, [], { text });
+        console.log(`[COMMAND] Finished 'yardim' for ${from}`);
+      } catch (err) {
+        console.error('[Yardım Komutu] Hata:', err.message);
+        await sock.sendMessage(from, { text: `⚠️ Yardım menüsü alınırken bir sorun oluştu: ${err.message}` });
+      }
     }
     return;
   }
@@ -599,6 +633,7 @@ export async function handleMessage(sock, m) {
 
   if (commandName && commands.has(commandName)) {
     const cmd = commands.get(commandName);
+    console.log(`[COMMAND] Executing '${commandName}' for ${from}...`);
     try {
       await cmd.execute(sock, msg, from, args, {
         text,
@@ -609,6 +644,7 @@ export async function handleMessage(sock, m) {
         downloadsDir,
         formatBytes
       });
+      console.log(`[COMMAND] Finished '${commandName}' for ${from}`);
     } catch (err) {
       console.error(`Command error (${commandName}):`, err.message);
       await sock.sendMessage(from, { text: `⚠️ Komut hatası: ${err.message}` });

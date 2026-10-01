@@ -553,19 +553,16 @@ export function cleanCorruptedSessions(dir = sessionPath) {
       const fp = path.join(dir, f);
       try {
         const stat = fs.statSync(fp);
-        // Yalnızca aşırı büyük / bozulmuş oturum ve sender-key dosyalarını temizle (>5KB)
-        const isBloatedSession = f.startsWith('session-') && stat.size > 5000;
-        const isBloatedSenderKey = f.startsWith('sender-key-') && stat.size > 5000;
-        const isBloatedAppState = f.startsWith('app-state-sync-') && stat.size > 10000;
-        if (isBloatedSession || isBloatedSenderKey || isBloatedAppState) {
+        // Sadece tamamen boş (0 baytlık) bozuk dosyaları temizle; geçerli oturum ve anahtarları asla silme!
+        if (stat.size === 0) {
           fs.unlinkSync(fp);
           cleaned++;
-          console.log(`[Session Guard] Bozulmuş oturum anahtarı temizlendi: ${f} (${stat.size} bayt)`);
+          console.log(`[Session Guard] Boş oturum dosyası temizlendi: ${f}`);
         }
       } catch (e) {}
     }
     if (cleaned > 0) {
-      console.log(`[Session Guard] Toplam ${cleaned} bozulmuş anahtar temizlendi. creds.json korundu (oturum açık).`);
+      console.log(`[Session Guard] Toplam ${cleaned} boş dosya temizlendi. creds.json ve tüm oturum anahtarları korundu.`);
     }
   } catch (err) {
     console.error('[Session Guard] cleanCorruptedSessions hatası:', err.message);

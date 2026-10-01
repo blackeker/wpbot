@@ -142,25 +142,7 @@ async function startBot() {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger)
     },
-    makeSignalRepository: (auth) => {
-      const repository = DEFAULT_CONNECTION_CONFIG.makeSignalRepository(auth);
-      const originalDecryptMessage = repository.decryptMessage.bind(repository);
-      repository.decryptMessage = async ({ jid, type, ciphertext }) => {
-        try {
-          return await originalDecryptMessage({ jid, type, ciphertext });
-        } catch (err) {
-          if (err && err.message && (err.message.includes('Bad MAC') || err.message.includes('No matching sessions'))) {
-            const addrStr = repository.jidToSignalProtocolAddress(jid).toString();
-            console.warn(`[Session Auto-Fix] Bozulmuş oturum anahtarı (${err.message}) tespit edildi: ${addrStr}. Temizlenerek yeni anahtar değişimi tetikleniyor.`);
-            try {
-              await auth.keys.set({ session: { [addrStr]: null } });
-            } catch (clearErr) {}
-          }
-          throw err;
-        }
-      };
-      return repository;
-    },
+    makeSignalRepository: (auth) => DEFAULT_CONNECTION_CONFIG.makeSignalRepository(auth),
     logger: logger,
     browser: Browsers.macOS('Desktop'),
     printQRInTerminal: false,
@@ -178,6 +160,7 @@ async function startBot() {
   
   const originalSendMessage = sock.sendMessage.bind(sock);
   sock.sendMessage = async (...args) => {
+    const [targetJid] = args;
     const result = await originalSendMessage(...args);
     if (result && result.key && result.key.id) {
       addSentMessageId(result.key.id);
@@ -185,6 +168,7 @@ async function startBot() {
         storeMessage(result.key, result.message);
       }
     }
+    console.log(`[MSG OUTGOING] Sent to: ${targetJid} | ID: ${result?.key?.id}`);
     return result;
   };
 
