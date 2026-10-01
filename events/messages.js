@@ -704,6 +704,12 @@ async function processSingleMessage(sock, msg) {
     } else if (['yemek', 'yemekler', 'gunlukyemek', 'yemekhane'].includes(ltext) || ltext.startsWith('yemek ') || ltext.startsWith('yemekler ')) {
       commandName = 'yemek';
       args = text.trim().split(/\s+/).slice(1);
+    } else if (['22', 'otobus', 'otobüs', 'otobussaatleri', 'otobüs saatleri', '22 saatleri'].includes(ltext) || ltext.startsWith('22 ') || ltext.startsWith('otobus ') || ltext.startsWith('otobüs ')) {
+      commandName = '22';
+      args = text.trim().split(/\s+/).slice(1);
+    } else if (['uniyemek', 'uni yemek', 'üniversite yemek', 'universite yemek', 'fırat yemek', 'firat yemek', 'üniversite yemeği'].includes(ltext) || ltext.startsWith('uniyemek ') || ltext.startsWith('firatyemek ')) {
+      commandName = 'uniyemek';
+      args = text.trim().split(/\s+/).slice(1);
     }
   }
 

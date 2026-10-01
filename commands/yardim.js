@@ -21,7 +21,9 @@ export default {
 • *!kahvalti [gün/tarih]* ➔ Günün kahvaltı menüsü (Örn: \`!kahvalti yarin\`).
 • *!aksam [gün/tarih]* ➔ Günün akşam yemeği menüsü (Örn: \`!aksam\`).
 • *!yemek [gün/tarih]* ➔ Günlük kahvaltı + akşam tam menüsü.
+• *!uniyemek* ➔ Fırat Üniversitesi yemekhanesi günün menüsü (unievi.firat.edu.tr).
 • *!adres* ➔ Ahmet Kabaklı Öğrenci Yurdu adresini gönderir.
+• *!22* / *!otobus* ➔ 22 numara otobüs saatlerini ve sıradaki seferi gösterir.
 • *!haber* ➔ Son dakika gündem haberleri.
 • *!namaz [şehir]* ➔ Namaz vakitleri & kalan zaman geri sayımı.
 • *!deprem* ➔ Kandilli Rasathanesi son depremler.

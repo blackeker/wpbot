@@ -8,6 +8,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { gotScraping } from 'got-scraping';
 import { exec, execSync } from 'child_process';
+import { startCronScheduler } from './server/cronScheduler.js';
 
 import { getModuleLogger } from './utils/logger.js';
 const logger = getModuleLogger('server');
@@ -1314,7 +1315,7 @@ function matchCron(cronExpr, date = new Date()) {
          parseCronField(parts[4], dow);
 }
 
-export { startCronScheduler } from './server/cronScheduler.js';
+export { startCronScheduler };
 
 export function startServer(PORT, startBotCallback) {
   onResetRequest = startBotCallback;
