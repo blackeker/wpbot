@@ -512,11 +512,11 @@ Mesajınızın içine \`kare\` (1:1), \`dikey\` (9:16) veya \`yatay\` (16:9) ekl
 
     // 5. WhatsApp Mesajı Oluşturma ve Gönderme
     const isTranslated = englishPrompt.toLowerCase().trim() !== userPrompt.toLowerCase().trim();
-    let caption = `⚡ *Perchance AI Görseli Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${userPrompt}\n`;
+    let caption = ` * Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${userPrompt}\n`;
     if (isTranslated) {
       caption += `🌐 *Çeviri:* _${englishPrompt}_\n`;
     }
-    caption += `🎨 *Stil:* ${selectedStyle.icon} ${selectedStyle.name}\n📐 *Boyut:* ${shapeLabel}\n⚡ *Motor:* ${result.engine} (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+    caption += `🎨 *Stil:* ${selectedStyle.icon} ${selectedStyle.name}\n📐 *Boyut:* ${shapeLabel}\n (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
 
     await sock.sendMessage(from, {
       image: result.buffer,

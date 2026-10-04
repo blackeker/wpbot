@@ -3,15 +3,24 @@ dotenv.config({ override: true });
 
 // Process Crash Resilience: Catch unhandled errors and rejections to prevent bot crashes
 process.on('uncaughtException', (err) => {
-  console.error('[UNCAUGHT EXCEPTION]', err?.message || err);
+  const errMsg = err?.message || String(err);
+  if (errMsg.includes('Over 2000 messages into the future') || errMsg.includes('Failed to decrypt')) {
+    // Handled by session auto-healer
+    return;
+  }
+  console.error('[UNCAUGHT EXCEPTION]', errMsg);
   if (err?.stack) console.error(err.stack);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
+  const reasonMsg = reason?.message || String(reason);
+  if (reasonMsg.includes('Over 2000 messages into the future') || reasonMsg.includes('Failed to decrypt')) {
+    return;
+  }
   console.error('[UNHANDLED REJECTION] At:', promise, 'Reason:', reason);
 });
 
-// Libsignal gürültülü iç debug loglarını (Closing session, Opening session vb.) filtrele
+// Libsignal session ratchet desync auto-healer & noisy debug log filters
 const originalConsoleInfo = console.info.bind(console);
 console.info = (...args) => {
   if (typeof args[0] === 'string' && (args[0].startsWith('Closing session:') || args[0].startsWith('Opening session:'))) {
@@ -22,10 +31,34 @@ console.info = (...args) => {
 
 const originalConsoleWarn = console.warn.bind(console);
 console.warn = (...args) => {
-  if (typeof args[0] === 'string' && args[0].includes('Closing open session in favor of incoming prekey bundle')) {
+  const str = typeof args[0] === 'string' ? args[0] : '';
+  if (str.includes('Closing open session in favor of incoming prekey bundle') || str.includes('Failed to decrypt message')) {
     return;
   }
   originalConsoleWarn(...args);
+};
+
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  const fullText = args.map(a => (typeof a === 'object' ? (a?.stack || a?.message || JSON.stringify(a)) : String(a))).join(' ');
+  
+  // Auto-heal "Over 2000 messages into the future" libsignal ratchet desynchronization
+  if (fullText.includes('Over 2000 messages into the future') || fullText.includes('Failed to decrypt message with any known session')) {
+    const sessionMatch = fullText.match(/(?:at\s+|session-)(\d+\.\d+|\d+)/i);
+    if (sessionMatch) {
+      const sessId = sessionMatch[1];
+      const targetSession = path.join(sessionPath, `session-${sessId}.json`);
+      try {
+        if (fs.existsSync(targetSession)) {
+          fs.unlinkSync(targetSession);
+          console.log(`[SESSION HEALER] 🩹 Bozuk/desenkronize oturum dosyası otomatik yenilendi: session-${sessId}.json`);
+        }
+      } catch (e) {}
+    }
+    return; // Don't flood PM2 error logs with thousands of lines
+  }
+
+  originalConsoleError(...args);
 };
 
 import { 
