@@ -1,3 +1,5 @@
+import { sendMenuResponse } from '../utils/menuData.js';
+
 export default {
   name: '22',
   aliases: ['otobus22', 'otobüs22', 'hat22', 'otobus', 'otobüs'],
@@ -50,6 +52,6 @@ export default {
       message += `ℹ️ _Bugünkü seferler tamamlanmıştır. İlk sefer yarın sabah 07:45'te._\n`;
     }
 
-    await sock.sendMessage(from, { text: message.trim() });
+    await sendMenuResponse(sock, msg, from, message.trim());
   }
 };

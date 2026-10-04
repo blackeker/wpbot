@@ -19,32 +19,25 @@ export async function handleConnectionUpdate(sock, update, startBot) {
       }
       console.clear();
       console.log('====================================');
-      console.log('--- WhatsApp Bot QR Code ---');
-      console.log('Scan the QR code below using your WhatsApp Linked Devices:');
+      console.log('--- WhatsApp Bot QR Kodu ---');
+      console.log('WhatsApp uygulamanızdan Bağlı Cihazlar menüsüne giderek aşağıdaki QR kodu taratın:');
       console.log('====================================');
       qrcode.generate(qr, { small: true });
+      console.log('\n💡 İpucu: Eşleşme kodu (Pairing Code) ile bağlanmak için web panelini (http://localhost:7860) kullanabilir veya \'npm start -- --pairing <numara>\' komutuyla başlatabilirsiniz.\n');
     } else {
-      botState.status = 'connecting';
-      console.log('[PAIRING] QR baskı atlandı, pairing code bekleniyor...');
+      if (!botState.pairingCode) {
+        botState.status = 'connecting';
+        console.log('[PAIRING] Eşleşme modu aktif, eşleşme kodu bekleniyor...');
+      }
     }
   }
 
-  if (connection === 'connecting' && pairingState.isPairingMode && pairingState.pairingPhoneNumber) {
-    const cleanPhone = pairingState.pairingPhoneNumber.replace(/[^0-9]/g, '');
-    console.log(`[PAIRING] Bağlantı kuruluyor, kod isteniyor: ${cleanPhone}`);
-    setTimeout(async () => {
-      try {
-        const code = await sock.requestPairingCode(cleanPhone);
-        botState.pairingCode = code;
-        botState.pairingMode = true;
-        botState.status = 'pairing';
-        console.log(`\n🔑 PAIRING CODE: ${code}\n`);
-      } catch (err) {
-        console.error('[PAIRING] Hata:', err.message);
-        pairingState.isPairingMode = false;
-        botState.pairingMode = false;
-      }
-    }, 3000);
+  if (connection === 'connecting') {
+    if (pairingState.isPairingMode) {
+      botState.status = botState.pairingCode ? 'pairing' : 'connecting';
+    } else if (!botState.qrCodeUrl) {
+      botState.status = 'connecting';
+    }
   }
 
   if (connection === 'close') {

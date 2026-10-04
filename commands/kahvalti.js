@@ -1,4 +1,4 @@
-import { getKahvaltiMessage } from '../utils/menuData.js';
+import { getKahvaltiMessage, sendMenuResponse } from '../utils/menuData.js';
 
 export default {
   name: 'kahvalti',
@@ -7,10 +7,10 @@ export default {
     try {
       const query = args && args.length > 0 ? args.join(' ').trim() : '';
       const replyText = getKahvaltiMessage(query);
-      await sock.sendMessage(from, { text: replyText });
+      await sendMenuResponse(sock, msg, from, replyText);
     } catch (err) {
       console.error('[Kahvaltı Komutu] Hata:', err.message);
-      await sock.sendMessage(from, { text: `❌ *Hata:* Kahvaltı menüsü alınırken bir sorun oluştu: ${err.message}` });
+      await sendMenuResponse(sock, msg, from, `❌ *Hata:* Kahvaltı menüsü alınırken bir sorun oluştu: ${err.message}`);
     }
   }
 };

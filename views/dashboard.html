@@ -1405,9 +1405,10 @@
 
           <div class="section-divider" style="border-top:1px solid var(--border-subtle); margin:20px 0;"></div>
 
-          <div class="panel-title" style="font-size:0.95rem; margin-bottom:12px;">
-            <span>🔑 Telefon No İle Pairing Kodu İste</span>
+          <div class="panel-title" style="font-size:0.95rem; margin-bottom:8px;">
+            <span>🔑 Telefon Numarası İle Eşleşme (Pairing) Kodu İste</span>
           </div>
+          <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:10px;">Numaranızı ülke koduyla birlikte başında <b>+</b> veya <b>0</b> olmadan girin (Örn: <code>905551234567</code>):</p>
           <div style="display:flex; gap:10px;">
             <input type="text" id="pairing-phone-input" class="glass-input" value="905551234567" placeholder="905XXXXXXXXX" style="flex:1;">
             <button class="btn-primary" onclick="requestNewPairingCode()" style="width:auto; padding:0 20px;">Kod İste 🔑</button>
@@ -2241,10 +2242,11 @@
           let qrOrPairingHtml = '';
           if (data.pairingCode) {
             qrOrPairingHtml = `
-              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">Pairing Kodu:</div>
-              <div style="background:rgba(99,102,241,0.15); border:1px dashed rgba(99,102,241,0.5); border-radius:10px; padding:10px 20px; font-size:1.5rem; font-weight:900; font-family:monospace; color:#818cf8; cursor:pointer;" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>showToast('Kopyalandı', 'Pairing kodu kopyalandı.', 'success'))">
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">Eşleşme (Pairing) Kodu:</div>
+              <div style="background:rgba(99,102,241,0.18); border:1px dashed #818cf8; border-radius:10px; padding:10px 16px; font-size:1.5rem; font-weight:900; letter-spacing:2px; font-family:monospace; color:#a5b4fc; cursor:pointer;" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>showToast('Kopyalandı', 'Eşleşme kodu panoya kopyalandı.', 'success'))" title="Kopyalamak için tıklayın">
                 ${data.pairingCode}
               </div>
+              <div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">📋 Tıkla ve Kopyala</div>
             `;
           } else if (data.qrCodeUrl) {
             qrOrPairingHtml = `
@@ -2266,8 +2268,8 @@
                     <span>⚠️</span> WhatsApp Bağlantısı Aktif Değil!
                   </h3>
                   <p style="color:var(--text-secondary); font-size:0.85rem; line-height:1.5; margin:0;">
-                    Botun WhatsApp üzerinden indirme isteklerini alabilmesi ve mesaj gönderebilmesi için oturum açmalısınız. 
-                    Sağdaki QR kodu telefonunuzdaki WhatsApp uygulamasından taratın veya <b>Komuta İstasyonu</b> sekmesinden pairing kodu alın.
+                    Botun WhatsApp üzerinden mesaj alıp gönderebilmesi için oturum açmalısınız. 
+                    Sağdaki QR kodu telefonunuzdan taratın veya <b>Komuta İstasyonu</b> sekmesinden telefon numaranız ile 8 haneli eşleşme kodu alın.
                   </p>
                 </div>
                 <div style="min-width:160px; text-align:center;">
@@ -2290,15 +2292,20 @@
         `;
       } else if (data.pairingCode) {
         sideDot.className = 'status-dot';
-        sideText.innerText = 'Pairing Kodu';
+        sideText.innerText = 'Eşleşme Kodu';
         waContainer.innerHTML = `
-          <p style="color:var(--text-secondary); margin-bottom:12px;">WhatsApp uygulamanızı açıp <b>Bağlı Cihazlar -> Telefon numarasıyla bağla</b> seçeneğine girin ve bu kodu yazın:</p>
-          <div style="background:rgba(99,102,241,0.1); border:2px dashed rgba(99,102,241,0.4); border-radius:18px; padding:20px; font-size:2.4rem; font-weight:900; font-family:monospace; color:#818cf8; cursor:pointer;" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>showToast('Kopyalandı', 'Pairing kodu panoya kopyalandı.', 'success'))">
-            ${data.pairingCode}
-          </div>
-          <p style="font-size:0.75rem; color:var(--text-muted); margin-top:8px;">Kopyalamak için koda tıklayın.</p>
-          <div style="margin-top:16px;">
-            <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="resetSessionAction()">🔄 Oturumu Sıfırla / QR Koduna Geç</button>
+          <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.3); border-radius:18px; padding:24px; text-align:center;">
+            <h3 style="color:#a5b4fc; font-size:1.25rem; margin-bottom:12px;">🔑 WhatsApp Eşleşme (Pairing) Kodu</h3>
+            <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:14px;">WhatsApp uygulamanızı açıp <b>Bağlı Cihazlar &gt; Cihaz Bağla &gt; Telefon Numarasıyla Bağla</b> seçeneğine dokunun ve aşağıdaki 8 haneli kodu girin:</p>
+            <div style="background:rgba(99,102,241,0.15); border:2px dashed #818cf8; border-radius:16px; padding:18px; font-size:2.4rem; font-weight:900; letter-spacing:4px; font-family:monospace; color:#a5b4fc; cursor:pointer; display:inline-block; margin:8px auto; box-shadow:0 0 24px rgba(99,102,241,0.2);" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>showToast('Kopyalandı', 'Eşleşme kodu panoya kopyalandı.', 'success'))" title="Kopyalamak için tıklayın">
+              ${data.pairingCode}
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:6px;">📋 Panoya kopyalamak için koda tıklayın</p>
+            <div style="margin-top:18px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+              <button class="btn-primary" style="padding:8px 16px; font-size:0.85rem;" onclick="navigator.clipboard.writeText('${data.pairingCode}').then(()=>showToast('Kopyalandı', 'Eşleşme kodu panoya kopyalandı.', 'success'))">📋 Kodu Kopyala</button>
+              <button class="btn-secondary" style="padding:8px 16px; font-size:0.85rem;" onclick="requestQrAction()">📷 QR Koduna Geç</button>
+              <button class="btn-danger" style="padding:8px 16px; font-size:0.85rem;" onclick="resetSessionAction()">🔄 Sıfırla</button>
+            </div>
           </div>
         `;
       } else if (data.qrCodeUrl) {
@@ -2316,7 +2323,7 @@
         sideText.innerText = 'Giriş Bekleniyor';
         waContainer.innerHTML = `
           <div style="padding:24px;">
-            <p style="color:var(--text-muted); margin-bottom:12px;">Giriş bekleniyor. QR kod veya pairing kodu yükleniyor...</p>
+            <p style="color:var(--text-muted); margin-bottom:12px;">Giriş bekleniyor. QR kod veya eşleşme kodu yükleniyor...</p>
             <div style="display:inline-block; border:4px solid rgba(255,255,255,0.1); border-top-color:var(--accent-primary); border-radius:50%; width:32px; height:32px; animation: spin 1s linear infinite;"></div>
           </div>
         `;
@@ -2790,6 +2797,7 @@
       if (!phone) return showToast('Hata', 'Telefon numarası girilmelidir.', 'warn');
 
       try {
+        showToast('Talep Gönderiliyor', 'Eşleşme kodu isteniyor, lütfen bekleyin...', 'info');
         const res = await fetch('/api/request-pairing', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2797,12 +2805,32 @@
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Talep Gönderildi', data.message, 'success');
+          if (data.pairingCode) {
+            navigator.clipboard.writeText(data.pairingCode).catch(()=>{});
+            showToast('Eşleşme Kodu Alındı!', `Kod: ${data.pairingCode} (Panoya kopyalandı)`, 'success');
+          } else {
+            showToast('Talep Gönderildi', data.message, 'success');
+          }
         } else {
           showToast('Hata', data.error, 'error');
         }
       } catch (e) {
         showToast('Bağlantı Hatası', e.message, 'error');
+      }
+    }
+
+    async function requestQrAction() {
+      try {
+        showToast('İşleniyor', 'QR kod moduna geçiliyor...', 'info');
+        const res = await fetch('/api/request-qr', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Başarılı', data.message, 'success');
+        } else {
+          showToast('Hata', data.error, 'error');
+        }
+      } catch (e) {
+        showToast('Hata', e.message, 'error');
       }
     }
 

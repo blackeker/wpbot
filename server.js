@@ -1104,7 +1104,7 @@ app.post('/api/request-pairing', async (req, res) => {
   if (!phone) return res.status(400).json({ error: 'Telefon numarası gereklidir.' });
 
   const cleanPhone = phone.replace(/[^0-9]/g, '');
-  if (cleanPhone.length < 10) return res.status(400).json({ error: 'Geçersiz telefon numarası.' });
+  if (cleanPhone.length < 10) return res.status(400).json({ error: 'Geçersiz telefon numarası. Lütfen ülke koduyla birlikte girin (Örn: 905551234567).' });
 
   try {
     pairingState.isPairingMode = true;
@@ -1114,9 +1114,26 @@ app.post('/api/request-pairing', async (req, res) => {
     botState.pairingMode = true;
     botState.qrCodeUrl = null;
     botState.status = 'connecting';
+    notifyStatusUpdate();
 
-    console.log(`[PAIRING] Temiz başlatma — numara: ${cleanPhone}`);
+    console.log(`[PAIRING] Eşleşme kodu isteği alındı — Numara: +${cleanPhone}`);
 
+    // Canlı soket üzerinden anında eşleşme kodu istemeyi dene
+    if (botSocketRef.current && !botSocketRef.current.authState?.creds?.registered) {
+      try {
+        const { requestBotPairingCode } = await import('./bot.js');
+        const code = await requestBotPairingCode(cleanPhone);
+        return res.json({ 
+          success: true, 
+          pairingCode: code, 
+          message: `Eşleşme kodu başarıyla oluşturuldu: ${code}` 
+        });
+      } catch (directErr) {
+        console.warn('[PAIRING API] Canlı soket üzerinden kod alma başarısız, soket yeniden başlatılıyor:', directErr.message);
+      }
+    }
+
+    // Soket yeniden başlatma
     if (botSocketRef.current) {
       try { botSocketRef.current.end(new Error('Pairing mode restart')); } catch(e) {}
       botSocketRef.current = null;
@@ -1126,12 +1143,43 @@ app.post('/api/request-pairing', async (req, res) => {
     fs.mkdirSync(sessionPath, { recursive: true });
 
     if (onResetRequest) {
-      setTimeout(() => onResetRequest(), 1500);
+      setTimeout(() => onResetRequest(), 1200);
     }
 
-    return res.json({ success: true, message: 'Pairing code isteniyor, 5-10 saniye bekleyin...' });
+    return res.json({ success: true, message: 'Eşleşme kodu talep edildi, birkaç saniye içinde ekranda görünecektir...' });
   } catch (err) {
     console.error('Pairing request error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/request-qr', async (req, res) => {
+  try {
+    pairingState.isPairingMode = false;
+    pairingState.pairingPhoneNumber = '';
+    botState.pairingCode = null;
+    botState.pairingMode = false;
+    botState.status = 'connecting';
+    botState.qrCodeUrl = null;
+    notifyStatusUpdate();
+
+    console.log('[QR] QR kod moduna geçiliyor...');
+
+    if (botSocketRef.current) {
+      try { botSocketRef.current.end(new Error('Switch to QR mode')); } catch(e) {}
+      botSocketRef.current = null;
+    }
+
+    fs.rmSync(sessionPath, { recursive: true, force: true });
+    fs.mkdirSync(sessionPath, { recursive: true });
+
+    if (onResetRequest) {
+      setTimeout(() => onResetRequest(), 1200);
+    }
+
+    return res.json({ success: true, message: 'QR kod moduna geçiliyor, lütfen bekleyin...' });
+  } catch (err) {
+    console.error('Request QR error:', err);
     return res.status(500).json({ error: err.message });
   }
 });

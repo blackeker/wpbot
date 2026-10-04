@@ -1,4 +1,4 @@
-import { getAksamMessage } from '../utils/menuData.js';
+import { getAksamMessage, sendMenuResponse } from '../utils/menuData.js';
 
 export default {
   name: 'aksam',
@@ -7,10 +7,10 @@ export default {
     try {
       const query = args && args.length > 0 ? args.join(' ').trim() : '';
       const replyText = getAksamMessage(query);
-      await sock.sendMessage(from, { text: replyText });
+      await sendMenuResponse(sock, msg, from, replyText);
     } catch (err) {
       console.error('[Akşam Yemeği Komutu] Hata:', err.message);
-      await sock.sendMessage(from, { text: `❌ *Hata:* Akşam yemeği menüsü alınırken bir sorun oluştu: ${err.message}` });
+      await sendMenuResponse(sock, msg, from, `❌ *Hata:* Akşam yemeği menüsü alınırken bir sorun oluştu: ${err.message}`);
     }
   }
 };

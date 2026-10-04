@@ -94,6 +94,11 @@ async function processSingleMessage(sock, msg) {
   }
 
   if (msg.key.fromMe) {
+    const isExplicitCmd = text.startsWith('!');
+    const isDlLink = text.startsWith('http://') || text.startsWith('https://') || text.startsWith('magnet:') || text.toLowerCase().includes('.torrent');
+    if (!isExplicitCmd && !isDlLink) {
+      return;
+    }
     if (config.groupJid && from !== config.groupJid) {
       return;
     }
@@ -639,7 +644,19 @@ async function processSingleMessage(sock, msg) {
   }
 
   // Help / Menu check
-  const menuMatch = ltext.match(/^(?:!?(?:menü|menu|yardım|yardim|help|rehber)|merhaba|selam|sa|hey|hi|ne yapabilirsin|ne yaparsın)(?:\s+(.*))?$/i);
+  const isGroupChat = from.endsWith('@g.us');
+  let menuMatch = null;
+  if (isGroupChat) {
+    menuMatch = ltext.match(/^!(?:menü|menu|yardım|yardim|help|rehber)(?:\s+(.*))?$/i);
+    if (!menuMatch && ['menü', 'menu', 'yardım', 'yardim', 'rehber'].includes(ltext)) {
+      menuMatch = [ltext, ''];
+    }
+  } else {
+    menuMatch = ltext.match(/^(?:!?(?:menü|menu|yardım|yardim|help|rehber)|ne yapabilirsin|ne yaparsın)(?:\s+(.*))?$/i);
+    if (!menuMatch && ['merhaba', 'selam', 'sa', 'hey', 'hi'].includes(ltext)) {
+      menuMatch = [ltext, ''];
+    }
+  }
 
   if (menuMatch) {
     const perm = checkCommandPermission('yardim', from, { isOwner, isAdmin });
@@ -713,19 +730,28 @@ async function processSingleMessage(sock, msg) {
       args = text.trim().split(/\s+/).slice(1);
     } else if (['hhelp', 'hentaihelp', 'h-help', 'hyardim', 'hentaiyardim', 'hentai yardım', 'hentai yardim'].includes(ltext)) {
       commandName = 'hhelp';
-    } else if (['kahvalti', 'kahvaltı', 'sabah', 'sabahyemegi', 'sabahyemeği'].includes(ltext) || ltext.startsWith('kahvalti ') || ltext.startsWith('kahvaltı ')) {
+    } else if (
+      ['kahvalti', 'kahvaltı', 'sabah', 'sabahyemegi', 'sabahyemeği'].includes(ltext) ||
+      (/^(?:kahvalti|kahvaltı)\s+(.+)$/i.test(ltext) && /^(?:bugun|bugün|yarin|yarın|dun|dün|pazartesi|sali|salı|carsamba|çarşamba|persembe|perşembe|cuma|cumartesi|pazar|\d{1,2}(?:\.\d{1,2}(?:\.\d{4})?)?)$/i.test(ltext.replace(/^(?:kahvalti|kahvaltı)\s+/i, '').trim()))
+    ) {
       commandName = 'kahvalti';
       args = text.trim().split(/\s+/).slice(1);
-    } else if (['aksam', 'akşam', 'aksamyemegi', 'akşamyemeği'].includes(ltext) || ltext.startsWith('aksam ') || ltext.startsWith('akşam ')) {
+    } else if (
+      ['aksam', 'akşam', 'aksamyemegi', 'akşamyemeği'].includes(ltext) ||
+      (/^(?:aksam|akşam)\s+(.+)$/i.test(ltext) && /^(?:bugun|bugün|yarin|yarın|dun|dün|pazartesi|sali|salı|carsamba|çarşamba|persembe|perşembe|cuma|cumartesi|pazar|\d{1,2}(?:\.\d{1,2}(?:\.\d{4})?)?)$/i.test(ltext.replace(/^(?:aksam|akşam)\s+/i, '').trim()))
+    ) {
       commandName = 'aksam';
       args = text.trim().split(/\s+/).slice(1);
-    } else if (['yemek', 'yemekler', 'gunlukyemek', 'yemekhane'].includes(ltext) || ltext.startsWith('yemek ') || ltext.startsWith('yemekler ')) {
+    } else if (
+      ['yemek', 'yemekler', 'gunlukyemek', 'yemekhane'].includes(ltext) ||
+      (/^(?:yemek|yemekler)\s+(.+)$/i.test(ltext) && /^(?:bugun|bugün|yarin|yarın|dun|dün|pazartesi|sali|salı|carsamba|çarşamba|persembe|perşembe|cuma|cumartesi|pazar|\d{1,2}(?:\.\d{1,2}(?:\.\d{4})?)?)$/i.test(ltext.replace(/^(?:yemek|yemekler)\s+/i, '').trim()))
+    ) {
       commandName = 'yemek';
       args = text.trim().split(/\s+/).slice(1);
-    } else if (['22', 'otobus', 'otobüs', 'otobussaatleri', 'otobüs saatleri', '22 saatleri'].includes(ltext) || ltext.startsWith('22 ') || ltext.startsWith('otobus ') || ltext.startsWith('otobüs ')) {
+    } else if (['22', 'otobus', 'otobüs', 'otobussaatleri', 'otobüs saatleri', '22 saatleri', 'hat22', 'hat 22'].includes(ltext)) {
       commandName = '22';
       args = text.trim().split(/\s+/).slice(1);
-    } else if (['uniyemek', 'uni yemek', 'üniversite yemek', 'universite yemek', 'fırat yemek', 'firat yemek', 'üniversite yemeği'].includes(ltext) || ltext.startsWith('uniyemek ') || ltext.startsWith('firatyemek ')) {
+    } else if (['uniyemek', 'uni yemek', 'üniversite yemek', 'universite yemek', 'fırat yemek', 'firat yemek', 'üniversite yemeği', 'unimenu', 'firatmenu'].includes(ltext)) {
       commandName = 'uniyemek';
       args = text.trim().split(/\s+/).slice(1);
     } else if (['takvim', 'akademik', 'akademiktakvim', 'akademik takvim'].includes(ltext)) {

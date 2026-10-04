@@ -45,6 +45,7 @@ import {
   botSocketRef, 
   sessionPath, 
   botState, 
+  pairingState,
   setupPingTimer,
   cleanOldDownloads,
   restoreSession,
@@ -54,7 +55,7 @@ import {
   addSentMessageId
 } from './config.js';
 
-import { startServer, startCaptchaPoller } from './server.js';
+import { startServer, startCaptchaPoller, notifyStatusUpdate } from './server.js';
 import { handleConnectionUpdate } from './events/connection.js';
 import { handleMessage } from './events/messages.js';
 
@@ -110,6 +111,53 @@ async function loadCommands() {
 // Setup keep-alive ping
 setupPingTimer(botState.pingUrl);
 
+export async function requestBotPairingCode(phoneNumber) {
+  const sock = botSocketRef.current;
+  if (!sock) {
+    throw new Error('WhatsApp soketi henüz başlatılmadı.');
+  }
+  if (sock.authState?.creds?.registered) {
+    throw new Error('Cihaz zaten bağlı ve kayıtlı.');
+  }
+
+  const cleanPhone = (phoneNumber || pairingState.pairingPhoneNumber || '').replace(/[^0-9]/g, '');
+  if (!cleanPhone || cleanPhone.length < 10) {
+    throw new Error('Geçersiz telefon numarası. Lütfen ülke koduyla birlikte girin (Örn: 905551234567).');
+  }
+
+  pairingState.isPairingMode = true;
+  pairingState.pairingPhoneNumber = cleanPhone;
+  botState.pairingNumber = cleanPhone;
+  botState.pairingMode = true;
+  botState.status = 'connecting';
+  notifyStatusUpdate();
+
+  console.log(`[PAIRING] WhatsApp eşleşme kodu isteniyor: +${cleanPhone}...`);
+  const rawCode = await sock.requestPairingCode(cleanPhone);
+  const formattedCode = rawCode?.match(/.{1,4}/g)?.join("-") || rawCode;
+
+  botState.pairingCode = formattedCode;
+  botState.status = 'pairing';
+  botState.qrCodeUrl = null;
+
+  console.clear();
+  console.log('\n╔══════════════════════════════════════════════════════════════╗');
+  console.log('║             🔑 WHATSAPP EŞLEŞME KODU (PAIRING CODE)          ║');
+  console.log('╠══════════════════════════════════════════════════════════════╣');
+  console.log(`║  Telefon Numarası : +${cleanPhone.padEnd(39)} ║`);
+  console.log(`║  Eşleşme Kodu     : \x1b[1;32m${formattedCode.padEnd(39)}\x1b[0m ║`);
+  console.log('╠══════════════════════════════════════════════════════════════╣');
+  console.log('║  Nasıl Bağlanılır?                                           ║');
+  console.log('║  1. Telefonunuzdan WhatsApp uygulamasını açın                 ║');
+  console.log('║  2. Ayarlar > Bağlı Cihazlar > Cihaz Bağla                   ║');
+  console.log('║  3. "Telefon numarasıyla bağla" seçeneğine dokunun            ║');
+  console.log(`║  4. Ekrana şu kodu girin: \x1b[1;33m${formattedCode}\x1b[0m                            ║`);
+  console.log('╚══════════════════════════════════════════════════════════════╝\n');
+
+  notifyStatusUpdate();
+  return formattedCode;
+}
+
 async function startBot() {
   // Auto-update yt-dlp on startup in the background
   (async () => {
@@ -144,7 +192,7 @@ async function startBot() {
     },
     makeSignalRepository: (auth) => DEFAULT_CONNECTION_CONFIG.makeSignalRepository(auth),
     logger: logger,
-    browser: Browsers.macOS('Desktop'),
+    browser: Browsers.ubuntu('Chrome'),
     printQRInTerminal: false,
     syncFullHistory: false,
     markOnlineOnConnect: true,
@@ -186,6 +234,19 @@ async function startBot() {
     }
     await handleMessage(sock, m);
   });
+
+  // Otomatik Eşleşme Kodu Talebi (Eğer pairing modu aktifse ve oturum henüz kayıtlı değilse)
+  if (pairingState.isPairingMode && pairingState.pairingPhoneNumber && !state.creds?.registered) {
+    setTimeout(async () => {
+      try {
+        if (botSocketRef.current && !botSocketRef.current.authState?.creds?.registered) {
+          await requestBotPairingCode(pairingState.pairingPhoneNumber);
+        }
+      } catch (err) {
+        console.error('[PAIRING] Otomatik eşleşme kodu alma hatası:', err.message);
+      }
+    }, 3000);
+  }
 }
 
 // Start everything

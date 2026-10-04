@@ -265,10 +265,29 @@ export const botSocketRef = {
   current: null
 };
 
+// Check CLI arguments for --pairing or -p
+let cliPairingPhone = "";
+let cliPairingFlag = false;
+for (let i = 0; i < process.argv.length; i++) {
+  const arg = process.argv[i];
+  if (arg === '--pairing' || arg === '-p' || arg === '--use-pairing') {
+    cliPairingFlag = true;
+    if (process.argv[i + 1] && !process.argv[i + 1].startsWith('-')) {
+      cliPairingPhone = process.argv[i + 1];
+    }
+  } else if (arg.startsWith('--pairing=')) {
+    cliPairingFlag = true;
+    cliPairingPhone = arg.split('=')[1];
+  }
+}
+
+let initialPairingPhone = (cliPairingPhone || process.env.WHATSAPP_PHONE_NUMBER || process.env.PAIRING_NUMBER || "").replace(/[^0-9]/g, '');
+let initialPairingMode = cliPairingFlag || Boolean(process.env.PAIRING_MODE === 'true') || (initialPairingPhone.length >= 10);
+
 // Shared state for pairing mode (process level)
 export const pairingState = {
-  isPairingMode: false,
-  pairingPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || ""
+  isPairingMode: initialPairingMode,
+  pairingPhoneNumber: initialPairingPhone
 };
 
 // Main Shared Bot State
@@ -276,8 +295,8 @@ export const botState = {
   status: 'connecting',
   qrCodeUrl: null,
   pairingCode: null,
-  pairingMode: false,
-  pairingNumber: process.env.WHATSAPP_PHONE_NUMBER || "",
+  pairingMode: initialPairingMode,
+  pairingNumber: initialPairingPhone,
   uptime: new Date(),
   pingUrl: readConfig().pingUrl || process.env.PING_URL || process.env.RENDER_EXTERNAL_URL || '',
   activeTasks: [],

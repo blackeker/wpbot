@@ -209,8 +209,89 @@ function getNotFoundMessage(query, data, cmdName) {
   );
 }
 
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+const DIVIDERS = [
+  '━━━━━━━━━━━━━━━━━━━━',
+  '────────────────────',
+  '····································',
+  '════════════════════',
+  '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈',
+  '✦ ──────────────── ✦'
+];
+
+const BULLET_FORMATS = [
+  (emoji, item) => `${emoji} ${item}`,
+  (emoji, item) => `• ${emoji} ${item}`,
+  (emoji, item) => `▹ ${emoji} ${item}`,
+  (emoji, item) => `${emoji} *${item}*`,
+  (emoji, item) => `▫️ ${emoji} ${item}`
+];
+
+const AKSAM_HEADERS = [
+  '🍲 *AKŞAM YEMEĞİ MENÜSÜ* 🍽️',
+  '🍽️ *Günün Akşam Menüsü* ✨',
+  '🥘 *KYK Akşam Yemeği Menüsü*',
+  '🍴 *Akşam Yemeği Listesi*',
+  '🥣 *KYK Akşam Menüsü* 🥖',
+  '✨ *Akşam Yemeğinde Ne Var?* 🍲',
+  '🍽️ *Akşam Menüsü | KYK*'
+];
+
+const KAHVALTI_HEADERS = [
+  '🍳 *KAHVALTI MENÜSÜ* 🥐',
+  '🥐 *Günün Sabah Kahvaltısı* ☕',
+  '🥪 *KYK Kahvaltı Menüsü*',
+  '☕ *Sabah Kahvaltısı Listesi*',
+  '🍳 *Kahvaltıda Ne Var?* 🥐',
+  '✨ *KYK Sabah Menüsü* 🥪',
+  '🥖 *Sabah Kahvaltısı | KYK*'
+];
+
+const YEMEK_HEADERS = [
+  '📋 *GÜNLÜK YEMEK MENÜSÜ* 🍽️',
+  '🍛 *KYK Günlük Yemek Listesi*',
+  '🍽️ *Bugünün Menüsü (Kahvaltı & Akşam)*',
+  '✨ *Günün Tam Yemek Menüsü* 🥘',
+  '📋 *KYK Yemek Listesi*'
+];
+
+const AKSAM_FOOTERS = [
+  '💡 _Yarın için:_ `!aksam yarin`  |  _Kahvaltı:_ `!kahvalti`',
+  '✨ _Afiyet olsun!_ 💡 _Yarınki menü:_ `!aksam yarin`',
+  '🍴 _Afiyet olsun, iyi akşamlar!_',
+  '😋 _Afiyet olsun!_ 📌 _Yarın için:_ `!aksam yarin`',
+  '💡 _Kahvaltı menüsü için:_ `!kahvalti`  |  _Tam menü:_ `!yemek`'
+];
+
+const KAHVALTI_FOOTERS = [
+  '💡 _Yarın için:_ `!kahvalti yarin`  |  _Akşam:_ `!aksam`',
+  '✨ _Afiyet olsun, hayırlı sabahlar!_',
+  '☕ _Afiyet olsun!_ 💡 _Akşam için:_ `!aksam`',
+  '😋 _Afiyet olsun!_ 📌 _Yarınki kahvaltı:_ `!kahvalti yarin`'
+];
+
+const YEMEK_FOOTERS = [
+  '💡 _Yarın için:_ `!yemek yarin`  |  _Sadece akşam:_ `!aksam`',
+  '✨ _Afiyet olsun!_',
+  '📌 _Yarınki menü için:_ `!yemek yarin`',
+  '🍽️ _Afiyet olsun, iyi günler!_'
+];
+
+function formatDateHeader(tarih, gun, tag) {
+  const formats = [
+    `📅 *Tarih:* ${tarih} — *${gun}*${tag}`,
+    `🗓️ *${tarih}* | *${gun}*${tag}`,
+    `📆 *${gun}* (${tarih})${tag}`,
+    `📅 *${tarih}* — ${gun}${tag}`
+  ];
+  return pickRandom(formats);
+}
+
 /**
- * Kahvaltı menüsü yanıt metnini hazırlar.
+ * Kahvaltı menüsü yanıt metnini dinamik ve değişken şablonla hazırlar.
  */
 export function getKahvaltiMessage(query = '') {
   const data = loadMenuData();
@@ -230,21 +311,26 @@ export function getKahvaltiMessage(query = '') {
     return `ℹ️ *${entry.tarih} (${entry.gun})* tarihi için kahvaltı menüsü bulunmuyor.`;
   }
 
-  const formattedItems = items.map(item => `${getItemEmoji(item, 'kahvalti')} ${item}`).join('\n');
+  const bulletFn = pickRandom(BULLET_FORMATS);
+  const formattedItems = items.map(item => bulletFn(getItemEmoji(item, 'kahvalti'), item)).join('\n');
   const tag = result.label && result.label !== entry.gun ? ` _(${result.label})_` : '';
+  const header = pickRandom(KAHVALTI_HEADERS);
+  const divider = pickRandom(DIVIDERS);
+  const footer = pickRandom(KAHVALTI_FOOTERS);
+  const dateLine = formatDateHeader(entry.tarih, entry.gun, tag);
 
   return (
-    `🍳 *KAHVALTI MENÜSÜ* 🥐\n` +
-    `📅 *Tarih:* ${entry.tarih} — *${entry.gun}*${tag}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `${header}\n` +
+    `${dateLine}\n` +
+    `${divider}\n` +
     `${formattedItems}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `💡 _Yarın için:_ \`!kahvalti yarin\`  |  _Akşam:_ \`!aksam\``
+    `${divider}\n` +
+    `${footer}`
   );
 }
 
 /**
- * Akşam yemeği menüsü yanıt metnini hazırlar.
+ * Akşam yemeği menüsü yanıt metnini dinamik ve değişken şablonla hazırlar.
  */
 export function getAksamMessage(query = '') {
   const data = loadMenuData();
@@ -264,16 +350,21 @@ export function getAksamMessage(query = '') {
     return `ℹ️ *${entry.tarih} (${entry.gun})* tarihi için akşam yemeği menüsü bulunmuyor.`;
   }
 
-  const formattedItems = items.map(item => `${getItemEmoji(item, 'aksam')} ${item}`).join('\n');
+  const bulletFn = pickRandom(BULLET_FORMATS);
+  const formattedItems = items.map(item => bulletFn(getItemEmoji(item, 'aksam'), item)).join('\n');
   const tag = result.label && result.label !== entry.gun ? ` _(${result.label})_` : '';
+  const header = pickRandom(AKSAM_HEADERS);
+  const divider = pickRandom(DIVIDERS);
+  const footer = pickRandom(AKSAM_FOOTERS);
+  const dateLine = formatDateHeader(entry.tarih, entry.gun, tag);
 
   return (
-    `🍲 *AKŞAM YEMEĞİ MENÜSÜ* 🍽️\n` +
-    `📅 *Tarih:* ${entry.tarih} — *${entry.gun}*${tag}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `${header}\n` +
+    `${dateLine}\n` +
+    `${divider}\n` +
     `${formattedItems}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `💡 _Yarın için:_ \`!aksam yarin\`  |  _Kahvaltı:_ \`!kahvalti\``
+    `${divider}\n` +
+    `${footer}`
   );
 }
 
@@ -292,16 +383,51 @@ export function getYemekMessage(query = '') {
   }
 
   const entry = result.entry;
-  const kahvaltiItems = (entry.kahvalti || []).map(item => `${getItemEmoji(item, 'kahvalti')} ${item}`).join('\n');
-  const aksamItems = (entry.aksam_yemegi || []).map(item => `${getItemEmoji(item, 'aksam')} ${item}`).join('\n');
+  const bulletFn = pickRandom(BULLET_FORMATS);
+  const kahvaltiItems = (entry.kahvalti || []).map(item => bulletFn(getItemEmoji(item, 'kahvalti'), item)).join('\n');
+  const aksamItems = (entry.aksam_yemegi || []).map(item => bulletFn(getItemEmoji(item, 'aksam'), item)).join('\n');
   const tag = result.label && result.label !== entry.gun ? ` _(${result.label})_` : '';
 
-  let text = `📋 *GÜNLÜK YEMEK MENÜSÜ*\n📅 *Tarih:* ${entry.tarih} — *${entry.gun}*${tag}\n━━━━━━━━━━━━━━━━━━━━\n`;
+  const header = pickRandom(YEMEK_HEADERS);
+  const divider = pickRandom(DIVIDERS);
+  const footer = pickRandom(YEMEK_FOOTERS);
+  const dateLine = formatDateHeader(entry.tarih, entry.gun, tag);
 
+  let text = `${header}\n${dateLine}\n${divider}\n`;
   text += `🍳 *KAHVALTI:*\n${kahvaltiItems || '— Menü belirtilmemiş —'}\n\n`;
   text += `🍲 *AKŞAM YEMEĞİ:*\n${aksamItems || '— Menü belirtilmemiş —'}\n`;
-  text += `━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `💡 _Yarın için:_ \`!yemek yarin\``;
+  text += `${divider}\n`;
+  text += `${footer}`;
 
   return text;
 }
+
+/**
+ * Menü yanıtını komutun geldiği sohbete (Grup veya DM) gönderir.
+ * Anti-ban ve insan simülasyonu için 'yazıyor...' durumu ve kısa rastgele gecikme ekler.
+ */
+export async function sendMenuResponse(sock, msg, from, replyPayload) {
+  const payload = typeof replyPayload === 'string' ? { text: replyPayload } : replyPayload;
+
+  // 1. İnsan davranışı simülasyonu: "Yazıyor..." durumu gönder
+  try {
+    if (sock?.sendPresenceUpdate && from) {
+      await sock.sendPresenceUpdate('composing', from);
+    }
+  } catch (e) {}
+
+  // 2. Rastgele insani gecikme (600ms - 1400ms)
+  const delay = Math.floor(Math.random() * 800) + 600;
+  await new Promise(resolve => setTimeout(resolve, delay));
+
+  // 3. Mesajı alıntılayarak gönder
+  await sock.sendMessage(from, payload, { quoted: msg });
+
+  // 4. Yazıyor durumunu sonlandır
+  try {
+    if (sock?.sendPresenceUpdate && from) {
+      await sock.sendPresenceUpdate('paused', from);
+    }
+  } catch (e) {}
+}
+

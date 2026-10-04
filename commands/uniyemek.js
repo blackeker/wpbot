@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { sendMenuResponse } from '../utils/menuData.js';
 
 export default {
   name: 'uniyemek',
@@ -32,28 +33,40 @@ export default {
       });
 
       if (foodItems.length === 0) {
-        await sock.sendMessage(from, {
-          text: `⚠️ *Fırat Üniversitesi Yemek Menüsü*\n\nMenü bilgisi şu anda sitede bulunamadı veya henüz güncellenmedi.\n\n🌐 Kontrol etmek için: ${url}`
-        });
+        await sendMenuResponse(sock, msg, from, `⚠️ *Fırat Üniversitesi Yemek Menüsü*\n\nMenü bilgisi şu anda sitede bulunamadı veya henüz güncellenmedi.\n\n🌐 Kontrol etmek için: ${url}`);
         return;
       }
 
-      let message = `🍽️ *FIRAT ÜNİVERSİTESİ YEMEK MENÜSÜ*\n`;
+      const UNI_HEADERS = [
+        '🍽️ *FIRAT ÜNİVERSİTESİ YEMEK MENÜSÜ*',
+        '🎓 *Fırat Üniversitesi Günün Menüsü* 🍛',
+        '🍲 *Üniversite Yemekhane Menüsü* ✨',
+        '📋 *Fırat Üni Yemek Listesi*'
+      ];
+      const UNI_DIVIDERS = [
+        '━━━━━━━━━━━━━━━━━━━━',
+        '────────────────────',
+        '····································',
+        '════════════════════'
+      ];
+      const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      const h = pick(UNI_HEADERS);
+      const d = pick(UNI_DIVIDERS);
+
+      let message = `${h}\n`;
       message += `📅 *Tarih:* ${foodDate}\n`;
-      message += `━━━━━━━━━━━━━━━━━━━━\n`;
+      message += `${d}\n`;
       message += `🍲 *Günün Menüsü:*\n\n`;
       foodItems.forEach(item => {
         message += `• ${item}\n`;
       });
-      message += `━━━━━━━━━━━━━━━━━━━━\n`;
+      message += `${d}\n`;
       message += `🌐 _Kaynak: ${url}_`;
 
-      await sock.sendMessage(from, { text: message.trim() });
+      await sendMenuResponse(sock, msg, from, message.trim());
     } catch (err) {
       console.error('[uniyemek] Hata:', err.message);
-      await sock.sendMessage(from, {
-        text: `❌ *Hata:* Üniversite yemek menüsü çekilemedi: ${err.message}`
-      });
+      await sendMenuResponse(sock, msg, from, `❌ *Hata:* Üniversite yemek menüsü çekilemedi: ${err.message}`);
     }
   }
 };
