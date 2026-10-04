@@ -3,10 +3,9 @@ import { translateToEnglish } from '../utils/translator.js';
 
 // Perchance AI API Endpoints (Local or Remote VPS)
 const PERCHANCE_API_LIST = [
+  'http://127.0.0.1:8000',
   process.env.PERCHANCE_AI_API,
   process.env.AI_IMAGE_API,
-  'http://111.235.150.203:8000',
-  'http://127.0.0.1:8000',
   'http://localhost:8000'
 ].filter(Boolean);
 
