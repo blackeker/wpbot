@@ -1,316 +1,486 @@
 import axios from 'axios';
 import { translateToEnglish } from '../utils/translator.js';
 
-const API_BASE = process.env.AI_IMAGE_API || 'http://111.235.150.203:5000';
+// Perchance AI API Endpoints (Local or Remote VPS)
+const PERCHANCE_API_LIST = [
+  process.env.PERCHANCE_AI_API,
+  process.env.AI_IMAGE_API,
+  'http://111.235.150.203:8000',
+  'http://127.0.0.1:8000',
+  'http://localhost:8000'
+].filter(Boolean);
 
-const CATEGORY_MAP = {
+// Core 8 Perchance Styles + User Keywords Mapping
+const STYLE_MAP = {
+  // 1. Anime & Manga
   anime: {
     name: 'Anime & Manga',
     icon: '🌸',
-    apiCat: 'anime',
-    style: 'Painted Anime Plus',
-    tags: 'masterpiece, best quality, ultra-detailed anime art, vibrant anime aesthetic, sharp focus, 8k resolution',
-    neg: 'lowres, bad anatomy, bad hands, cropped, worst quality, low quality, blurry, text, watermark',
-    models: ['Animagine XL', 'Anything Diffusion', 'Dreamshaper', 'Waifu Diffusion']
+    perchanceStyle: 'anime',
+    pollinationsModel: 'flux-anime',
+    negative: 'lowres, bad anatomy, bad hands, blurry, worst quality, low quality, distorted',
+    tags: 'masterpiece, best quality, ultra-detailed anime art, vibrant anime aesthetic, sharp focus'
+  },
+  manga: {
+    name: 'Anime & Manga',
+    icon: '🌸',
+    perchanceStyle: 'anime',
+    pollinationsModel: 'flux-anime',
+    negative: 'lowres, bad anatomy, blurry, worst quality',
+    tags: 'masterpiece, ultra-detailed anime aesthetic'
   },
   ghibli: {
-    name: 'Studio Ghibli',
+    name: 'Studio Ghibli Anime',
     icon: '🍃',
-    apiCat: 'anime',
-    style: 'Studio Ghibli',
-    tags: 'ghibli style anime, hand-drawn anime aesthetic, lush landscape, soft atmospheric lighting, nostalgic studio ghibli masterpiece',
-    neg: 'lowres, 3d, realistic, photo, bad quality, blurry, dark',
-    models: ['Animagine XL', 'Dreamshaper', 'Anything Diffusion']
-  },
-  cyberpunk: {
-    name: 'Siberpunk & Sci-Fi',
-    icon: '🌃',
-    apiCat: 'cyberpunk',
-    style: 'Neon Vintage Anime',
-    tags: 'cyberpunk aesthetic, neon lighting, futuristic sci-fi, dark rainy high-tech city, volumetric lighting, unreal engine 5, 8k',
-    neg: 'lowres, bad anatomy, blurry, worst quality, low quality, oversaturated',
-    models: ['Dreamshaper', 'Deliberate', 'ICBINP - I Cant Believe Its Not Photography', 'AlbedoBase XL']
-  },
-  siberpunk: {
-    name: 'Siberpunk & Sci-Fi',
-    icon: '🌃',
-    apiCat: 'cyberpunk',
-    style: 'Neon Vintage Anime',
-    tags: 'cyberpunk aesthetic, neon lighting, futuristic sci-fi, dark rainy high-tech city, volumetric lighting, unreal engine 5, 8k',
-    neg: 'lowres, bad anatomy, blurry, worst quality, low quality',
-    models: ['Dreamshaper', 'Deliberate', 'AlbedoBase XL']
-  },
-  mecha: {
-    name: 'Futuristic Mecha',
-    icon: '🤖',
-    apiCat: 'cyberpunk',
-    style: 'Futuristic Mecha',
-    tags: 'detailed futuristic mecha robot, high-tech armor, intricate mechanical joints, cinematic lighting',
-    neg: 'lowres, bad anatomy, blurry, worst quality',
-    models: ['Dreamshaper', 'Deliberate']
-  },
-  foto: {
-    name: 'Fotogerçekçi & Portre',
-    icon: '📸',
-    apiCat: 'photorealistic',
-    style: 'Professional Photo',
-    tags: 'photorealistic portrait, 8k raw photo, highly detailed skin texture, 35mm lens, depth of field, studio lighting, award winning',
-    neg: 'anime, drawing, cartoon, 3d, render, illustration, bad anatomy, blurry, low quality',
-    models: ['ICBINP - I Cant Believe Its Not Photography', 'Deliberate', 'Dreamshaper']
-  },
-  portre: {
-    name: 'Fotogerçekçi & Portre',
-    icon: '📸',
-    apiCat: 'photorealistic',
-    style: 'Professional Photo',
-    tags: 'photorealistic portrait, 8k raw photo, highly detailed skin texture, 35mm lens, depth of field, studio lighting',
-    neg: 'anime, drawing, cartoon, 3d, render, bad anatomy, blurry, low quality',
-    models: ['ICBINP - I Cant Believe Its Not Photography', 'Deliberate', 'Dreamshaper']
-  },
-  sinema: {
-    name: 'Sinematik Film Sahnesi',
-    icon: '🎬',
-    apiCat: 'photorealistic',
-    style: 'Cinematic',
-    tags: 'cinematic film still, 35mm movie scene, realistic atmospheric lighting, color graded masterpiece, 8k raw',
-    neg: 'anime, cartoon, drawing, painting, bad quality, blurry',
-    models: ['ICBINP - I Cant Believe Its Not Photography', 'Deliberate', 'Dreamshaper']
-  },
-  '3d': {
-    name: '3D Pixar & Disney',
-    icon: '🎨',
-    apiCat: 'digital_art',
-    style: '3D Disney Character',
-    tags: 'cute 3d render, pixar disney animation style, octane render, vivid colors, smooth surfaces, raytracing 4k',
-    neg: 'flat, 2d, sketch, painting, bad render, blurry, distorted',
-    models: ['Dreamshaper', 'Anything Diffusion', 'Deliberate']
-  },
-  pixar: {
-    name: 'Pixar 3D',
-    icon: '🎨',
-    apiCat: 'digital_art',
-    style: '3D Disney Character',
-    tags: 'cute 3d render, pixar disney animation style, octane render, vivid colors, smooth surfaces, raytracing 4k',
-    neg: 'flat, 2d, sketch, painting, bad render, blurry, distorted',
-    models: ['Dreamshaper', 'Anything Diffusion', 'Deliberate']
-  },
-  pixel: {
-    name: 'Pixel Art (16-bit)',
-    icon: '👾',
-    apiCat: 'pixel_art',
-    style: 'Pixel Art (16-bit)',
-    tags: '16-bit pixel art, retro gaming aesthetic, vibrant pixelated details, snes arcade pixel masterpiece',
-    neg: 'photorealistic, 3d, modern render, blurry, smooth, gradient',
-    models: ['Dreamshaper', 'Anything Diffusion']
-  },
-  fantastik: {
-    name: 'Fantastik & RPG',
-    icon: '🧙‍♂️',
-    apiCat: 'fantasy',
-    style: 'Fantasy Painting',
-    tags: 'epic high fantasy digital art, mythical, magical atmosphere, detailed concept art, cinematic lighting, artstation',
-    neg: 'low quality, modern, car, blurry, bad anatomy, lowres',
-    models: ['Dreamshaper', 'Deliberate', 'Animagine XL']
-  },
-  lol: {
-    name: 'League of Legends Art',
-    icon: '⚔️',
-    apiCat: 'fantasy',
-    style: 'League of Legends',
-    tags: 'league of legends splash art style, dynamic champion pose, magical glow, epic concept art masterpiece',
-    neg: 'lowres, blurry, bad anatomy',
-    models: ['Dreamshaper', 'Deliberate']
-  },
-  yagliboya: {
-    name: 'Rönesans Yağlı Boya',
-    icon: '🖼️',
-    apiCat: 'oil_painting',
-    style: 'Oil Painting',
-    tags: 'renaissance classical oil painting on canvas, artistic textured brushstrokes, fine art masterpiece',
-    neg: 'photo, 3d render, digital, bad art, low quality',
-    models: ['Dreamshaper', 'Deliberate']
-  },
-  nsfw: {
-    name: 'NSFW & Uncensored',
-    icon: '🔞',
-    apiCat: 'anime',
-    style: 'Painted Anime Plus',
-    tags: 'masterpiece, best quality, ultra-detailed, uncensored, expressive, vibrant lighting, highly detailed',
-    neg: 'lowres, bad anatomy, bad hands, blurry, worst quality, low quality, censored, mosaic',
-    models: ['Animagine XL', 'Anything Diffusion', 'Waifu Diffusion', 'Dreamshaper']
-  },
-  hentai: {
-    name: 'Hentai & Ecchi',
-    icon: '🔞',
-    apiCat: 'anime',
-    style: 'Painted Anime Plus',
-    tags: 'masterpiece, best quality, uncensored anime, ecchi, detailed anime art, vibrant colors',
-    neg: 'lowres, bad anatomy, bad hands, blurry, worst quality, low quality, censored, mosaic',
-    models: ['Animagine XL', 'Anything Diffusion', 'Waifu Diffusion']
-  },
-  ecchi: {
-    name: 'Ecchi & Waifu',
-    icon: '💋',
-    apiCat: 'anime',
-    style: 'Painted Anime Plus',
-    tags: 'masterpiece, best quality, beautiful waifu, ecchi aesthetic, detailed, vibrant',
-    neg: 'lowres, bad anatomy, blurry, worst quality, low quality, censored',
-    models: ['Animagine XL', 'Anything Diffusion', 'Waifu Diffusion']
+    perchanceStyle: 'anime',
+    pollinationsModel: 'flux-anime',
+    negative: 'lowres, 3d, realistic, bad quality, blurry',
+    tags: 'studio ghibli style, hand-drawn anime aesthetic, lush landscape, soft atmospheric lighting, nostalgic'
   },
   waifu: {
     name: 'Anime Waifu',
     icon: '💖',
-    apiCat: 'anime',
-    style: 'Painted Anime Plus',
-    tags: 'masterpiece, best quality, extremely beautiful waifu, glowing soft eyes, cute expression, highly detailed anime',
-    neg: 'lowres, bad anatomy, blurry, worst quality, low quality',
-    models: ['Animagine XL', 'Anything Diffusion', 'Dreamshaper']
+    perchanceStyle: 'anime',
+    pollinationsModel: 'flux-anime',
+    negative: 'lowres, bad anatomy, blurry, worst quality',
+    tags: 'masterpiece, best quality, extremely beautiful waifu, glowing soft eyes, cute expression'
+  },
+  nsfw: {
+    name: 'NSFW & Uncensored',
+    icon: '🔞',
+    perchanceStyle: 'anime',
+    pollinationsModel: 'flux-anime',
+    negative: 'lowres, bad anatomy, bad hands, blurry, worst quality, low quality, censored, mosaic',
+    tags: 'masterpiece, best quality, ultra-detailed, uncensored, expressive, vibrant lighting'
+  },
+  hentai: {
+    name: 'Hentai & Ecchi',
+    icon: '🔞',
+    perchanceStyle: 'anime',
+    pollinationsModel: 'flux-anime',
+    negative: 'lowres, bad anatomy, bad hands, blurry, worst quality, low quality, censored, mosaic',
+    tags: 'masterpiece, best quality, uncensored anime, ecchi, detailed anime art, vibrant colors'
+  },
+  ecchi: {
+    name: 'Ecchi & Waifu',
+    icon: '💋',
+    perchanceStyle: 'anime',
+    pollinationsModel: 'flux-anime',
+    negative: 'lowres, bad anatomy, blurry, worst quality, low quality, censored',
+    tags: 'masterpiece, best quality, beautiful waifu, ecchi aesthetic, detailed'
+  },
+
+  // 2. Photorealistic & Portrait
+  foto: {
+    name: 'Fotogerçekçi & Portre',
+    icon: '📸',
+    perchanceStyle: 'photorealistic',
+    pollinationsModel: 'flux-realism',
+    negative: 'anime, drawing, cartoon, 3d, render, illustration, bad anatomy, blurry, low quality',
+    tags: 'photorealistic portrait, 8k raw photo, highly detailed skin texture, 35mm lens, depth of field, studio lighting, award winning'
+  },
+  portre: {
+    name: 'Fotogerçekçi Portre',
+    icon: '📸',
+    perchanceStyle: 'photorealistic',
+    pollinationsModel: 'flux-realism',
+    negative: 'anime, cartoon, drawing, 3d, render, bad anatomy, blurry, low quality',
+    tags: 'photorealistic portrait, 8k raw photo, highly detailed skin texture, studio lighting'
+  },
+  photorealistic: {
+    name: 'Fotogerçekçi (8K)',
+    icon: '📸',
+    perchanceStyle: 'photorealistic',
+    pollinationsModel: 'flux-realism',
+    negative: 'anime, drawing, cartoon, bad anatomy, blurry',
+    tags: 'photorealistic, 8k resolution, raw photo, realistic lighting'
+  },
+
+  // 3. Cinematic
+  sinema: {
+    name: 'Sinematik Film Sahnesi',
+    icon: '🎬',
+    perchanceStyle: 'cinematic',
+    pollinationsModel: 'flux-cablyai',
+    negative: 'anime, cartoon, drawing, painting, bad quality, blurry',
+    tags: 'cinematic film still, 35mm movie scene, realistic atmospheric lighting, color graded masterpiece, 8k raw'
+  },
+  cinematic: {
+    name: 'Sinematik Sahne',
+    icon: '🎬',
+    perchanceStyle: 'cinematic',
+    pollinationsModel: 'flux-cablyai',
+    negative: 'anime, cartoon, drawing, bad quality, blurry',
+    tags: 'cinematic lighting, dramatic atmosphere, color graded 8k movie still'
+  },
+
+  // 4. Digital Art & Illustration
+  dijital: {
+    name: 'Modern Dijital Çizim',
+    icon: '🎨',
+    perchanceStyle: 'digital art',
+    pollinationsModel: 'flux',
+    negative: 'photo, realistic, bad drawing, blurry, low quality',
+    tags: 'modern digital art illustration, clean lines, vibrant colors, trending on artstation'
+  },
+  cizim: {
+    name: 'Dijital İllüstrasyon',
+    icon: '🎨',
+    perchanceStyle: 'digital art',
+    pollinationsModel: 'flux',
+    negative: 'photo, realistic, bad drawing, blurry',
+    tags: 'detailed digital illustration, artistic style, colorful masterpiece'
+  },
+  digital: {
+    name: 'Digital Art',
+    icon: '🎨',
+    perchanceStyle: 'digital art',
+    pollinationsModel: 'flux',
+    negative: 'photo, blurry, low quality',
+    tags: 'digital art masterpiece, high resolution concept art'
+  },
+
+  // 5. Cyberpunk & Sci-Fi
+  cyberpunk: {
+    name: 'Siberpunk & Neon Şehir',
+    icon: '🌃',
+    perchanceStyle: 'cyberpunk',
+    pollinationsModel: 'flux',
+    negative: 'lowres, bad anatomy, blurry, worst quality, low quality, oversaturated',
+    tags: 'cyberpunk aesthetic, neon lighting, futuristic sci-fi, dark rainy high-tech city, volumetric lighting, 8k'
+  },
+  siberpunk: {
+    name: 'Siberpunk & Sci-Fi',
+    icon: '🌃',
+    perchanceStyle: 'cyberpunk',
+    pollinationsModel: 'flux',
+    negative: 'lowres, bad anatomy, blurry, worst quality',
+    tags: 'cyberpunk aesthetic, neon glowing lights, futuristic high-tech city, volumetric lighting'
+  },
+  mecha: {
+    name: 'Futuristik Mecha Robot',
+    icon: '🤖',
+    perchanceStyle: 'cyberpunk',
+    pollinationsModel: 'flux',
+    negative: 'lowres, bad anatomy, blurry',
+    tags: 'detailed futuristic mecha robot, high-tech armor, mechanical joints, cinematic neon lighting'
+  },
+
+  // 6. Oil Painting (Yağlı Boya)
+  yagliboya: {
+    name: 'Klasik Yağlı Boya Tablo',
+    icon: '🖼️',
+    perchanceStyle: 'oil painting',
+    pollinationsModel: 'flux',
+    negative: 'photo, 3d render, digital, bad art, low quality',
+    tags: 'renaissance classical oil painting on canvas, artistic textured brushstrokes, fine art masterpiece'
+  },
+  oil: {
+    name: 'Oil Painting',
+    icon: '🖼️',
+    perchanceStyle: 'oil painting',
+    pollinationsModel: 'flux',
+    negative: 'photo, 3d render, digital, blurry',
+    tags: 'classical oil painting on canvas, artistic textured brushstrokes'
+  },
+
+  // 7. Fantasy & RPG
+  fantastik: {
+    name: 'Büyülü Fantastik & RPG',
+    icon: '🧙‍♂️',
+    perchanceStyle: 'fantasy',
+    pollinationsModel: 'flux',
+    negative: 'low quality, modern, car, blurry, bad anatomy, lowres',
+    tags: 'epic high fantasy digital art, mythical, magical glowing atmosphere, detailed concept art, cinematic lighting'
+  },
+  fantasy: {
+    name: 'Fantasy World',
+    icon: '🧙‍♂️',
+    perchanceStyle: 'fantasy',
+    pollinationsModel: 'flux',
+    negative: 'modern, blurry, bad anatomy',
+    tags: 'epic high fantasy, magical atmosphere, detailed concept art'
+  },
+  lol: {
+    name: 'League of Legends Art',
+    icon: '⚔️',
+    perchanceStyle: 'fantasy',
+    pollinationsModel: 'flux',
+    negative: 'lowres, blurry, bad anatomy',
+    tags: 'league of legends splash art style, dynamic champion pose, magical glow, epic concept art masterpiece'
+  },
+
+  // 8. 3D Render & Disney / Pixar
+  '3d': {
+    name: '3D Pixar & Disney Animation',
+    icon: '👾',
+    perchanceStyle: '3D render',
+    pollinationsModel: 'flux-3d',
+    negative: 'flat, 2d, sketch, painting, bad render, blurry, distorted',
+    tags: 'cute 3d render, pixar disney animation style, octane render, vivid colors, smooth surfaces, raytracing 4k'
+  },
+  pixar: {
+    name: 'Pixar & 3D Character',
+    icon: '👾',
+    perchanceStyle: '3D render',
+    pollinationsModel: 'flux-3d',
+    negative: 'flat, 2d, sketch, painting, bad render, blurry',
+    tags: '3d render, pixar disney character animation, unreal engine 5, octane render, vivid colors'
+  },
+  render: {
+    name: '3D Octane Render',
+    icon: '👾',
+    perchanceStyle: '3D render',
+    pollinationsModel: 'flux-3d',
+    negative: 'flat, 2d, bad render, blurry',
+    tags: 'unreal engine 5, octane 3d render, smooth surfaces, raytracing 8k'
+  },
+
+  // 9. Pixel Art (16-bit)
+  pixel: {
+    name: '16-Bit Pixel Art',
+    icon: '🕹️',
+    perchanceStyle: 'digital art',
+    pollinationsModel: 'flux',
+    negative: 'photorealistic, 3d, modern render, blurry, smooth, gradient',
+    tags: '16-bit pixel art, retro gaming aesthetic, vibrant pixelated details, snes arcade pixel masterpiece'
   }
 };
 
-async function generateHordeDirect(prompt, categoryKey, width = 768, height = 512) {
-  const cat = CATEGORY_MAP[categoryKey] || CATEGORY_MAP.anime;
-  const fullPrompt = `${prompt}, ${cat.tags} ### ${cat.neg}`;
-  const models = cat.models || ['Dreamshaper', 'Animagine XL', 'Deliberate'];
+/**
+ * Generates an image using the Perchance AI Image Generator REST API.
+ */
+async function generateWithPerchanceAPI(prompt, styleObj, shape = 'square') {
+  for (const baseUrl of PERCHANCE_API_LIST) {
+    try {
+      const startTime = Date.now();
+      const payload = {
+        prompt: styleObj.tags ? `${prompt}, ${styleObj.tags}` : prompt,
+        negative_prompt: styleObj.negative || 'blurry, low quality, bad anatomy',
+        style: styleObj.perchanceStyle || 'anime',
+        shape: shape, // "square" | "portrait" | "landscape"
+        num_images: 1,
+        response_format: 'url'
+      };
 
-  const payload = {
-    prompt: fullPrompt,
-    params: {
-      sampler_name: 'k_euler_a',
-      cfg_scale: 7.5,
-      width: width,
-      height: height,
-      steps: 22,
-      n: 1
-    },
-    models: models,
-    nsfw: true,
-    censor_nsfw: false,
-    shared: true
-  };
-
-  const res = await axios.post('https://aihorde.net/api/v2/generate/async', payload, {
-    headers: {
-      'apikey': '0000000000',
-      'Client-Agent': 'wpbot:1.0'
-    },
-    timeout: 15000
-  });
-
-  const reqId = res.data?.id;
-  if (!reqId) throw new Error('Horde görev ID oluşturamadı.');
-
-  const startTime = Date.now();
-  while (Date.now() - startTime < 75000) {
-    await new Promise(r => setTimeout(r, 2500));
-    const check = await axios.get(`https://aihorde.net/api/v2/generate/check/${reqId}`, {
-      headers: { 'apikey': '0000000000', 'Client-Agent': 'wpbot:1.0' },
-      timeout: 10000
-    });
-
-    if (check.data?.done) {
-      const statusRes = await axios.get(`https://aihorde.net/api/v2/generate/status/${reqId}`, {
-        headers: { 'apikey': '0000000000', 'Client-Agent': 'wpbot:1.0' },
-        timeout: 15000
+      const res = await axios.post(`${baseUrl}/generate`, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 75000 // Average generation is 15-25s
       });
 
-      const gen = statusRes.data?.generations?.[0];
-      if (!gen || !gen.img) throw new Error('Horde görsel verisi boş döndü.');
+      if (res.data && res.data.data && res.data.data[0]) {
+        const item = res.data.data[0];
+        let buffer = null;
 
-      let buffer;
-      if (gen.img.startsWith('http')) {
-        const imgDownload = await axios.get(gen.img, { responseType: 'arraybuffer', timeout: 20000 });
-        buffer = Buffer.from(imgDownload.data);
-      } else {
-        buffer = Buffer.from(gen.img, 'base64');
+        if (item.b64_json) {
+          buffer = Buffer.from(item.b64_json, 'base64');
+        } else if (item.url) {
+          const imgUrl = item.url.startsWith('http') ? item.url : `${baseUrl}${item.url}`;
+          const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 25000 });
+          buffer = Buffer.from(imgRes.data);
+        }
+
+        if (buffer && buffer.length > 0) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          return {
+            buffer,
+            engine: `Perchance AI Engine (${styleObj.perchanceStyle})`,
+            elapsed
+          };
+        }
       }
-
-      return {
-        buffer,
-        model: gen.model || 'OmniArt SDXL Engine',
-        elapsed: ((Date.now() - startTime) / 1000).toFixed(1)
-      };
+    } catch (err) {
+      console.warn(`[PERCHANCE API] Error connecting to ${baseUrl}:`, err.response?.data?.detail || err.message);
     }
   }
 
-  throw new Error('Horde işlemi zaman aşımına uğradı.');
+  return null;
+}
+
+/**
+ * Fallback 1: High-Speed Pollinations Engine
+ */
+async function generateWithPollinations(prompt, styleObj, shape = 'square') {
+  try {
+    const startTime = Date.now();
+    let width = 768, height = 768;
+    if (shape === 'portrait') { width = 576; height = 1024; }
+    else if (shape === 'landscape') { width = 1024; height = 576; }
+
+    const model = styleObj.pollinationsModel || (styleObj.perchanceStyle === 'anime' ? 'flux-anime' : 'flux');
+    const enrichedPrompt = styleObj.tags ? `${prompt}, ${styleObj.tags}` : prompt;
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(enrichedPrompt)}?width=${width}&height=${height}&model=${model}&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
+
+    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000 });
+    if (res.status === 200 && res.data) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      return {
+        buffer: Buffer.from(res.data),
+        engine: `Pollinations AI (${model})`,
+        elapsed
+      };
+    }
+  } catch (err) {
+    console.warn('[POLLINATIONS FALLBACK] Error:', err.message);
+  }
+  return null;
+}
+
+/**
+ * Fallback 2: Stable Horde Distributed SDXL Engine
+ */
+async function generateWithStableHorde(prompt, styleObj, shape = 'square') {
+  try {
+    const startTime = Date.now();
+    let width = 768, height = 512;
+    if (shape === 'portrait') { width = 512; height = 768; }
+    else if (shape === 'square') { width = 512; height = 512; }
+
+    const fullPrompt = styleObj.tags 
+      ? `${prompt}, ${styleObj.tags} ### ${styleObj.negative || 'lowres, bad quality'}` 
+      : `${prompt} ### lowres, bad quality`;
+
+    const payload = {
+      prompt: fullPrompt,
+      params: {
+        sampler_name: 'k_euler_a',
+        cfg_scale: 7.5,
+        width,
+        height,
+        steps: 20,
+        n: 1
+      },
+      models: ['Animagine XL', 'Dreamshaper', 'Deliberate', 'Anything Diffusion'],
+      nsfw: true,
+      censor_nsfw: false,
+      shared: true
+    };
+
+    const res = await axios.post('https://aihorde.net/api/v2/generate/async', payload, {
+      headers: { 'apikey': '0000000000', 'Client-Agent': 'wpbot:1.0' },
+      timeout: 15000
+    });
+
+    const reqId = res.data?.id;
+    if (!reqId) return null;
+
+    while (Date.now() - startTime < 65000) {
+      await new Promise(r => setTimeout(r, 2500));
+      const check = await axios.get(`https://aihorde.net/api/v2/generate/check/${reqId}`, {
+        headers: { 'apikey': '0000000000', 'Client-Agent': 'wpbot:1.0' },
+        timeout: 10000
+      });
+
+      if (check.data?.done) {
+        const statusRes = await axios.get(`https://aihorde.net/api/v2/generate/status/${reqId}`, {
+          headers: { 'apikey': '0000000000', 'Client-Agent': 'wpbot:1.0' },
+          timeout: 15000
+        });
+
+        const gen = statusRes.data?.generations?.[0];
+        if (!gen || !gen.img) return null;
+
+        let buffer;
+        if (gen.img.startsWith('http')) {
+          const imgDl = await axios.get(gen.img, { responseType: 'arraybuffer', timeout: 20000 });
+          buffer = Buffer.from(imgDl.data);
+        } else {
+          buffer = Buffer.from(gen.img, 'base64');
+        }
+
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        return {
+          buffer,
+          engine: `Stable Horde (${gen.model || 'SDXL'})`,
+          elapsed
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[HORDE FALLBACK] Error:', err.message);
+  }
+  return null;
 }
 
 export default {
   name: 'ciz',
-  aliases: ['çiz', 'resim', 'imagine', 'gorsel', 'görsel', 'airesim', 'aiciz', 'omniart'],
+  aliases: ['çiz', 'resim', 'imagine', 'gorsel', 'görsel', 'airesim', 'aiciz', 'omniart', 'perchance'],
+  description: 'Perchance AI motoru ile yüksek kaliteli görsel oluşturur',
   async execute(sock, msg, from, args = [], ctx = {}) {
     if (!args || args.length === 0) {
       const help = 
-`⚡ *OMNIART AI - GÖRSEL STÜDYOSU*
+`⚡ *PERCHANCE AI - GÖRSEL STÜDYOSU*
 ━━━━━━━━━━━━━━━━━━━━
-Yapay zeka ile istediğiniz görseli oluşturmak için:
+Yapay zeka ile dilediğiniz görseli oluşturmak için:
 
-📌 *Popüler Stiller:*
+🎨 *Desteklenen Sanat Tarzları:*
 • \`!ciz <açıklama>\` ➔ Standart Anime / Çizim
-• \`!ciz anime <açıklama>\` ➔ 🌸 Painted Anime Plus
-• \`!ciz ghibli <açıklama>\` ➔ 🍃 Studio Ghibli
-• \`!ciz cyberpunk <açıklama>\` ➔ 🌃 Neon Siberpunk
-• \`!ciz foto <açıklama>\` ➔ 📸 Professional Photo (8K)
-• \`!ciz sinema <açıklama>\` ➔ 🎬 Sinematik 35mm Sahne
-• \`!ciz 3d <açıklama>\` ➔ 🎨 3D Disney & Pixar
-• \`!ciz pixel <açıklama>\` ➔ 👾 16-Bit Pixel Art
-• \`!ciz lol <açıklama>\` ➔ ⚔️ League of Legends Splash Art
-• \`!ciz fantastik <açıklama>\` ➔ 🧙‍♂️ Epik Fantastik / RPG
-• \`!ciz yagliboya <açıklama>\` ➔ 🖼️ Rönesans Yağlı Boya
-• \`!ciz nsfw <açıklama>\` ➔ 🔞 NSFW & Uncensored
-• \`!ciz hentai <açıklama>\` ➔ 🔞 Hentai / Ecchi Anime
+• \`!ciz anime <açıklama>\` ➔ 🌸 Anime & Manga (Makoto Shinkai / Ghibli)
+• \`!ciz foto <açıklama>\` ➔ 📸 Fotogerçekçi 8K Portre
+• \`!ciz sinema <açıklama>\` ➔ 🎬 Sinematik Film Sahnesi Aydınlatması
+• \`!ciz dijital <açıklama>\` ➔ 🎨 Modern Dijital İllüstrasyon
+• \`!ciz cyberpunk <açıklama>\` ➔ 🌃 Neon Siberpunk & Gelecek
+• \`!ciz yagliboya <açıklama>\` ➔ 🖼️ Klasik Yağlı Boya Tablo
+• \`!ciz fantastik <açıklama>\` ➔ 🧙‍♂️ Büyülü Fantastik Konsept / RPG
+• \`!ciz 3d <açıklama>\` ➔ 👾 3D Disney & Pixar / Octane Render
+• \`!ciz pixel <açıklama>\` ➔ 🕹️ 16-Bit Retro Pixel Art
+• \`!ciz nsfw <açıklama>\` ➔ 🔞 NSFW & Hentai (Uncensored)
 
-📐 *Boyut Seçenekleri (Opsiyonel):*
-Açıklamanın içine \`dikey\` veya \`kare\` yazabilirsiniz.
+📐 *En-Boy Oranı (Opsiyonel):*
+Mesajınızın içine \`kare\` (1:1), \`dikey\` (9:16) veya \`yatay\` (16:9) ekleyebilirsiniz.
 
-💡 *Örnek:* \`!ciz anime karlı dağlarda koşan sihirli beyaz kedi\``;
+💡 *Örnekler:*
+• \`!ciz anime karlı dağlarda koşan sihirli beyaz kedi dikey\`
+• \`!ciz foto yağmur altında yürüyen şemsiyeli kadın portresi\`
+• \`!ciz cyberpunk neon ışıklı fütüristik spor araba yatay\``;
       await sock.sendMessage(from, { text: help });
       return;
     }
 
     let rawText = args.join(' ').trim();
 
-    // Boyut tespiti (Landscape 768x512, Square 512x512, Portrait 512x768)
-    let shape = '768x512';
-    let hordeW = 768, hordeH = 512;
-    if (/\b(dikey|portrait|düşey)\b/i.test(rawText)) {
-      shape = '512x768';
-      hordeW = 512; hordeH = 768;
-      rawText = rawText.replace(/\b(dikey|portrait|düşey)\b/ig, '').trim();
-    } else if (/\b(kare|square)\b/i.test(rawText)) {
-      shape = '512x512';
-      hordeW = 512; hordeH = 512;
-      rawText = rawText.replace(/\b(kare|square)\b/ig, '').trim();
-    } else if (/\b(yatay|landscape)\b/i.test(rawText)) {
-      shape = '768x512';
-      hordeW = 768; hordeH = 512;
-      rawText = rawText.replace(/\b(yatay|landscape)\b/ig, '').trim();
+    // 1. En-Boy Oranı Tespiti (square, portrait, landscape)
+    let shape = 'square';
+    let shapeLabel = '1:1 Kare';
+
+    if (/\b(dikey|portrait|düşey|9:16|hikaye|story)\b/i.test(rawText)) {
+      shape = 'portrait';
+      shapeLabel = '9:16 Dikey';
+      rawText = rawText.replace(/\b(dikey|portrait|düşey|9:16|hikaye|story)\b/ig, '').trim();
+    } else if (/\b(yatay|landscape|genis|geniş|16:9)\b/i.test(rawText)) {
+      shape = 'landscape';
+      shapeLabel = '16:9 Yatay';
+      rawText = rawText.replace(/\b(yatay|landscape|genis|geniş|16:9)\b/ig, '').trim();
+    } else if (/\b(kare|square|1:1)\b/i.test(rawText)) {
+      shape = 'square';
+      shapeLabel = '1:1 Kare';
+      rawText = rawText.replace(/\b(kare|square|1:1)\b/ig, '').trim();
     }
 
+    // 2. Stil Tespiti
     const words = rawText.split(/\s+/);
     const firstWord = words[0].toLowerCase().replace(/^[!#]/, '');
-    let categoryKey = null;
+    let styleKey = 'anime';
     let userPrompt = '';
 
-    if (CATEGORY_MAP[firstWord] && words.length > 1) {
-      categoryKey = firstWord;
+    if (STYLE_MAP[firstWord] && words.length > 1) {
+      styleKey = firstWord;
       userPrompt = words.slice(1).join(' ').trim();
     } else {
       userPrompt = rawText;
     }
 
     if (!userPrompt) {
-      await sock.sendMessage(from, { text: '⚠️ Lütfen çizilmesini istediğiniz görseli açıklayın.\nÖrnek: `!ciz anime uzayda süzülen astronot kedi`' });
+      await sock.sendMessage(from, { 
+        text: '⚠️ Lütfen çizilmesini istediğiniz görseli açıklayın.\nÖrnek: `!ciz anime uzayda süzülen astronot kedi`' 
+      });
       return;
     }
 
-    const catInfo = categoryKey ? CATEGORY_MAP[categoryKey] : CATEGORY_MAP.anime;
-    const catName = `${catInfo.icon} ${catInfo.name}`;
-
+    const selectedStyle = STYLE_MAP[styleKey] || STYLE_MAP.anime;
     sock.sendPresenceUpdate('composing', from).catch(() => {});
 
-    // Promptu Türkçeden İngilizceye otomatik çevir
+    // 3. Otomatik Türkçe -> İngilizce Çeviri
     let englishPrompt = userPrompt;
     try {
       englishPrompt = await translateToEnglish(userPrompt);
@@ -318,76 +488,39 @@ Açıklamanın içine \`dikey\` veya \`kare\` yazabilirsiniz.
       englishPrompt = userPrompt;
     }
 
-    let imageBuffer = null;
-    let usedModel = 'OmniArt AI Engine';
-    let elapsed = '0';
+    // 4. Görsel Üretimi (3 Kademeli Kusursuz Mimari)
+    // Aşama 1: Perchance AI API (Port 8000)
+    let result = await generateWithPerchanceAPI(englishPrompt, selectedStyle, shape);
 
-    // 1. OmniArt REST API v1 (http://111.235.150.203:5000/api/v1/generate)
-    try {
-      const apiRes = await axios.post(`${API_BASE}/api/v1/generate`, {
-        prompt: englishPrompt,
-        category: catInfo.apiCat,
-        style: catInfo.style,
-        provider: 'auto',
-        shape: shape
-      }, { timeout: 90000 });
-
-      if (apiRes.data && apiRes.data.success && apiRes.data.url) {
-        const fullImgUrl = apiRes.data.url.startsWith('http') 
-          ? apiRes.data.url 
-          : `${API_BASE}${apiRes.data.url}`;
-        
-        const imgDownload = await axios.get(fullImgUrl, { responseType: 'arraybuffer', timeout: 30000 });
-        imageBuffer = Buffer.from(imgDownload.data);
-        usedModel = `${(apiRes.data.provider || 'OmniArt').toUpperCase()} (${apiRes.data.style || catInfo.style})`;
-        elapsed = apiRes.data.elapsed_seconds || '';
-      }
-    } catch (apiErr) {
-      console.log(`[OMNIART REMOTE] Remote API (${apiErr.message}), yerel SDXL motoruna geçiliyor...`);
+    // Aşama 2: Hızlı Pollinations Flux Motoru
+    if (!result) {
+      console.log('[CIZ] Perchance API yanıt vermedi veya meşgul, Pollinations AI motoruna geçiliyor...');
+      result = await generateWithPollinations(englishPrompt, selectedStyle, shape);
     }
 
-    // 2. Fallback: Stable Horde Dağıtık AI Motoru
-    if (!imageBuffer) {
-      try {
-        const result = await generateHordeDirect(englishPrompt, categoryKey || 'anime', hordeW, hordeH);
-        imageBuffer = result.buffer;
-        usedModel = result.model;
-        elapsed = result.elapsed;
-      } catch (hordeErr) {
-        console.error('[OMNIART HORDE ERROR]:', hordeErr.message);
-      }
+    // Aşama 3: Stable Horde Dağıtık SDXL
+    if (!result) {
+      console.log('[CIZ] Pollinations yanıt vermedi, Stable Horde motoruna geçiliyor...');
+      result = await generateWithStableHorde(englishPrompt, selectedStyle, shape);
     }
 
-    // 3. Fallback: Pollinations Hızlı Motor (Sıfır Hata Garantisi)
-    if (!imageBuffer) {
-      try {
-        const polliModel = catInfo.apiCat === 'anime' ? 'flux-anime' : 'flux';
-        const polliUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(englishPrompt)}?width=${hordeW}&height=${hordeH}&model=${polliModel}&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
-        const polliRes = await axios.get(polliUrl, { responseType: 'arraybuffer', timeout: 30000 });
-        if (polliRes.status === 200) {
-          imageBuffer = Buffer.from(polliRes.data);
-          usedModel = `POLLINATIONS (${polliModel})`;
-          elapsed = '5.0';
-        }
-      } catch (polliErr) {
-        console.error('[OMNIART POLLINATIONS ERROR]:', polliErr.message);
-      }
-    }
-
-    if (!imageBuffer) {
-      await sock.sendMessage(from, { text: '❌ Görsel üretilirken bir hata oluştu. Lütfen biraz sonra tekrar deneyin.' });
+    if (!result || !result.buffer) {
+      await sock.sendMessage(from, { 
+        text: '❌ Görsel üretilirken tüm AI motorları zaman aşımına uğradı. Lütfen birkaç saniye sonra tekrar deneyin.' 
+      });
       return;
     }
 
-    const isDifferent = englishPrompt.toLowerCase() !== userPrompt.toLowerCase();
-    let caption = `⚡ *OmniArt AI Görseli Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${userPrompt}\n`;
-    if (isDifferent) {
+    // 5. WhatsApp Mesajı Oluşturma ve Gönderme
+    const isTranslated = englishPrompt.toLowerCase().trim() !== userPrompt.toLowerCase().trim();
+    let caption = `⚡ *Perchance AI Görseli Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${userPrompt}\n`;
+    if (isTranslated) {
       caption += `🌐 *Çeviri:* _${englishPrompt}_\n`;
     }
-    caption += `🎨 *Stil:* ${catName} (${shape})\n⚡ *Motor:* ${usedModel} (${elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+    caption += `🎨 *Stil:* ${selectedStyle.icon} ${selectedStyle.name}\n📐 *Boyut:* ${shapeLabel}\n⚡ *Motor:* ${result.engine} (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
 
     await sock.sendMessage(from, {
-      image: imageBuffer,
+      image: result.buffer,
       caption: caption.trim()
     });
   }
