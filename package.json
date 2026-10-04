@@ -6,12 +6,12 @@
   "type": "module",
   "scripts": {
     "start": "node bot.js",
-    "dev": "node --watch-path=bot.js --watch-path=server.js --watch-path=queue.js --watch-path=pipelines.js --watch-path=downloader.js --watch-path=extractor.js --watch-path=cache.js --watch-path=config.js --watch-path=tracker.js --watch-path=discordApi.js --watch-path=mangaPdfCompiler.js --watch-path=commands --watch-path=extractors --watch-path=events --watch-path=utils --watch-path=views bot.js",
+    "dev": "node --watch-path=bot.js --watch-path=server.js --watch-path=queue.js --watch-path=pipelines.js --watch-path=downloader.js --watch-path=extractor.js --watch-path=cache.js --watch-path=config.js --watch-path=tracker.js --watch-path=commands --watch-path=extractors --watch-path=events --watch-path=utils --watch-path=views bot.js",
     "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop wpbot",
     "pm2:restart": "pm2 restart wpbot",
     "pm2:logs": "pm2 logs wpbot",
-    "menu": "node menu-cli.js"
+    "menu": "node bin/menu-cli.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",

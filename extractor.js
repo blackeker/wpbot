@@ -388,6 +388,9 @@ export async function extractVideoUrl(pageUrl, fromJid = null, selectedAudio = n
   if (targetUrl.includes('merlinscans.org') || targetUrl.includes('merlintoon.com')) {
     return extractMerlinScans(targetUrl);
   }
+  if (targetUrl.includes('mangaportali.com')) {
+    return extractMangaPortali(targetUrl);
+  }
   if (targetUrl.includes('dizipal')) {
     return extractDizipal(targetUrl);
   }
@@ -822,6 +825,8 @@ import { extractMangaTR } from "./extractors/mangatr.js";
 export { extractMangaTR };
 import { extractMerlinScans } from "./extractors/merlinscans.js";
 export { extractMerlinScans };
+import { extractMangaPortali } from "./extractors/mangaportali.js";
+export { extractMangaPortali };
 import { extractFilmMakinesi } from "./extractors/filmmakinesi.js";
 export { extractFilmMakinesi };
 import { extractGenericWebpage } from "./extractors/generic_webpage.js";

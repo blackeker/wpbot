@@ -152,7 +152,6 @@ app.use((req, res, next) => {
   basicAuth(req, res, next);
 });
 
-export { activeCaptchasMap, sentCaptchasSet, startCaptchaPoller } from './server/captchaPoller.js';
 
 // Site-specific direct link extraction API endpoints
 app.get('/api/extract', async (req, res) => {
@@ -973,57 +972,6 @@ app.post('/api/indir-multiple', (req, res) => {
 });
 
 
-// Endpoint for Discord bot to notify new captcha
-app.post('/api/notify-captcha', async (req, res) => {
-  const { username, accountType, token, channelId, messageId, warnCount, localImageUrl } = req.body;
-  if (!messageId || !channelId) {
-    return res.status(400).json({ error: 'messageId and channelId are required.' });
-  }
-
-  if (sentCaptchasSet.has(messageId)) {
-    return res.json({ success: true, message: 'Already notified.' });
-  }
-  sentCaptchasSet.add(messageId);
-
-  captchaCounter++;
-  const durumKodu = String(captchaCounter);
-  activeCaptchasMap.set(durumKodu, { messageId, username, accountType, token, channelId });
-
-  const cfg = readConfig();
-  const adminNum = cfg.adminJids?.[0] || cfg.whatsappPhoneNumber;
-  const targetJid = adminNum ? (adminNum.includes('@') ? adminNum : `${adminNum}@s.whatsapp.net`) : '';
-
-  let infoText = `⚠️ *YENİ CAPTCHA BELİRDİ!* ⚠️\n\n`;
-  infoText += `👤 *Hesap:* ${username} (${accountType === 'main' ? 'Ana Hesap' : 'Yan Hesap'})\n`;
-  infoText += `⚠️ *Uyarı:* ${warnCount}/6\n`;
-  infoText += `🔑 *Durum Kodu (Sıra No):* *${durumKodu}*\n\n`;
-  infoText += `💬 *Çözmek için:* \n\`!çöz ${durumKodu} KOD\` yazıp gönderin.`;
-
-  try {
-    if (botSocketRef.current) {
-      if (localImageUrl) {
-        const imgUrl = `http://127.0.0.1:8181${localImageUrl}`;
-        const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer' });
-        if (imgRes.status === 200) {
-          await botSocketRef.current.sendMessage(targetJid, { 
-            image: Buffer.from(imgRes.data), 
-            caption: infoText 
-          });
-        } else {
-          await botSocketRef.current.sendMessage(targetJid, { text: infoText + `\n\n⚠️ Resim indirilemedi (HTTP ${imgRes.status})` });
-        }
-      } else {
-        await botSocketRef.current.sendMessage(targetJid, { text: infoText });
-      }
-      res.json({ success: true });
-    } else {
-      res.status(500).json({ error: 'WhatsApp client is not ready.' });
-    }
-  } catch (err) {
-    console.error('Error sending captcha notification to WhatsApp:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Internal WhatsApp Relay for Test / Worker Instances
 app.post('/api/internal/send-text', async (req, res) => {

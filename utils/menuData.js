@@ -4,7 +4,9 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DATA_PATH = path.resolve(__dirname, '../data.json');
+const DATA_PATH = fs.existsSync(path.resolve(__dirname, '../data/data.json'))
+  ? path.resolve(__dirname, '../data/data.json')
+  : path.resolve(__dirname, '../data.json');
 
 /**
  * Türkçe karakterleri ASCII küçük harfe dönüştürür.

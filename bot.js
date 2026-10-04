@@ -72,6 +72,7 @@ import {
 import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import { exec } from 'child_process';
 
 import { 
@@ -88,7 +89,7 @@ import {
   addSentMessageId
 } from './config.js';
 
-import { startServer, startCaptchaPoller, notifyStatusUpdate } from './server.js';
+import { startServer, notifyStatusUpdate } from './server.js';
 import { handleConnectionUpdate } from './events/connection.js';
 import { handleMessage } from './events/messages.js';
 
@@ -112,6 +113,21 @@ export function storeMessage(key, message) {
   }
 }
 
+function getCommandFiles(dir) {
+  let results = [];
+  if (!fs.existsSync(dir)) return results;
+  const list = fs.readdirSync(dir, { withFileTypes: true });
+  for (const item of list) {
+    const fullPath = path.join(dir, item.name);
+    if (item.isDirectory()) {
+      results = results.concat(getCommandFiles(fullPath));
+    } else if (item.name.endsWith('.js')) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
 async function loadCommands() {
   commands.clear();
   const commandsDir = path.resolve('./commands');
@@ -119,23 +135,22 @@ async function loadCommands() {
     fs.mkdirSync(commandsDir, { recursive: true });
   }
 
-  const files = fs.readdirSync(commandsDir);
-  for (const file of files) {
-    if (file.endsWith('.js')) {
-      try {
-        const module = await import(`./commands/${file}`);
-        const cmd = module.default;
-        if (cmd && cmd.name) {
-          commands.set(cmd.name, cmd);
-          if (cmd.aliases && Array.isArray(cmd.aliases)) {
-            for (const alias of cmd.aliases) {
-              commands.set(alias, cmd);
-            }
+  const files = getCommandFiles(commandsDir);
+  for (const filePath of files) {
+    try {
+      const fileUrl = pathToFileURL(filePath).href;
+      const module = await import(fileUrl);
+      const cmd = module.default;
+      if (cmd && cmd.name) {
+        commands.set(cmd.name, cmd);
+        if (cmd.aliases && Array.isArray(cmd.aliases)) {
+          for (const alias of cmd.aliases) {
+            commands.set(alias, cmd);
           }
         }
-      } catch (err) {
-        appLogger.error({ file, err: err.message }, '[LOADER] Failed to load command');
       }
+    } catch (err) {
+      appLogger.error({ filePath, err: err.message }, '[LOADER] Failed to load command');
     }
   }
   appLogger.info({ count: commands.size }, `[LOADER] Loaded ${commands.size} command handlers/aliases.`);
@@ -286,9 +301,8 @@ async function startBot() {
 (async () => {
   await loadCommands();
   
-  // Start Express and Captcha Poller
+  // Start Express Server
   startServer(PORT, startBot);
-  startCaptchaPoller();
 
   // Start Baileys WhatsApp Bot
   startBot().catch(err => console.error("Error starting bot:", err));

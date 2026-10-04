@@ -18,7 +18,7 @@ export const CATEGORIES = {
     name: 'İndirme & Medya',
     icon: '📥',
     description: 'Video, ses, dizi, film, torrent ve kuyruk yönetimi',
-    commands: ['indir', 'kuyruk', 'dur', 'devam', 'iptal', 'temizle', 'tekrargonder', 'linkler']
+    commands: ['indir', 'kuyruk', 'dur', 'devam', 'iptal', 'temizle', 'tekrargonder']
   },
   universite: {
     name: 'Üniversite & Yurt',
@@ -35,14 +35,14 @@ export const CATEGORIES = {
   araclar: {
     name: 'Faydalı Araçlar',
     icon: '🧰',
-    description: 'Captcha çözücü, hatırlatıcı, QR, link kısaltma, sözlük ve wiki',
-    commands: ['otocoz', 'captcha', 'coz', 'hatirlat', 'qr', 'kisalt', 'sozluk', 'wiki', 'mesaj', 'patates']
+    description: 'Hatırlatıcı, QR, link kısaltma, sözlük ve wiki',
+    commands: ['hatirlat', 'qr', 'kisalt', 'sozluk', 'wiki']
   },
   ai: {
-    name: 'Yapay Zeka & Görsel',
+    name: 'Yapay Zeka & Görsel (DM)',
     icon: '🎨',
-    description: 'Yapay zeka ile görsel üretimi ve yapay zeka araçları',
-    commands: ['ciz', 'gem']
+    description: 'Yapay zeka ile görsel üretimi',
+    commands: ['ciz']
   },
   hentai: {
     name: 'Yetişkin & Hentai (18+)',
@@ -59,11 +59,8 @@ export const CATEGORIES = {
   admin: {
     name: 'Yönetici Komutları',
     icon: '👑',
-    description: 'Bot yönetimi, grup izinleri, ban kontrolleri, çerez ve ayarlar',
-    commands: [
-      'izin', 'grupsec', 'bancheck', 'banlar', 'botkontrol', 'bots',
-      'cerez', 'depo', 'guncelle', 'komutekle', 'komutlar', 'komutsil', 'limit', 'pingurl'
-    ]
+    description: 'Bot yönetimi, grup izinleri, çerez ve ayarlar',
+    commands: ['izin', 'grupsec', 'cerez', 'depo', 'guncelle']
   },
   genel: {
     name: 'Genel & Yardım',
@@ -83,7 +80,6 @@ export const ALIAS_MAP = {
   'iptal': 'iptal', 'cancel': 'iptal', 'iptalet': 'iptal',
   'temizle': 'temizle', 'clear': 'temizle',
   'tekrargonder': 'tekrargonder', 'tekrar': 'tekrargonder', 'resend': 'tekrargonder',
-  'link': 'linkler', 'linkler': 'linkler', 'url': 'linkler',
 
   // Universite
   'uniyemek': 'uniyemek', 'uni yemek': 'uniyemek', 'üniversite yemek': 'uniyemek',
@@ -109,20 +105,14 @@ export const ALIAS_MAP = {
   'deprem': 'deprem', 'kandilli': 'deprem', 'afad': 'deprem', 'sondepremler': 'deprem',
 
   // Araclar
-  'otocoz': 'otocoz', 'otoçöz': 'otocoz', 'aicoz': 'otocoz', 'cozai': 'otocoz', 'autocaptcha': 'otocoz',
-  'captcha': 'captcha',
-  'coz': 'coz', 'çöz': 'coz',
   'hatirlat': 'hatirlat', 'hatırlat': 'hatirlat', 'alarm': 'hatirlat', 'remind': 'hatirlat',
   'qr': 'qr', 'qrcode': 'qr', 'barkod': 'qr',
   'kisalt': 'kisalt', 'kısalt': 'kisalt', 'short': 'kisalt', 'shorten': 'kisalt', 'urlkisalt': 'kisalt',
   'sozluk': 'sozluk', 'sözlük': 'sozluk', 'tdk': 'sozluk', 'anlam': 'sozluk',
   'wiki': 'wiki', 'vikipedi': 'wiki', 'wikipedia': 'wiki',
-  'mesaj': 'mesaj', 'dm': 'mesaj', 'ilet': 'mesaj', 'gonder': 'mesaj', 'fwd': 'mesaj',
-  'patates': 'patates', 'potato': 'patates',
 
   // AI
-  'ciz': 'ciz', 'çiz': 'ciz', 'resim': 'ciz', 'imagine': 'ciz', 'gorsel': 'ciz', 'görsel': 'ciz', 'airesim': 'ciz', 'aiciz': 'ciz', 'omniart': 'ciz',
-  'gem': 'gem', 'ai': 'gem', 'ask': 'gem', 'soru': 'gem',
+  'ciz': 'ciz', 'çiz': 'ciz', 'resim': 'ciz', 'imagine': 'ciz', 'gorsel': 'ciz', 'görsel': 'ciz', 'airesim': 'ciz', 'aiciz': 'ciz', 'omniart': 'ciz', 'perchance': 'ciz',
 
   // Hentai
   'hentaizmfav': 'hentaizmfav', 'hentaizm fav': 'hentaizmfav', 'hentaifav': 'hentaizmfav', 'fav hentai': 'hentaizmfav',
@@ -139,20 +129,11 @@ export const ALIAS_MAP = {
   'hatalar': 'hatalar', 'hata': 'hatalar', 'logs': 'hatalar', 'loglar': 'hatalar', 'error': 'hatalar', 'errors': 'hatalar',
 
   // Admin
-  'izin': 'izin', 'yetki': 'izin', 'izinler': 'izin', 'grupizin': 'izin', 'grupayar': 'izin', 'komutkapat': 'izin', 'komutac': 'izin',
+  'izin': 'izin', 'yetki': 'izin', 'izinler': 'izin', 'grupizin': 'izin', 'grupayar': 'izin', 'komutkapat': 'izin', 'komutac': 'izin', 'komut': 'izin',
   'grupsec': 'grupsec', 'grupseç': 'grupsec', 'grup': 'grupsec',
-  'bancheck': 'bancheck', 'bankontrol': 'bancheck',
-  'banlar': 'banlar',
-  'botkontrol': 'botkontrol',
-  'bots': 'bots', 'botlar': 'bots',
   'cerez': 'cerez', 'çerez': 'cerez', 'cookie': 'cerez', 'cookies': 'cerez',
   'depo': 'depo',
   'guncelle': 'guncelle', 'güncelle': 'guncelle', 'update': 'guncelle',
-  'komutekle': 'komutekle', 'cmdadd': 'komutekle', 'addcmd': 'komutekle',
-  'komutlar': 'komutlar', 'cmds': 'komutlar', 'customcmds': 'komutlar', 'ozelkomutlar': 'komutlar',
-  'komutsil': 'komutsil', 'cmddel': 'komutsil', 'delcmd': 'komutsil',
-  'limit': 'limit', 'sinir': 'limit', 'sınır': 'limit', 'ratelimit': 'limit',
-  'pingurl': 'pingurl', 'ping': 'pingurl',
 
   // Genel
   'yardim': 'yardim', 'help': 'yardim', 'menu': 'yardim', 'menü': 'yardim', 'rehber': 'yardim'
@@ -324,7 +305,7 @@ export function checkCommandPermission(commandName, from, options = {}) {
       };
     }
 
-    // Other admin commands (guncelle, cerez, bancheck, botkontrol, etc.) require Bot Owner
+    // Other admin commands require Bot Owner
     return {
       allowed: false,
       reason: 'owner_required',

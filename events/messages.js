@@ -30,7 +30,8 @@ import {
   checkCommandPermission, 
   checkLinkPermission, 
   isGroupAdminOrOwner, 
-  isBotOwner 
+  isBotOwner,
+  getCanonicalCommandName
 } from '../utils/permissionManager.js';
 
 function unwrapMessage(message) {
@@ -74,29 +75,20 @@ async function processSingleMessage(sock, msg) {
   ).trim();
   const ltext = text.toLowerCase().trim();
 
+  if (!text) return;
+
   console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}"`);
 
-  // --- WhatsApp Captcha Resmine Yanıt Verme (Reply) Yakalayıcı ---
-  const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
-  if (quotedMsg && text) {
-    const quotedCaption = (quotedMsg.conversation || quotedMsg.imageMessage?.caption || quotedMsg.extendedTextMessage?.text || '').toLowerCase();
-    if (quotedCaption.includes('captcha') || quotedCaption.includes('durduruldu') || quotedCaption.includes('hesap')) {
-      const code = text.replace(/^!coz\s*/i, '').trim();
-      if (code) {
-        console.log(`[CAPTCHA REPLIED] Captcha görseline yanıt verildi. Gönderilen kod: "${code}"`);
-        const cozCmd = commands.get('coz');
-        if (cozCmd) {
-          await cozCmd.execute(sock, msg, from, [code], { text: `!coz ${code}`, ltext: `!coz ${code}` });
-          return;
-        }
-      }
-    }
-  }
+
+
+  const prefixes = ['!', '/', '.'];
+  const matchedPrefix = prefixes.find(p => text.startsWith(p));
+  const hasPrefix = Boolean(matchedPrefix);
+  const isGroupChat = from.endsWith('@g.us');
 
   if (msg.key.fromMe) {
-    const isExplicitCmd = text.startsWith('!');
     const isDlLink = text.startsWith('http://') || text.startsWith('https://') || text.startsWith('magnet:') || text.toLowerCase().includes('.torrent');
-    if (!isExplicitCmd && !isDlLink) {
+    if (!hasPrefix && !isDlLink) {
       return;
     }
     if (config.groupJid && from !== config.groupJid) {
@@ -110,16 +102,17 @@ async function processSingleMessage(sock, msg) {
   const isAdmin = await isGroupAdminOrOwner(sock, msg, from);
 
   // Private DM Whitelist check
-  if (!msg.key.fromMe && config.adminJids && !from.endsWith('@g.us')) {
+  if (!msg.key.fromMe && config.adminJids && !isGroupChat) {
     if (!isOwner) {
       return; // Ignore silently in private messages if admin list is set
     }
   }
 
-  // Custom Commands
+  // Custom Commands (Must be prefixed in groups to prevent accidental triggers)
   const customCmds = config.customCommands || {};
-  if (customCmds[ltext]) {
-    let replyTemplate = customCmds[ltext];
+  let customTrigger = hasPrefix ? text.slice(matchedPrefix.length).toLowerCase().trim() : (isGroupChat ? null : ltext);
+  if (customTrigger && customCmds[customTrigger]) {
+    let replyTemplate = customCmds[customTrigger];
     
     const uptimeMs = Date.now() - botState.uptime.getTime();
     const uptimeHours = (uptimeMs / (1000 * 60 * 60)).toFixed(1);
@@ -161,14 +154,89 @@ async function processSingleMessage(sock, msg) {
   const isSupportedLink = (isLink && (SUPPORTED_DOMAINS.some(d => text.includes(d)) || text.includes('itch.io') || text.includes('9mod.com'))) || isDirectFileLink;
   const isTorrentUrl = text.startsWith('magnet:') || text.toLowerCase().includes('.torrent');
 
-  if (text.startsWith('!') || isSupportedLink || isTorrentUrl || isLink) {
+  if (hasPrefix || isSupportedLink || isTorrentUrl || isLink) {
     sock.sendPresenceUpdate('composing', from).catch(() => {});
   }
 
-  // 0. Pending Quality Selection Handler
+  // 0. Pending Quality Selection / Interactive Flow Handler
   if (pendingSelections[from]) {
     const selection = pendingSelections[from];
     
+    // --- Yapay Zeka Görsel Üretimi Adım Adım Sihirbazı (Prompt -> Kategori -> Boyut) ---
+    if (selection.type === 'ciz_flow') {
+      const input = text.trim().toLowerCase();
+
+      if (input === 'iptal' || input === 'vazgeç' || input === 'cancel') {
+        delete pendingSelections[from];
+        await sock.sendMessage(from, { text: '❌ Görsel oluşturma işlemi iptal edildi.' });
+        return;
+      }
+
+      if (selection.step === 'prompt') {
+        if (!text.trim()) {
+          await sock.sendMessage(from, { text: '⚠️ Lütfen çizilmesini istediğiniz görselin açıklamasını yazın.' });
+          return;
+        }
+        selection.prompt = text.trim();
+        selection.step = 'style';
+        const { getStyleMenuText } = await import('../commands/tools/ciz.js');
+        await sock.sendMessage(from, { text: getStyleMenuText(selection.prompt) });
+        return;
+      }
+
+      if (selection.step === 'style') {
+        const { resolveStyle, getShapeMenuText } = await import('../commands/tools/ciz.js');
+        const chosenStyle = resolveStyle(input);
+        selection.selectedStyle = chosenStyle;
+        selection.step = 'shape';
+        await sock.sendMessage(from, { text: getShapeMenuText(chosenStyle) });
+        return;
+      }
+
+      if (selection.step === 'shape') {
+        let shape = 'square';
+        let shapeLabel = '1:1 Kare';
+        if (['2', 'dikey', 'portrait', '9:16', 'hikaye', 'story'].includes(input)) {
+          shape = 'portrait';
+          shapeLabel = '9:16 Dikey';
+        } else if (['3', 'yatay', 'landscape', '16:9', 'genis', 'geniş'].includes(input)) {
+          shape = 'landscape';
+          shapeLabel = '16:9 Yatay';
+        } else {
+          shape = 'square';
+          shapeLabel = '1:1 Kare';
+        }
+
+        const prompt = selection.prompt;
+        const styleObj = selection.selectedStyle;
+        delete pendingSelections[from];
+
+        await sock.sendMessage(from, {
+          text: `⏳ *Görseliniz üretiliyor...*\n\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${shapeLabel}\n\n_Lütfen bekleyin..._`
+        });
+
+        try {
+          const { executeAiDraw } = await import('../commands/tools/ciz.js');
+          const result = await executeAiDraw(prompt, styleObj, shape);
+
+          if (!result || !result.buffer) {
+            await sock.sendMessage(from, { text: '❌ Görsel üretilirken tüm AI motorları zaman aşımına uğradı. Lütfen birkaç saniye sonra tekrar deneyin.' });
+            return;
+          }
+
+          let caption = `✨ *Görsel Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${shapeLabel}\n⚡ (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+
+          await sock.sendMessage(from, {
+            image: result.buffer,
+            caption: caption.trim()
+          });
+        } catch (err) {
+          await sock.sendMessage(from, { text: `❌ Görsel oluşturulurken bir hata oluştu: ${err.message}` });
+        }
+        return;
+      }
+    }
+
     if (selection.type === 'audio_selection') {
       const input = text.trim().toLowerCase();
 
@@ -557,7 +625,7 @@ async function processSingleMessage(sock, msg) {
         delete pendingSelections[from];
         try {
           const task = addDownloadTask(selection.url, from, selection.title, chosen.format_id);
-          await sock.sendMessage(from, { text: `✅ *${chosen.label}* kalitesi seçildi!\n\n📥 Sıraya eklendi, bekleme sırası çok olmadığı sürece kısa süre içinde başlayacak.\n\n🔢 Görev no: *${task.id}*  |  Kuyruk: *kuyruk* yaz` });
+          await sock.sendMessage(from, { text: `✅ *${chosen.label}* kalitesi seçildi!\n\n📥 Sıraya eklendi, bekleme sırası çok olmadığı sürece kısa süre içinde başlayacak.\n\n🔢 Görev no: *${task.id}*  |  Kuyruk: \`!kuyruk\`` });
         } catch (err) {
           await sock.sendMessage(from, { text: `⚠️ Bir sorun oluştu: ${err.message}` });
         }
@@ -643,17 +711,15 @@ async function processSingleMessage(sock, msg) {
     if (handled) return;
   }
 
-  // Help / Menu check
-  const isGroupChat = from.endsWith('@g.us');
+  // Help / Menu check (Guarded against casual chat triggering)
   let menuMatch = null;
-  if (isGroupChat) {
-    menuMatch = ltext.match(/^!(?:menü|menu|yardım|yardim|help|rehber)(?:\s+(.*))?$/i);
-    if (!menuMatch && ['menü', 'menu', 'yardım', 'yardim', 'rehber'].includes(ltext)) {
-      menuMatch = [ltext, ''];
-    }
-  } else {
-    menuMatch = ltext.match(/^(?:!?(?:menü|menu|yardım|yardim|help|rehber)|ne yapabilirsin|ne yaparsın)(?:\s+(.*))?$/i);
-    if (!menuMatch && ['merhaba', 'selam', 'sa', 'hey', 'hi'].includes(ltext)) {
+  if (hasPrefix) {
+    const cleanPrefixText = text.slice(matchedPrefix.length).trim();
+    const lClean = cleanPrefixText.toLowerCase();
+    menuMatch = lClean.match(/^(?:menü|menu|yardım|yardim|help|rehber)(?:\s+(.*))?$/i);
+  } else if (!isGroupChat) {
+    // In DMs only, allow explicit menu queries
+    if (['menü', 'menu', 'yardım', 'yardim', 'help', 'rehber', 'ne yapabilirsin', 'ne yaparsın'].includes(ltext)) {
       menuMatch = [ltext, ''];
     }
   }
@@ -681,132 +747,74 @@ async function processSingleMessage(sock, msg) {
     return;
   }
 
-  // Route to commands Map
+  // Parse Command Name and Arguments
   let commandName = '';
   let args = [];
 
-  if (text.startsWith('!')) {
-    const parts = text.slice(1).trim().split(/\s+/);
+  if (hasPrefix) {
+    const cleanPrefixText = text.slice(matchedPrefix.length).trim();
+    const parts = cleanPrefixText.split(/\s+/);
     commandName = parts[0].toLowerCase();
     args = parts.slice(1);
-  } else {
-    // Shortcut commands (prefixless)
-    if (['kuyruk', 'ne var', 'nerede', 'durum ne', 'kac tane', 'kaç tane'].includes(ltext) || ltext.startsWith('kuyruk temizle') || ltext.startsWith('kuyruğu temizle') || ltext.startsWith('kuyruktemizle') || ltext.startsWith('kuyruk sıfırla')) {
+  } else if (!isGroupChat) {
+    // In Direct Messages (DM) only: Support prefixless single explicit commands for convenience
+    // (Casual words like 'sa', 'selam', 'dur', 'hata', 'sabah', 'yemek' in groups are NOT triggered)
+    if (['kuyruk', 'queue'].includes(ltext)) {
       commandName = 'kuyruk';
-    } else if (['durum', 'status', 'bot durumu', 'durum?'].includes(ltext)) {
+    } else if (['durum', 'status'].includes(ltext)) {
       commandName = 'durum';
-    } else if (['disk', 'yer', 'depolama'].includes(ltext)) {
+    } else if (['disk', 'depolama'].includes(ltext)) {
       commandName = 'disk';
-    } else if (['geçmiş', 'gecmis', 'indirdim', 'son indirmeler'].includes(ltext)) {
+    } else if (['gecmis', 'geçmiş'].includes(ltext)) {
       commandName = 'gecmis';
-    } else if (['hatalar', 'hata', 'sorun', 'neden olmadı'].includes(ltext)) {
+    } else if (['hatalar'].includes(ltext)) {
       commandName = 'hatalar';
-    } else if (['hız', 'hiz', 'hız ne', 'nasıl gidiyor'].includes(ltext)) {
+    } else if (['hiz', 'hız'].includes(ltext)) {
       commandName = 'hiz';
-    } else if (['dur', 'durdur', 'bekle', 'pause'].includes(ltext)) {
-      commandName = 'dur';
-    } else if (['devam', 'başlat', 'resume'].includes(ltext)) {
-      commandName = 'devam';
-    } else if (['iptal', 'durdur aktif', 'aktifi iptal', 'cancel'].includes(ltext)) {
-      commandName = 'iptal';
-    } else if (['güncelle', 'guncelle', 'update'].includes(ltext)) {
-      commandName = 'guncelle';
-    } else if (ltext.startsWith('tekrar gönder') || ltext.startsWith('tekrar gonder')) {
-      commandName = 'tekrargonder';
-      args = text.split(' ').slice(2);
-    } else if (ltext === 'temizle') {
-      commandName = 'temizle';
-    } else if (/^(?:he[n]?taizmfav|he[n]?taizm\s+fav|he[n]?taifav|fav\s*he[n]?tai)(?:\s+.*)?$/i.test(ltext)) {
-      commandName = 'hentaizmfav';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (/^(?:indir\s*he[n]?tai|indirhe[n]?tai|he[n]?tai\s*indir|he[n]?taiindir)(?:\s+.*)?$/i.test(ltext)) {
-      commandName = 'indirhentai';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (/^(?:toplu\s*he[n]?tai|topluhe[n]?tai|he[n]?tai\s*toplu|he[n]?taitoplu)(?:\s+.*)?$/i.test(ltext)) {
-      commandName = 'topluhentai';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (/^(?:he[n]?tai\s*grup|he[n]?taigrup)(?:\s+.*)?$/i.test(ltext)) {
-      commandName = 'hentaigrup';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (['hhelp', 'hentaihelp', 'h-help', 'hyardim', 'hentaiyardim', 'hentai yardım', 'hentai yardim'].includes(ltext)) {
-      commandName = 'hhelp';
-    } else if (
-      ['kahvalti', 'kahvaltı', 'sabah', 'sabahyemegi', 'sabahyemeği'].includes(ltext) ||
-      (/^(?:kahvalti|kahvaltı)\s+(.+)$/i.test(ltext) && /^(?:bugun|bugün|yarin|yarın|dun|dün|pazartesi|sali|salı|carsamba|çarşamba|persembe|perşembe|cuma|cumartesi|pazar|\d{1,2}(?:\.\d{1,2}(?:\.\d{4})?)?)$/i.test(ltext.replace(/^(?:kahvalti|kahvaltı)\s+/i, '').trim()))
-    ) {
-      commandName = 'kahvalti';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (
-      ['aksam', 'akşam', 'aksamyemegi', 'akşamyemeği'].includes(ltext) ||
-      (/^(?:aksam|akşam)\s+(.+)$/i.test(ltext) && /^(?:bugun|bugün|yarin|yarın|dun|dün|pazartesi|sali|salı|carsamba|çarşamba|persembe|perşembe|cuma|cumartesi|pazar|\d{1,2}(?:\.\d{1,2}(?:\.\d{4})?)?)$/i.test(ltext.replace(/^(?:aksam|akşam)\s+/i, '').trim()))
-    ) {
-      commandName = 'aksam';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (
-      ['yemek', 'yemekler', 'gunlukyemek', 'yemekhane'].includes(ltext) ||
-      (/^(?:yemek|yemekler)\s+(.+)$/i.test(ltext) && /^(?:bugun|bugün|yarin|yarın|dun|dün|pazartesi|sali|salı|carsamba|çarşamba|persembe|perşembe|cuma|cumartesi|pazar|\d{1,2}(?:\.\d{1,2}(?:\.\d{4})?)?)$/i.test(ltext.replace(/^(?:yemek|yemekler)\s+/i, '').trim()))
-    ) {
-      commandName = 'yemek';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (['22', 'otobus', 'otobüs', 'otobussaatleri', 'otobüs saatleri', '22 saatleri', 'hat22', 'hat 22'].includes(ltext)) {
-      commandName = '22';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (['uniyemek', 'uni yemek', 'üniversite yemek', 'universite yemek', 'fırat yemek', 'firat yemek', 'üniversite yemeği', 'unimenu', 'firatmenu'].includes(ltext)) {
+    } else if (['uniyemek'].includes(ltext)) {
       commandName = 'uniyemek';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (['takvim', 'akademik', 'akademiktakvim', 'akademik takvim'].includes(ltext)) {
+    } else if (['takvim'].includes(ltext)) {
       commandName = 'takvim';
-      args = text.trim().split(/\s+/).slice(1);
-    } else if (['vize', 'vizeler', 'vizesayac', 'vize sayacı', 'vize sayac'].includes(ltext)) {
-      commandName = 'takvim';
-      args = ['vize'];
-    } else if (['final', 'finaller', 'finalsayac', 'final sayacı', 'final sayac'].includes(ltext)) {
-      commandName = 'takvim';
-      args = ['final'];
-    } else if (['but', 'büt', 'bütünleme', 'butunleme', 'butsayac', 'büt sayacı'].includes(ltext)) {
-      commandName = 'takvim';
-      args = ['but'];
-    } else if (['tatil', 'tatiller', 'resmitatil', 'resmi tatil', 'resmi tatiller'].includes(ltext)) {
-      commandName = 'takvim';
-      args = ['tatil'];
-    } else if (['sinav', 'sınav', 'sayac', 'sayaç', 'sınavlar', 'sinavlar', 'sınav sayacı'].includes(ltext)) {
-      commandName = 'takvim';
-      args = ['sayac'];
-    } else if (/^(?:ciz|çiz|imagine|airesim|aiciz)(?:\s+.*)?$/i.test(ltext)) {
+    } else if (/^(?:ciz|çiz|imagine|airesim|aiciz)\s+(.+)$/i.test(ltext)) {
       commandName = 'ciz';
       args = text.trim().split(/\s+/).slice(1);
     }
   }
 
-  if (commandName && commands.has(commandName)) {
-    const perm = checkCommandPermission(commandName, from, { isOwner, isAdmin });
-    if (!perm.allowed) {
-      if (!perm.silent && perm.message) {
-        await sock.sendMessage(from, { text: perm.message });
+  // Execute Command if matched
+  if (commandName) {
+    const canonicalName = getCanonicalCommandName(commandName);
+    const cmd = commands.get(canonicalName) || commands.get(commandName);
+
+    if (cmd) {
+      const perm = checkCommandPermission(canonicalName || cmd.name, from, { isOwner, isAdmin });
+      if (!perm.allowed) {
+        if (!perm.silent && perm.message) {
+          await sock.sendMessage(from, { text: perm.message });
+        }
+        return;
+      }
+
+      console.log(`[COMMAND] Executing '${cmd.name}' for ${from}...`);
+      try {
+        await cmd.execute(sock, msg, from, args, {
+          text,
+          ltext,
+          config,
+          botState,
+          activeCaptchasMap: global.activeCaptchasMap || new Map(),
+          downloadsDir,
+          formatBytes,
+          isOwner,
+          isAdmin
+        });
+        console.log(`[COMMAND] Finished '${cmd.name}' for ${from}`);
+      } catch (err) {
+        console.error(`Command error (${cmd.name}):`, err.message);
+        await sock.sendMessage(from, { text: `⚠️ Komut hatası: ${err.message}` });
       }
       return;
     }
-
-    const cmd = commands.get(commandName);
-    console.log(`[COMMAND] Executing '${commandName}' for ${from}...`);
-    try {
-      await cmd.execute(sock, msg, from, args, {
-        text,
-        ltext,
-        config,
-        botState,
-        activeCaptchasMap: global.activeCaptchasMap || new Map(),
-        downloadsDir,
-        formatBytes,
-        isOwner,
-        isAdmin
-      });
-      console.log(`[COMMAND] Finished '${commandName}' for ${from}`);
-    } catch (err) {
-      console.error(`Command error (${commandName}):`, err.message);
-      await sock.sendMessage(from, { text: `⚠️ Komut hatası: ${err.message}` });
-    }
-    return;
   }
 
   // Treat as download if supported link

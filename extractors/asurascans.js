@@ -1,6 +1,6 @@
 import { gotScraping } from '../extractor.js';
 import * as cheerio from 'cheerio';
-import { compileMangaPagesToPdf } from '../mangaPdfCompiler.js';
+import { compileMangaPagesToPdf } from '../utils/mangaPdfCompiler.js';
 
 export async function extractAsuraScans(pageUrl) {
   try {
