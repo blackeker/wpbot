@@ -405,6 +405,13 @@ export default {
   aliases: ['çiz', 'resim', 'imagine', 'gorsel', 'görsel', 'airesim', 'aiciz', 'omniart', 'perchance'],
   description: 'Perchance AI motoru ile yüksek kaliteli görsel oluşturur',
   async execute(sock, msg, from, args = [], ctx = {}) {
+    if (from.endsWith('@g.us')) {
+      await sock.sendMessage(from, { 
+        text: '❌ Bu komut gruplarda kullanılamaz. Lütfen özel mesaj (DM) üzerinden kullanın.' 
+      });
+      return;
+    }
+
     if (!args || args.length === 0) {
       const help = 
 `⚡ *PERCHANCE AI - GÖRSEL STÜDYOSU*
