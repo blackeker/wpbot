@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { translateToEnglish } from '../utils/translator.js';
 
 // Perchance AI API Endpoints (Local or Remote VPS)
 const PERCHANCE_API_LIST = [
@@ -479,28 +478,20 @@ Mesajınızın içine \`kare\` (1:1), \`dikey\` (9:16) veya \`yatay\` (16:9) ekl
     const selectedStyle = STYLE_MAP[styleKey] || STYLE_MAP.anime;
     sock.sendPresenceUpdate('composing', from).catch(() => {});
 
-    // 3. Otomatik Türkçe -> İngilizce Çeviri
-    let englishPrompt = userPrompt;
-    try {
-      englishPrompt = await translateToEnglish(userPrompt);
-    } catch (e) {
-      englishPrompt = userPrompt;
-    }
-
-    // 4. Görsel Üretimi (3 Kademeli Kusursuz Mimari)
+    // 3. Görsel Üretimi (3 Kademeli Kusursuz Mimari)
     // Aşama 1: Perchance AI API (Port 8000)
-    let result = await generateWithPerchanceAPI(englishPrompt, selectedStyle, shape);
+    let result = await generateWithPerchanceAPI(userPrompt, selectedStyle, shape);
 
     // Aşama 2: Hızlı Pollinations Flux Motoru
     if (!result) {
       console.log('[CIZ] Perchance API yanıt vermedi veya meşgul, Pollinations AI motoruna geçiliyor...');
-      result = await generateWithPollinations(englishPrompt, selectedStyle, shape);
+      result = await generateWithPollinations(userPrompt, selectedStyle, shape);
     }
 
     // Aşama 3: Stable Horde Dağıtık SDXL
     if (!result) {
       console.log('[CIZ] Pollinations yanıt vermedi, Stable Horde motoruna geçiliyor...');
-      result = await generateWithStableHorde(englishPrompt, selectedStyle, shape);
+      result = await generateWithStableHorde(userPrompt, selectedStyle, shape);
     }
 
     if (!result || !result.buffer) {
@@ -510,13 +501,8 @@ Mesajınızın içine \`kare\` (1:1), \`dikey\` (9:16) veya \`yatay\` (16:9) ekl
       return;
     }
 
-    // 5. WhatsApp Mesajı Oluşturma ve Gönderme
-    const isTranslated = englishPrompt.toLowerCase().trim() !== userPrompt.toLowerCase().trim();
-    let caption = ` * Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${userPrompt}\n`;
-    if (isTranslated) {
-      caption += `🌐 *Çeviri:* _${englishPrompt}_\n`;
-    }
-    caption += `🎨 *Stil:* ${selectedStyle.icon} ${selectedStyle.name}\n📐 *Boyut:* ${shapeLabel}\n (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+    // 4. WhatsApp Mesajı Oluşturma ve Gönderme
+    let caption = `✨ *Görsel Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${userPrompt}\n🎨 *Stil:* ${selectedStyle.icon} ${selectedStyle.name}\n📐 *Boyut:* ${shapeLabel}\n⚡ (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
 
     await sock.sendMessage(from, {
       image: result.buffer,
