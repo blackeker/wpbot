@@ -1083,138 +1083,37 @@ export default {
       }
       
       if (isYouTubeUrl && !isMp3Cmd) {
-        const activeProxy = getProxyUrl();
-        const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
-        const ytDlpCmd = getYtDlpCommand();
+        // Otomatik En İyi Kalite (Kullanıcıya sormadan doğrudan en iyi kalitede indir)
+        let customHeight = null;
+        let isMp3Requested = false;
 
-        exec(`"${ytDlpCmd}" ${proxyArg} -J --no-playlist "${singleUrl}"`, { maxBuffer: 15 * 1024 * 1024 }, async (err, stdout) => {
-          let ytTitle = 'YouTube Video';
-          let availableFormats = [];
-
-          if (!err && stdout) {
-            try {
-              const info = JSON.parse(stdout);
-              ytTitle = (info.title || 'YouTube Video').replace(/[\r\n]+/g, ' ').trim();
-              const formats = info.formats || [];
-              const duration = info.duration || 0;
-
-              // En yüksek ses akışının boyutunu veya süreden yaklaşık ses boyutunu hesapla
-              const audioFormats = formats.filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none'));
-              const bestAudioSize = audioFormats.reduce((max, f) => {
-                const sz = f.filesize || f.filesize_approx || 0;
-                return sz > max ? sz : max;
-              }, 0);
-              const approxAudioBytes = bestAudioSize > 0 ? bestAudioSize : (duration > 0 ? Math.round((128 * 1024 / 8) * duration) : 0);
-
-              // Standart çözünürlük seviyeleri eşleyici
-              const getStandardTier = (h) => {
-                if (h >= 3800) return { tier: 4320, name: '8K (4320p)' };
-                if (h >= 2000) return { tier: 2160, name: '4K (2160p)' };
-                if (h >= 1350) return { tier: 1440, name: '2K (1440p)' };
-                if (h >= 950)  return { tier: 1080, name: '1080p (FHD)' };
-                if (h >= 650)  return { tier: 720,  name: '720p (HD)' };
-                if (h >= 440)  return { tier: 480,  name: '480p (SD)' };
-                if (h >= 320)  return { tier: 360,  name: '360p (Mobil)' };
-                if (h >= 200)  return { tier: 240,  name: '240p' };
-                return { tier: 144, name: '144p' };
-              };
-
-              const videoFormats = formats.filter(f => f.vcodec && f.vcodec !== 'none');
-              const tierMap = new Map();
-
-              for (const f of videoFormats) {
-                // Hem yatay hem dikey (Shorts) videolar için gerçek çözünürlük kenarı
-                const effectiveHeight = (f.height && f.width) ? Math.min(f.height, f.width) : (f.height || 0);
-                if (!effectiveHeight || effectiveHeight <= 0) continue;
-
-                const { tier, name } = getStandardTier(effectiveHeight);
-                const fps = f.fps || 0;
-                const is60 = fps >= 50;
-                const isHdr = f.dynamic_range && /hdr/i.test(f.dynamic_range);
-
-                if (!tierMap.has(tier)) {
-                  tierMap.set(tier, {
-                    tier,
-                    name,
-                    bestFormat: f,
-                    has60fps: is60,
-                    isHdr: isHdr
-                  });
-                } else {
-                  const entry = tierMap.get(tier);
-                  if (is60) entry.has60fps = true;
-                  if (isHdr) entry.isHdr = true;
-                  const currentBest = entry.bestFormat;
-                  const currentScore = (currentBest.ext === 'mp4' ? 100000 : 0) + (currentBest.tbr || 0);
-                  const newScore = (f.ext === 'mp4' ? 100000 : 0) + (f.tbr || 0);
-                  if (newScore > currentScore) {
-                    entry.bestFormat = f;
-                  }
-                }
-              }
-
-              const sortedTiers = Array.from(tierMap.keys()).sort((a, b) => b - a);
-
-              for (const t of sortedTiers) {
-                const entry = tierMap.get(t);
-                const bf = entry.bestFormat;
-
-                let label = entry.name;
-                if (entry.has60fps && t >= 720) {
-                  label = label.replace(/\b(1080p|720p|1440p|2160p|4K|2K)\b/, '$1 60fps');
-                }
-                if (entry.isHdr) label += ' HDR';
-
-                let videoBytes = bf.filesize || bf.filesize_approx || 0;
-                if (!videoBytes && bf.tbr && duration) {
-                  videoBytes = Math.round((bf.tbr * 1024 / 8) * duration);
-                }
-                const totalBytes = videoBytes > 0 ? (videoBytes + approxAudioBytes) : 0;
-                const sizeStr = totalBytes > 0 ? ctx.formatBytes(totalBytes) : (videoBytes > 0 ? `~${ctx.formatBytes(videoBytes)}` : 'Boyut bilinmiyor');
-
-                availableFormats.push({
-                  format_id: `bestvideo[vcodec^=avc][height<=${t}]+bestaudio[acodec^=mp4a]/bestvideo[height<=${t}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${t}]+bestaudio/best[height<=${t}]`,
-                  label: `${label} [${sizeStr}]`,
-                  height: t
-                });
-              }
-            } catch (e) {
-              console.error('[YouTube Quality Parse Error]:', e.message);
-            }
+        for (const p of nonUrlParts) {
+          const lp = p.toLowerCase();
+          if (['mp3', 'ses', 'audio', 'müzik', 'muzik'].includes(lp)) {
+            isMp3Requested = true;
+            break;
           }
-
-          if (availableFormats.length === 0) {
-            availableFormats.push({
-              format_id: 'bestvideo[vcodec^=avc][ext=mp4]+bestaudio[acodec^=mp4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
-              label: 'Varsayılan En İyi Kalite',
-              height: 0
-            });
+          const m = lp.match(/(\d{3,4})p?/);
+          if (m) {
+            customHeight = parseInt(m[1], 10);
+            break;
           }
+        }
 
-          availableFormats.push({
-            format_id: 'mp3',
-            label: '🎵 Sadece Ses (MP3 olarak indir)',
-            height: -1
-          });
+        let chosenFormat = 'bestvideo[vcodec^=avc][ext=mp4]+bestaudio[acodec^=mp4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best';
+        let qualityLabel = 'Otomatik En İyi Kalite (1080p/HD)';
 
-          pendingSelections[from] = {
-            url: singleUrl,
-            title: ytTitle,
-            formats: availableFormats
-          };
+        if (isMp3Requested) {
+          chosenFormat = 'mp3';
+          qualityLabel = 'MP3 (Ses)';
+        } else if (customHeight) {
+          chosenFormat = `bestvideo[vcodec^=avc][height<=${customHeight}]+bestaudio[acodec^=mp4a]/bestvideo[height<=${customHeight}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${customHeight}]+bestaudio/best[height<=${customHeight}]`;
+          qualityLabel = `${customHeight}p`;
+        }
 
-          const numEmoji = (idx) => {
-            const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-            return emojis[idx] || `[${idx + 1}]`;
-          };
-
-          let optionsText = `🎬 *YOUTUBE KALİTE SEÇİMİ*\n\n🎥 *Video:* ${ytTitle}\n\nLütfen indirmek istediğiniz kaliteyi seçin:\n\n`;
-          availableFormats.forEach((f, idx) => {
-            optionsText += `${numEmoji(idx)} ${f.label}\n`;
-          });
-          optionsText += `\n*Seçmek için bu mesaja doğrudan seçeneğin numarasını (Ör: 1) yazarak yanıt verin.*`;
-
-          await sock.sendMessage(from, { text: optionsText });
+        addDownloadTask(singleUrl, from, 'YouTube Video', chosenFormat, priority);
+        await sock.sendMessage(from, {
+          text: `🎬 *YouTube Videosu Algılandı!*\n\n🚀 *Kalite:* ${qualityLabel}\n✅ Doğrudan sıraya eklendi, otomatik olarak indiriliyor...\n\nSırayı görmek için: \`!kuyruk\``
         });
         return;
       }
