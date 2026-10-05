@@ -49,7 +49,33 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN audioTrack TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE active_tasks ADD COLUMN audioTrack TEXT"); } catch (e) {}
 
 export let downloadQueue = [];
-export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...] } }
+export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...], timer } }
+
+export function setPendingSelection(from, selectionData) {
+  if (pendingSelections[from]?.timer) {
+    clearTimeout(pendingSelections[from].timer);
+  }
+  const timer = setTimeout(() => {
+    delete pendingSelections[from];
+    console.log(`[SELECTION] Zaman aşımına uğrayan seçim temizlendi (${from})`);
+  }, 60000);
+
+  pendingSelections[from] = {
+    ...selectionData,
+    createdAt: Date.now(),
+    timer
+  };
+}
+
+export function clearPendingSelection(from) {
+  if (pendingSelections[from]) {
+    if (pendingSelections[from].timer) {
+      clearTimeout(pendingSelections[from].timer);
+    }
+    delete pendingSelections[from];
+  }
+}
+
 let taskIdCounter = 1;
 
 let queueUpdateCallback = null;
@@ -370,7 +396,15 @@ export async function processQueue() {
 
   if (queueState.isPaused) return;
 
+  const sock = botSocketRef.current;
+  if (!sock) {
+    // WhatsApp socket henüz online değil, bağlantı kurulana kadar bekle
+    return;
+  }
+
   while (activeTasksList.length < limit && downloadQueue.length > 0 && !queueState.isPaused) {
+    if (!botSocketRef.current) return;
+
     const task = downloadQueue.shift();
     activeTasksList.push(task);
     saveQueueToFile();
@@ -389,35 +423,22 @@ export async function processQueue() {
     task.abortController = new AbortController();
 
     (async () => {
+      let isDisconnectError = false;
       try {
-        const sock = botSocketRef.current;
-        if (!sock) throw new Error("WhatsApp bağlantısı henüz kurulmadı.");
+        const currentSock = botSocketRef.current;
+        if (!currentSock) {
+          isDisconnectError = true;
+          throw new Error("WhatsApp bağlantısı henüz kurulmadı.");
+        }
         
         const from = task.recipientJid;
+        console.log(`[QUEUE] Görev başlatılıyor: ${task.title} (${task.url})`);
 
-        console.log(`Starting queue task: ${task.title} (${task.url})`);
-        let statusMsgKey = null;
-        const isBatch = task.episodeBatch && Array.isArray(task.episodeBatch) && task.episodeBatch.length > 1;
-        const startText = isBatch
-          ? `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\n📦 ${task.episodeBatch.length} bölümlük paket indiriliyor ve tek video olarak birleştiriliyor...`
-          : `⏳ *Kuyruk Sırası Geldi:*\n🎬 *${task.title}*\n\nVideo çözümleniyor ve indirme başlatılıyor...`;
-        try {
-          const statusMsg = await sock.sendMessage(from, { text: startText });
-          statusMsgKey = statusMsg?.key;
-          task.statusMsgKey = statusMsgKey;
-        } catch (e) {
-          console.error('Kuyruk başlangıç mesajı gönderilemedi:', e.message);
-        }
-
+        // Kullanıcı isteği: İndirme sırasında ara mesaj güncellemeleri yapılmaz, direkt indirilir ve gönderilir.
         await executeDownloadPipeline(
           task.url, 
           from, 
           async (statusText) => {
-            try {
-              if (botSocketRef.current && statusMsgKey) {
-                await botSocketRef.current.sendMessage(from, { text: statusText, edit: statusMsgKey });
-              }
-            } catch (e) { }
             notifyQueueUpdate();
           }, 
           task.abortController.signal,
@@ -426,6 +447,19 @@ export async function processQueue() {
 
       } catch (error) {
         console.error('Error running queued task:', error?.message || error?.stack || error);
+
+        // WhatsApp bağlantı kopması durumunda görevi silme, tekrar kuyruğun başına ekle!
+        if (!botSocketRef.current || isDisconnectError || error?.message?.includes('Closed') || error?.message?.includes('socket')) {
+          console.log(`[QUEUE] WhatsApp koptuğu için görev silinmedi, kuyruğun başına tekrar ekleniyor: ${task.title}`);
+          const idx = activeTasksList.indexOf(task);
+          if (idx !== -1) activeTasksList.splice(idx, 1);
+          task.status = 'bekliyor';
+          downloadQueue.unshift(task);
+          saveQueueToFile();
+          notifyQueueUpdate();
+          return;
+        }
+
         const isNoSource = error.message && (
           error.message.includes('video kaynağı bulunamadı') ||
           error.message.includes('Çözümlenebilir video') ||
@@ -441,22 +475,19 @@ export async function processQueue() {
             } else {
               text = `❌ *Hata (${task.title}):* ${error.message}`;
             }
-            
-            if (task.statusMsgKey) {
-              await botSocketRef.current.sendMessage(task.recipientJid, { text, edit: task.statusMsgKey });
-            } else {
-              await botSocketRef.current.sendMessage(task.recipientJid, { text });
-            }
+            await botSocketRef.current.sendMessage(task.recipientJid, { text }, { skipAntiBan: true, immediate: true });
           }
         } catch (e) { }
       } finally {
-        const idx = activeTasksList.indexOf(task);
-        if (idx !== -1) {
-          activeTasksList.splice(idx, 1);
+        if (!isDisconnectError) {
+          const idx = activeTasksList.indexOf(task);
+          if (idx !== -1) {
+            activeTasksList.splice(idx, 1);
+          }
+          saveQueueToFile();
+          notifyQueueUpdate();
+          processQueue();
         }
-        saveQueueToFile();
-        notifyQueueUpdate();
-        processQueue();
       }
     })();
   }

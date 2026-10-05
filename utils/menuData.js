@@ -47,6 +47,9 @@ function parseDateStr(str) {
   return new Date(y, m - 1, d);
 }
 
+let cachedMenuData = null;
+let lastMenuMtime = 0;
+
 /**
  * data.json dosyasını okur ve JSON objesi olarak döner.
  */
@@ -56,8 +59,14 @@ export function loadMenuData() {
       console.error('[MenuData] data.json bulunamadı:', DATA_PATH);
       return [];
     }
+    const stat = fs.statSync(DATA_PATH);
+    if (cachedMenuData && stat.mtimeMs === lastMenuMtime) {
+      return cachedMenuData;
+    }
     const raw = fs.readFileSync(DATA_PATH, 'utf-8');
-    return JSON.parse(raw);
+    cachedMenuData = JSON.parse(raw);
+    lastMenuMtime = stat.mtimeMs;
+    return cachedMenuData;
   } catch (err) {
     console.error('[MenuData] data.json okuma hatası:', err.message);
     return [];
@@ -410,26 +419,6 @@ export function getYemekMessage(query = '') {
  */
 export async function sendMenuResponse(sock, msg, from, replyPayload) {
   const payload = typeof replyPayload === 'string' ? { text: replyPayload } : replyPayload;
-
-  // 1. İnsan davranışı simülasyonu: "Yazıyor..." durumu gönder
-  try {
-    if (sock?.sendPresenceUpdate && from) {
-      await sock.sendPresenceUpdate('composing', from);
-    }
-  } catch (e) {}
-
-  // 2. Rastgele insani gecikme (600ms - 1400ms)
-  const delay = Math.floor(Math.random() * 800) + 600;
-  await new Promise(resolve => setTimeout(resolve, delay));
-
-  // 3. Mesajı alıntılayarak gönder
   await sock.sendMessage(from, payload, { quoted: msg });
-
-  // 4. Yazıyor durumunu sonlandır
-  try {
-    if (sock?.sendPresenceUpdate && from) {
-      await sock.sendPresenceUpdate('paused', from);
-    }
-  } catch (e) {}
 }
 

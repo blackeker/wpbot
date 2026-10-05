@@ -99,6 +99,18 @@ const DEFAULT_CONFIG = {
   groupJid: "",
   hentaiGroupJid: "",
   groupPermissions: {},
+  antiBan: {
+    enabled: true,
+    autoRead: true,
+    typingSimulation: true,
+    minTypingDelayMs: 1800,
+    maxTypingDelayMs: 12000,
+    msPerChar: 45,
+    jitterFactor: 0.20,
+    minIntervalBetweenSendsMs: 900,
+    maxInboundRatePerFiveSec: 8,
+    throttleDurationMs: 12000
+  },
   cronSchedules: [
     { id: "cleanup", name: "Disk Temizliği", cron: "0 4 * * *", action: "cleanup", active: true }
   ]
@@ -131,11 +143,29 @@ export function readConfig() {
   return config;
 }
 
+export function atomicWriteFileSync(filePath, data, encoding = 'utf8') {
+  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 8)}.tmp`;
+  try {
+    fs.writeFileSync(tmpPath, data, encoding);
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    if (fs.existsSync(tmpPath)) {
+      try { fs.unlinkSync(tmpPath); } catch (e) {}
+    }
+    fs.writeFileSync(filePath, data, encoding);
+  }
+}
+
 export function writeConfig(data) {
   const current = readConfig();
-  const updated = { ...current, ...data };
+  const updated = {
+    ...current,
+    ...data,
+    antiBan: { ...(current.antiBan || {}), ...(data.antiBan || {}) },
+    groupPermissions: { ...(current.groupPermissions || {}), ...(data.groupPermissions || {}) }
+  };
   cachedConfig = updated;
-  fs.writeFileSync(configPath, JSON.stringify(updated, null, 2), 'utf8');
+  atomicWriteFileSync(configPath, JSON.stringify(updated, null, 2), 'utf8');
   
   // Update process.env variables immediately
   if (updated.proxyUrl) process.env.PROXY_URL = updated.proxyUrl;

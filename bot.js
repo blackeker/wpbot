@@ -94,6 +94,7 @@ import { handleConnectionUpdate } from './events/connection.js';
 import { handleMessage } from './events/messages.js';
 
 import { getModuleLogger } from './utils/logger.js';
+import { sendHumanizedMessage } from './utils/antiBan.js';
 const appLogger = getModuleLogger('bot');
 
 const logger = pino({ level: 'silent' });
@@ -230,6 +231,14 @@ async function startBot() {
     // Fail silent
   }
 
+  if (botSocketRef.current) {
+    try {
+      botSocketRef.current.ev.removeAllListeners();
+      botSocketRef.current.end?.(new Error('Reconnecting bot'));
+    } catch (e) {}
+    botSocketRef.current = null;
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
   const sock = makeWASocket({
@@ -256,8 +265,8 @@ async function startBot() {
   
   const originalSendMessage = sock.sendMessage.bind(sock);
   sock.sendMessage = async (...args) => {
-    const [targetJid] = args;
-    const result = await originalSendMessage(...args);
+    const [targetJid, content, options] = args;
+    const result = await sendHumanizedMessage(sock, originalSendMessage, targetJid, content, options);
     if (result && result.key && result.key.id) {
       addSentMessageId(result.key.id);
       if (result.message) {

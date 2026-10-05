@@ -2,17 +2,23 @@ import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
 
-const sessionPath = process.env.SESSION_PATH || './auth_info_session';
-const logFile = path.join(sessionPath, 'app.log');
+const logDir = process.env.LOG_DIR || './logs';
+const logFile = path.join(logDir, 'app.log');
 
-// Ensure directory exists
-if (!fs.existsSync(sessionPath)) {
-  fs.mkdirSync(sessionPath, { recursive: true });
+// Ensure log directory exists
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
 }
+
+// Single shared file stream with error listener to prevent Windows file locking collisions
+const fileStream = fs.createWriteStream(logFile, { flags: 'a' });
+fileStream.on('error', (err) => {
+  console.error('[LOGGER STREAM ERROR]:', err?.message || err);
+});
 
 const streams = [
   { stream: process.stdout },
-  { stream: fs.createWriteStream(logFile, { flags: 'a' }) }
+  { stream: fileStream }
 ];
 
 export const logger = pino({
@@ -31,7 +37,7 @@ export const fileLogger = pino({
     err: pino.stdSerializers.err,
     error: pino.stdSerializers.err
   }
-}, fs.createWriteStream(logFile, { flags: 'a' }));
+}, fileStream);
 
 export function getModuleLogger(moduleName) {
   return logger.child({ module: moduleName });

@@ -1,10 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { gotScraping } from 'got-scraping';
-import { readConfig, botSocketRef, sessionPath } from './config.js';
-import { addDownloadTask } from './queue.js';
+import { readConfig, botSocketRef, sessionPath, atomicWriteFileSync } from './config.js';
 
 const trackedDbPath = path.join(sessionPath, 'tracked_db.json');
 
@@ -22,7 +20,12 @@ function readTrackedDb() {
 
 function saveTrackedDb(set) {
   try {
-    fs.writeFileSync(trackedDbPath, JSON.stringify([...set], null, 2), 'utf8');
+    // Sınırsız büyümeyi önlemek için en fazla son 2,000 adresi sakla
+    if (set.size > 2000) {
+      const arr = Array.from(set);
+      set = new Set(arr.slice(arr.length - 2000));
+    }
+    atomicWriteFileSync(trackedDbPath, JSON.stringify([...set], null, 2), 'utf8');
   } catch (e) {
     console.error('[Tracker DB Save Error]', e.message);
   }

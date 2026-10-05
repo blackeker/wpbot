@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { pendingSelections } from '../../queue.js';
+import { pendingSelections, setPendingSelection } from '../../queue.js';
 import { readConfig } from '../../config.js';
 
 // Core 10 Styles Definition
@@ -240,12 +240,12 @@ export default {
 
     // 1. Eğer hiçbir prompt yazılmadıysa prompt girmesini iste
     if (!rawText) {
-      pendingSelections[from] = {
+      setPendingSelection(from, {
         type: 'ciz_flow',
         step: 'prompt',
         sender,
         createdAt: Date.now()
-      };
+      });
       await sock.sendMessage(from, {
         text: `🎨 *Hazır Ve Nazır*\n━━━━━━━━━━━━━━━━━━━━\n📝 Lütfen çizilmesini istediğiniz görseli açıklayan metni (istem / prompt) yazın:\n\n_Örnek: ` + '`karlı dağlarda koşan sihirli beyaz kurt`_'
       });
@@ -253,13 +253,13 @@ export default {
     }
 
     // 2. Prompt verildi -> Kategori / Stil seçim aşamasına geç
-    pendingSelections[from] = {
+    setPendingSelection(from, {
       type: 'ciz_flow',
       step: 'style',
       prompt: rawText,
       sender,
       createdAt: Date.now()
-    };
+    });
 
     await sock.sendMessage(from, {
       text: getStyleMenuText(rawText)

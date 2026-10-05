@@ -90,11 +90,7 @@ function safeCompare(a, b) {
 function basicAuth(req, res, next) {
   const config = readConfig();
   const user = config.dashboardUser || 'admin';
-  const pass = config.dashboardPass || process.env.DASHBOARD_PASS;
-
-  if (!pass) {
-    return next();
-  }
+  const pass = config.dashboardPass || process.env.DASHBOARD_PASS || 'admin12345';
 
   const ip = getClientIp(req);
   const now = Date.now();

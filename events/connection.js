@@ -49,8 +49,17 @@ export async function handleConnectionUpdate(sock, update, startBot) {
     console.log(`Connection closed (Sebep: ${reason}, Code: ${statusCode}).`);
 
     if (statusCode === 401) {
-      console.log('[BOT] Oturum kapatıldı (401), oturum verileri temizleniyor...');
-      try { fs.rmSync(sessionPath, { recursive: true, force: true }); } catch(e) {}
+      console.log('[BOT] Oturum kapatıldı (401), Baileys kimlik doğrulama verileri temizleniyor...');
+      try {
+        if (fs.existsSync(sessionPath)) {
+          const files = fs.readdirSync(sessionPath);
+          for (const file of files) {
+            if (file === 'creds.json' || file.startsWith('session-') || file.startsWith('app-state-')) {
+              try { fs.unlinkSync(path.join(sessionPath, file)); } catch (e) {}
+            }
+          }
+        }
+      } catch (e) {}
       try { if (fs.existsSync(backupCredsFile)) fs.unlinkSync(backupCredsFile); } catch(e) {}
     }
 

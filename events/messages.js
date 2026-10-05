@@ -33,6 +33,7 @@ import {
   isBotOwner,
   getCanonicalCommandName
 } from '../utils/permissionManager.js';
+import { simulateIncomingRead, isSenderThrottled } from '../utils/antiBan.js';
 
 function unwrapMessage(message) {
   if (!message) return null;
@@ -112,6 +113,14 @@ async function processSingleMessage(sock, msg) {
   const isOwner = isBotOwner(msg, senderNumber);
   const isAdmin = await isGroupAdminOrOwner(sock, msg, from);
 
+  // Anti-Ban: Mark incoming message as read (blue ticks) naturally & check inbound flood
+  if (!msg.key.fromMe) {
+    simulateIncomingRead(sock, msg);
+    if (isSenderThrottled(sender)) {
+      return; // Ignore spam burst to protect bot from flood bans
+    }
+  }
+
   // Private DM Whitelist check
   if (!msg.key.fromMe && config.adminJids && !isGroupChat) {
     if (!isOwner) {
@@ -163,11 +172,7 @@ async function processSingleMessage(sock, msg) {
   const isLink = text.startsWith('http://') || text.startsWith('https://');
   const isDirectFileLink = isLink && /\.(mp4|mkv|avi|webm|apk|zip|rar|7z|pdf|exe)(\?.*)?$/i.test(text.split(' ')[0]);
   const isSupportedLink = (isLink && (SUPPORTED_DOMAINS.some(d => text.includes(d)) || text.includes('itch.io') || text.includes('9mod.com'))) || isDirectFileLink;
-  const isTorrentUrl = text.startsWith('magnet:') || text.toLowerCase().includes('.torrent');
-
-  if (hasPrefix || isSupportedLink || isTorrentUrl || isLink) {
-    sock.sendPresenceUpdate('composing', from).catch(() => {});
-  }
+  const isTorrentUrl = text.startsWith('magnet:') || (isLink && /\.torrent(\?.*)?$/i.test(text.split(/\s+/)[0]));
 
   // 0. Pending Quality Selection / Interactive Flow Handler
   if (pendingSelections[from]) {

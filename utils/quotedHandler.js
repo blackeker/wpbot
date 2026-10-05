@@ -1,8 +1,15 @@
 import { hentaiFavStore } from './hentaiFavStore.js';
 import { commands, messageStore } from '../bot.js';
+import { checkLinkPermission } from './permissionManager.js';
 
 export function getQuotedMessage(msg) {
-  const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+  const raw = msg?.message?.ephemeralMessage?.message || msg?.message?.viewOnceMessage?.message || msg?.message;
+  const contextInfo =
+    raw?.extendedTextMessage?.contextInfo ||
+    raw?.imageMessage?.contextInfo ||
+    raw?.videoMessage?.contextInfo ||
+    raw?.documentMessage?.contextInfo ||
+    raw?.documentWithCaptionMessage?.message?.documentMessage?.contextInfo;
   if (!contextInfo) return null;
 
   let quotedMsg = contextInfo.quotedMessage;
@@ -110,9 +117,13 @@ export async function handleReplyDownload(sock, msg, from, text, ctx) {
   console.log(`[REPLY DOWNLOAD] Quoted Text snippet: "${quotedText.substring(0, 100)}" | Extra args:`, extraArgs);
 
   // 1. Check for Hentaizm Anime No pattern in quoted message
-  // E.g. "🔞 *No: 1* - ...", "👉 indirhentai 1", "No: 12", "#12"
   const noMatch = quotedText.match(/(?:No:\s*|No\.\s*|indirhentai\s+|#\s*)(\d+)/i);
   if (noMatch) {
+    const perm = checkLinkPermission('hentaizm', from, { isOwner: ctx?.isOwner, isAdmin: ctx?.isAdmin });
+    if (!perm.allowed) {
+      if (!perm.silent && perm.message) await sock.sendMessage(from, { text: perm.message });
+      return true;
+    }
     const animeNo = noMatch[1];
     const indirhentaiCmd = commands.get('indirhentai');
     if (indirhentaiCmd) {
@@ -125,6 +136,11 @@ export async function handleReplyDownload(sock, msg, from, text, ctx) {
   const hentaizmUrlMatch = quotedText.match(/https?:\/\/[^\s"',<>]*hentaizm[^\s"',<>]*(?:\/anime\/|\?tab=|\/izle\/)[^\s"',<>]+/i);
   if (hentaizmUrlMatch) {
     const animeUrl = hentaizmUrlMatch[0];
+    const perm = checkLinkPermission(animeUrl, from, { isOwner: ctx?.isOwner, isAdmin: ctx?.isAdmin });
+    if (!perm.allowed) {
+      if (!perm.silent && perm.message) await sock.sendMessage(from, { text: perm.message });
+      return true;
+    }
     const indirhentaiCmd = commands.get('indirhentai');
     if (indirhentaiCmd) {
       await indirhentaiCmd.execute(sock, msg, from, [animeUrl, ...extraArgs], ctx);
@@ -135,6 +151,11 @@ export async function handleReplyDownload(sock, msg, from, text, ctx) {
   // 3. Check against hentaiFavStore for title match
   const matchedItem = hentaiFavStore.findItemByText(quotedText);
   if (matchedItem) {
+    const perm = checkLinkPermission('hentaizm', from, { isOwner: ctx?.isOwner, isAdmin: ctx?.isAdmin });
+    if (!perm.allowed) {
+      if (!perm.silent && perm.message) await sock.sendMessage(from, { text: perm.message });
+      return true;
+    }
     const indirhentaiCmd = commands.get('indirhentai');
     if (indirhentaiCmd) {
       await indirhentaiCmd.execute(sock, msg, from, [String(matchedItem.index), ...extraArgs], ctx);
@@ -148,6 +169,11 @@ export async function handleReplyDownload(sock, msg, from, text, ctx) {
   const targetLink = (urlMatch && urlMatch[0]) || (magnetMatch && magnetMatch[0]);
 
   if (targetLink) {
+    const perm = checkLinkPermission(targetLink, from, { isOwner: ctx?.isOwner, isAdmin: ctx?.isAdmin });
+    if (!perm.allowed) {
+      if (!perm.silent && perm.message) await sock.sendMessage(from, { text: perm.message });
+      return true;
+    }
     if (targetLink.includes('hentaizm')) {
       const indirhentaiCmd = commands.get('indirhentai');
       if (indirhentaiCmd) {

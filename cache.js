@@ -1,24 +1,31 @@
 import fs from 'fs';
 import path from 'path';
-import { sessionPath } from './config.js';
+import { sessionPath, atomicWriteFileSync } from './config.js';
 
 const cacheFilePath = path.join(sessionPath, 'cache_db.json');
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 Hours
 
-function readCacheFile() {
+let memoryCache = null;
+
+function loadMemoryCache() {
+  if (memoryCache) return memoryCache;
   if (fs.existsSync(cacheFilePath)) {
     try {
-      return JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
+      memoryCache = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
+      return memoryCache;
     } catch {
-      return {};
+      memoryCache = {};
+      return memoryCache;
     }
   }
-  return {};
+  memoryCache = {};
+  return memoryCache;
 }
 
-function writeCacheFile(data) {
+function writeCacheFile() {
   try {
-    fs.writeFileSync(cacheFilePath, JSON.stringify(data, null, 2), 'utf8');
+    const data = loadMemoryCache();
+    atomicWriteFileSync(cacheFilePath, JSON.stringify(data, null, 2), 'utf8');
   } catch (err) {
     console.error('[Cache] Save error:', err.message);
   }
@@ -26,14 +33,14 @@ function writeCacheFile(data) {
 
 export function getCachedResult(url) {
   try {
-    const cache = readCacheFile();
+    const cache = loadMemoryCache();
     const entry = cache[url];
     if (!entry) return null;
 
     const now = Date.now();
     if (now - entry.timestamp > CACHE_TTL_MS) {
       delete cache[url];
-      writeCacheFile(cache);
+      writeCacheFile();
       return null;
     }
 
@@ -56,21 +63,21 @@ export function saveToCache(url, result) {
       return;
     }
 
-    const cache = readCacheFile();
+    const cache = loadMemoryCache();
     cache[url] = {
       timestamp: Date.now(),
       result
     };
-    writeCacheFile(cache);
+    writeCacheFile();
   } catch (e) {}
 }
 
 export function deleteFromCache(url) {
   try {
-    const cache = readCacheFile();
+    const cache = loadMemoryCache();
     if (cache[url]) {
       delete cache[url];
-      writeCacheFile(cache);
+      writeCacheFile();
       console.log(`[Cache] Invalidated cache entry for: ${url}`);
     }
   } catch (e) {}
@@ -78,7 +85,7 @@ export function deleteFromCache(url) {
 
 export function clearExpiredCache() {
   try {
-    const cache = readCacheFile();
+    const cache = loadMemoryCache();
     const now = Date.now();
     let modified = false;
 
@@ -90,7 +97,7 @@ export function clearExpiredCache() {
     }
 
     if (modified) {
-      writeCacheFile(cache);
+      writeCacheFile();
     }
   } catch (e) {}
 }

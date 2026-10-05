@@ -241,12 +241,21 @@ export function isBotOwner(msg, senderNumber) {
   const config = readConfig();
   if (!config.adminJids) return false;
   
-  const adminList = config.adminJids.split(',').map(n => n.trim().toLowerCase()).filter(Boolean);
+  const adminList = config.adminJids.split(',').map(n => n.trim().replace(/[^0-9]/g, '')).filter(Boolean);
   if (adminList.length === 0) return false;
 
   const num = (senderNumber || '').replace(/[^0-9]/g, '');
-  return adminList.some(admin => num.includes(admin.replace(/[^0-9]/g, '')));
+  if (!num) return false;
+  const cleanNum = num.slice(-10);
+
+  return adminList.some(admin => {
+    const cleanAdmin = admin.slice(-10);
+    return cleanAdmin.length >= 7 && (cleanNum === cleanAdmin || num === admin);
+  });
 }
+
+// In-memory cache for group metadata with a 5-minute TTL
+const groupMetadataCache = new Map();
 
 /**
  * Checks if the user is authorized to administer group permissions (Bot Owner OR WhatsApp Group Admin).
@@ -260,10 +269,19 @@ export async function isGroupAdminOrOwner(sock, msg, from) {
   if (!from.endsWith('@g.us')) return true; // Direct messages are private
 
   try {
-    const metadata = await sock.groupMetadata(from);
-    if (!metadata || !metadata.participants) return false;
+    const now = Date.now();
+    let cached = groupMetadataCache.get(from);
+    if (!cached || now > cached.expiresAt) {
+      if (!sock || typeof sock.groupMetadata !== 'function') return false;
+      const metadata = await sock.groupMetadata(from);
+      if (metadata && metadata.participants) {
+        cached = { metadata, expiresAt: now + 300000 }; // 5 minutes TTL
+        groupMetadataCache.set(from, cached);
+      }
+    }
+    if (!cached?.metadata?.participants) return false;
     
-    const participant = metadata.participants.find(p => p.id === sender || p.id.split('@')[0] === senderNumber);
+    const participant = cached.metadata.participants.find(p => p.id === sender || p.id.split('@')[0] === senderNumber);
     if (participant && (participant.admin === 'admin' || participant.admin === 'superadmin')) {
       return true;
     }

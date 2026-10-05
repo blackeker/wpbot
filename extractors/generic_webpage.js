@@ -128,6 +128,10 @@ export async function extractGenericWebpage(pageUrl, siteName = 'Video') {
 
     throw new Error('Video bağlantısı çözülemedi.');
   } catch (err) {
+    const errMsg = err?.message || String(err);
+    if (errMsg.includes('ERR_NAME_NOT_RESOLVED') || errMsg.includes('ERR_CONNECTION_REFUSED') || errMsg.includes('ENOTFOUND')) {
+      throw new Error(`${siteName} sitesine erişilemedi (DNS/Bağlantı Hatası).`);
+    }
     throw err;
   } finally {
     if (page) {
