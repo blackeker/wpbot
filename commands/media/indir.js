@@ -1,5 +1,5 @@
 import { exec } from 'child_process';
-import { addDownloadTask, pendingSelections } from '../../queue.js';
+import { addDownloadTask, pendingSelections, setPendingSelection } from '../../queue.js';
 import { getYtDlpCommand, getProxyUrl } from '../../config.js';
 import { probeMediaAudioOptions } from '../../extractor.js';
 
@@ -85,15 +85,21 @@ export default {
       return;
     }
 
-    // Check if arguments specify an episode range (e.g. `!indir <url> 10 15` or `!indir <url> 10-15`)
+    // Check if arguments specify an episode range (e.g. `!indir <url> 10 15`, `!indir <url> 10-15`, `!indir <url> 50+`, `!indir <url> 50 son`)
     let numRange = null;
     const nonUrlParts = parts.filter(p => !p.startsWith('http://') && !p.startsWith('https://') && !p.startsWith('magnet:') && !p.startsWith('!') && !p.startsWith('--'));
     const joinedNonUrls = nonUrlParts.join(' ').trim();
-    const rangeMatch = joinedNonUrls.match(/^(\d+)\s*[-to–—]\s*(\d+)$/i) || joinedNonUrls.match(/^(\d+)\s+(\d+)$/);
+    const rangeMatch = joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s*[-to–—]\s*(\d+(?:\.\d+)?)$/i) || joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
+    const plusMatch = joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s*(?:\+|son|sonrasi|sonrası|-)$/i);
     if (rangeMatch) {
       numRange = {
-        start: parseInt(rangeMatch[1], 10),
-        end: parseInt(rangeMatch[2], 10)
+        start: parseFloat(rangeMatch[1]),
+        end: parseFloat(rangeMatch[2])
+      };
+    } else if (plusMatch) {
+      numRange = {
+        start: parseFloat(plusMatch[1]),
+        end: Infinity
       };
     }
 
@@ -364,10 +370,63 @@ export default {
           return;
         }
       }
+
+      // MangaPortalı 2 link aralığı
+      if (urls[0].includes('mangaportali.com') && urls[1].includes('mangaportali.com')) {
+        const match1 = urls[0].match(/bolum-(\d+(?:\.\d+)?)/i);
+        const match2 = urls[1].match(/bolum-(\d+(?:\.\d+)?)/i);
+        const startEp = match1 && match2 ? Math.min(parseFloat(match1[1]), parseFloat(match2[1])) : 1;
+        const endEp = match1 && match2 ? Math.max(parseFloat(match1[1]), parseFloat(match2[1])) : Infinity;
+
+        const { getMangaPortaliChapters } = await import('../../extractors/mangaportali.js');
+        const { seriesTitle, chapters } = await getMangaPortaliChapters(urls[0]);
+        const targetChapters = chapters.filter(c => c.number !== null && c.number >= startEp && c.number <= endEp);
+
+        if (targetChapters.length > 0) {
+          await sock.sendMessage(from, { text: `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\nBölüm Aralığı: ${startEp} - ${endEp === Infinity ? 'Son' : endEp}\nToplam *${targetChapters.length}* bölüm PDF olarak sıraya ekleniyor...` });
+
+          let addedCount = 0;
+          for (const chap of targetChapters) {
+            try {
+              addDownloadTask(chap.url, from, chap.title, null, priority);
+              addedCount++;
+            } catch (e) {}
+          }
+          await sock.sendMessage(from, { text: `✅ *${addedCount}* manga bölümü başarıyla sıraya eklendi!\nKuyruk durumu için: \`!kuyruk\`` });
+          return;
+        }
+      }
     }
 
-    // ─── Tek Link + Sayısal Bölüm Aralığı (Örn: !indir <url> 10 15 veya 10-15) ───
+    // ─── Tek Link + Sayısal Bölüm Aralığı (Örn: !indir <url> 10 15, 10-15 veya 50+) ───
     if (urls.length === 1 && numRange) {
+      if (urls[0].includes('mangaportali.com')) {
+        const startEp = Math.min(numRange.start, numRange.end);
+        const endEp = Math.max(numRange.start, numRange.end);
+
+        const { getMangaPortaliChapters } = await import('../../extractors/mangaportali.js');
+        const { seriesTitle, chapters } = await getMangaPortaliChapters(urls[0]);
+        const targetChapters = chapters.filter(c => c.number !== null && c.number >= startEp && (endEp === Infinity || c.number <= endEp));
+
+        if (targetChapters.length > 0) {
+          const endLabel = endEp === Infinity ? 'Son' : endEp;
+          await sock.sendMessage(from, { text: `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\nBölüm Aralığı: ${startEp} - ${endLabel}\nToplam *${targetChapters.length}* bölüm PDF olarak sıraya ekleniyor...` });
+
+          let addedCount = 0;
+          for (const chap of targetChapters) {
+            try {
+              addDownloadTask(chap.url, from, chap.title, null, priority);
+              addedCount++;
+            } catch (e) {}
+          }
+          await sock.sendMessage(from, { text: `✅ *${addedCount}* manga bölümü başarıyla sıraya eklendi!\nKuyruk durumu için: \`!kuyruk\`` });
+          return;
+        } else {
+          await sock.sendMessage(from, { text: `⚠️ Belirtilen aralıkta (${startEp} - ${endEp === Infinity ? 'Son' : endEp}) bölüm bulunamadı.` });
+          return;
+        }
+      }
+
       if (urls[0].includes('animecix') || urls[0].includes('ecchicix')) {
         const epInfo = parseAnimecixEpisodeInfo(urls[0]);
         if (epInfo) {
@@ -583,13 +642,13 @@ export default {
         }
 
         if (isMultiSeason && seasons && seasons.length > 1) {
-          pendingSelections[from] = {
+          setPendingSelection(from, {
             type: 'multi_season',
             seriesName: animeName,
             seasons: seasons,
             allEpisodes: episodes,
             priority: priority
-          };
+          });
 
           let prompt = `🎬 *${animeName}* animesi algılandı!\n` +
             `✨ Toplam *${seasons.length}* sezon bulundu:\n\n`;
@@ -613,12 +672,12 @@ export default {
           return;
         }
 
-        pendingSelections[from] = {
+        setPendingSelection(from, {
           type: 'series',
           seriesName: animeName,
           episodes: episodes,
           priority: priority
-        };
+        });
 
         let seasonPrompt = `🎬 *${animeName}* dizisi algılandı!\n📦 Toplam *${episodes.length}* hazır bölüm bulundu.\n\n` +
           `Lütfen indirmek istediğiniz seçeneği yazın:\n\n` +
