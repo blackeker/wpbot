@@ -85,12 +85,14 @@ export default {
       return;
     }
 
-    // Check if arguments specify an episode range (e.g. `!indir <url> 10 15`, `!indir <url> 10-15`, `!indir <url> 50+`, `!indir <url> 50 son`)
+    // Check if arguments specify an episode range (e.g. `!indir <url> 10 15`, `!indir <url> 10-15`, `!indir <url> 50+`, `!indir <url> 50 son`, `!indir <url_230> 244`)
     let numRange = null;
     const nonUrlParts = parts.filter(p => !p.startsWith('http://') && !p.startsWith('https://') && !p.startsWith('magnet:') && !p.startsWith('!') && !p.startsWith('--'));
     const joinedNonUrls = nonUrlParts.join(' ').trim();
     const rangeMatch = joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s*[-to–—]\s*(\d+(?:\.\d+)?)$/i) || joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
     const plusMatch = joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s*(?:\+|son|sonrasi|sonrası|-)$/i);
+    const singleNumMatch = joinedNonUrls.match(/^(\d+(?:\.\d+)?)$/);
+
     if (rangeMatch) {
       numRange = {
         start: parseFloat(rangeMatch[1]),
@@ -101,10 +103,25 @@ export default {
         start: parseFloat(plusMatch[1]),
         end: Infinity
       };
+    } else if (singleNumMatch && urls.length === 1) {
+      const targetNum = parseFloat(singleNumMatch[1]);
+      const urlEpMatch = urls[0].match(/(?:bolum|bölüm|episode|chapter|sezon-\d+-bolum)[/-](\d+(?:\.\d+)?)/i);
+      if (urlEpMatch) {
+        const urlNum = parseFloat(urlEpMatch[1]);
+        numRange = {
+          start: Math.min(urlNum, targetNum),
+          end: Math.max(urlNum, targetNum)
+        };
+      } else {
+        numRange = {
+          start: targetNum,
+          end: Infinity
+        };
+      }
     }
 
     const supportedDomains = [
-      'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm',
+      'hdfilmcehennemi', 'animecix', 'ecchicix', 'hentaizm', 'mangaportali', 'mangadenizi', 'mangatr', 'asurascans', 'webtoontr', 'merlinscans',
       'youtube.com', 'youtu.be', 'pornhub.com', 'doeda', 'hdabla', 'hdkore',
       'turkifsahub', 'turkifsalar', 'turkporno', 'cloud.mail.ru', 'cloidmail.ru', 'instagram.com',
       'tiktok.com', 'disk.yandex', 'yadi.sk', 'drive.google.com', 'mega.nz', 'yabancidizi', 'sezonlukdizi', 'terabox.com', 'teraboxapp.com', 'nephobox.com', 'liteapks.com', 'modyolo.com', 'koreanturk', 'koreanizm', 'dizigom', 'dizibox', 'dizipal', 'filmmodu', 'fullhdfilmizlesene', 'dramadizilerim', 'filmmakinesi'
@@ -571,8 +588,9 @@ export default {
     const isDiziSitesiUrl = singleUrl.includes('dizigom') || singleUrl.includes('dizibox') || singleUrl.includes('koreanturk') || singleUrl.includes('koreanizm') || singleUrl.includes('dizipal') || singleUrl.includes('filmmodu') || singleUrl.includes('fullhdfilmizlesene') || singleUrl.includes('filmmakinesi');
     const isDramadizilerim = singleUrl.includes('dramadizilerim.com');
     const isTorrentUrl = singleUrl.startsWith('magnet:') || singleUrl.toLowerCase().includes('.torrent');
+    const isMangaUrl = /mangaportali|mangadenizi|mangatr|asurascans|asuracomic|webtoontr|merlinscans|merlintoon/i.test(singleUrl);
 
-    if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl && !isLiteapksUrl && !isModyoloUrl && !isDiziSitesiUrl && !isTorrentUrl && !isDramadizilerim) {
+    if (!singleUrl.includes('hdfilmcehennemi') && !isAnimecix && !isYouTubeUrl && !isHentaizm && !isPornhub && !isDoeda && !isHdabla && !isHdkore && !isTurkifsahub && !isTurkifsalar && !isTurkporno && !isCloudMailRu && !isInstagramUrl && !isTikTokUrl && !isYandexUrl && !isGDriveUrl && !isMegaUrl && !isYabancidiziUrl && !isSezonlukdiziUrl && !isTeraboxUrl && !isLiteapksUrl && !isModyoloUrl && !isDiziSitesiUrl && !isTorrentUrl && !isDramadizilerim && !isMangaUrl) {
       await sock.sendMessage(from, { text: 'Lütfen geçerli bir desteklenen medya linki gönderin.' });
       return;
     }
