@@ -1,13 +1,6 @@
 import axios from 'axios';
 import { pendingSelections } from '../../queue.js';
-
-// Perchance AI API Endpoints (Local or Remote VPS)
-const PERCHANCE_API_LIST = [
-  'http://127.0.0.1:8000',
-  process.env.PERCHANCE_AI_API,
-  process.env.AI_IMAGE_API,
-  'http://localhost:8000'
-].filter(Boolean);
+import { readConfig } from '../../config.js';
 
 // Core 10 Styles Definition
 export const STYLE_MAP = {
@@ -26,7 +19,6 @@ export const STYLE_MAP = {
     name: 'Anime & Manga',
     icon: '🌸',
     perchanceStyle: 'anime',
-    pollinationsModel: 'flux-anime',
     negative: 'lowres, bad anatomy, bad hands, blurry, worst quality, low quality, distorted',
     tags: 'masterpiece, best quality, ultra-detailed anime art, vibrant anime aesthetic, sharp focus'
   },
@@ -34,7 +26,6 @@ export const STYLE_MAP = {
     name: 'Fotogerçekçi Portre (8K)',
     icon: '📸',
     perchanceStyle: 'photorealistic',
-    pollinationsModel: 'flux-realism',
     negative: 'anime, drawing, cartoon, 3d, render, illustration, bad anatomy, blurry, low quality',
     tags: 'photorealistic portrait, 8k raw photo, highly detailed skin texture, 35mm lens, depth of field, studio lighting, award winning'
   },
@@ -42,7 +33,6 @@ export const STYLE_MAP = {
     name: 'Sinematik Film Sahnesi',
     icon: '🎬',
     perchanceStyle: 'cinematic',
-    pollinationsModel: 'flux-cablyai',
     negative: 'anime, cartoon, drawing, painting, bad quality, blurry',
     tags: 'cinematic film still, 35mm movie scene, realistic atmospheric lighting, color graded masterpiece, 8k raw'
   },
@@ -50,7 +40,6 @@ export const STYLE_MAP = {
     name: 'Modern Dijital Çizim',
     icon: '🎨',
     perchanceStyle: 'digital art',
-    pollinationsModel: 'flux',
     negative: 'photo, realistic, bad drawing, blurry, low quality',
     tags: 'modern digital art illustration, clean lines, vibrant colors, trending on artstation'
   },
@@ -58,7 +47,6 @@ export const STYLE_MAP = {
     name: 'Neon Siberpunk & Gelecek',
     icon: '🌃',
     perchanceStyle: 'cyberpunk',
-    pollinationsModel: 'flux',
     negative: 'lowres, bad anatomy, blurry, worst quality, low quality, oversaturated',
     tags: 'cyberpunk aesthetic, neon lighting, futuristic sci-fi, dark rainy high-tech city, volumetric lighting, 8k'
   },
@@ -66,7 +54,6 @@ export const STYLE_MAP = {
     name: 'Klasik Yağlı Boya Tablo',
     icon: '🖼️',
     perchanceStyle: 'oil painting',
-    pollinationsModel: 'flux',
     negative: 'photo, 3d render, digital, bad art, low quality',
     tags: 'renaissance classical oil painting on canvas, artistic textured brushstrokes, fine art masterpiece'
   },
@@ -74,7 +61,6 @@ export const STYLE_MAP = {
     name: 'Büyülü Fantastik & RPG',
     icon: '🧙‍♂️',
     perchanceStyle: 'fantasy',
-    pollinationsModel: 'flux',
     negative: 'low quality, modern, car, blurry, bad anatomy, lowres',
     tags: 'epic high fantasy digital art, mythical, magical glowing atmosphere, detailed concept art, cinematic lighting'
   },
@@ -82,7 +68,6 @@ export const STYLE_MAP = {
     name: '3D Disney / Pixar & Octane',
     icon: '👾',
     perchanceStyle: '3D render',
-    pollinationsModel: 'flux-3d',
     negative: 'flat, 2d, sketch, painting, bad render, blurry, distorted',
     tags: 'cute 3d render, pixar disney animation style, octane render, vivid colors, smooth surfaces, raytracing 4k'
   },
@@ -90,7 +75,6 @@ export const STYLE_MAP = {
     name: '16-Bit Retro Pixel Art',
     icon: '🕹️',
     perchanceStyle: 'digital art',
-    pollinationsModel: 'flux',
     negative: 'photorealistic, 3d, modern render, blurry, smooth, gradient',
     tags: '16-bit pixel art, retro gaming aesthetic, vibrant pixelated details, snes arcade pixel masterpiece'
   },
@@ -98,7 +82,6 @@ export const STYLE_MAP = {
     name: 'NSFW & Hentai (Uncensored)',
     icon: '🔞',
     perchanceStyle: 'anime',
-    pollinationsModel: 'flux-anime',
     negative: 'lowres, bad anatomy, bad hands, blurry, worst quality, low quality, censored, mosaic',
     tags: 'masterpiece, best quality, ultra-detailed, uncensored, expressive, vibrant lighting'
   }
@@ -167,44 +150,30 @@ Lütfen görsel boyutunu seçin:
 }
 
 /**
- * Generates an image using Pollinations AI (FLUX.1), Perchance AI API, or Stable Horde.
+ * Generates an image exclusively using Perchance AI API.
  */
 export async function executeAiDraw(prompt, styleObj, shape = 'square') {
   let shapeLabel = '1:1 Kare';
-  let width = 1024, height = 1024;
   if (shape === 'portrait') {
     shapeLabel = '9:16 Dikey';
-    width = 576;
-    height = 1024;
   } else if (shape === 'landscape') {
     shapeLabel = '16:9 Yatay';
-    width = 1024;
-    height = 576;
   }
 
   const rawPrompt = prompt ? prompt.trim() : '';
+  const config = readConfig();
 
-  // 1. Primary: Pollinations AI FLUX.1 (High-Definition, Fast & Anatomically Superior)
-  try {
-    const startTime = Date.now();
-    const model = styleObj.pollinationsModel || (styleObj.perchanceStyle === 'anime' ? 'flux-anime' : 'flux');
-    const enrichedPrompt = styleObj.tags ? `${rawPrompt}, ${styleObj.tags}` : rawPrompt;
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(enrichedPrompt)}?width=${width}&height=${height}&model=${model}&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
+  // Candidate Perchance endpoints
+  const candidateEndpoints = [
+    config?.perchanceAiApi,
+    process.env.PERCHANCE_AI_API,
+    'http://127.0.0.1:8000',
+    'http://localhost:8000'
+  ].filter(Boolean);
 
-    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 35000 });
-    if (res.status === 200 && res.data && res.data.length > 1000) {
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      return { 
-        buffer: Buffer.from(res.data), 
-        engine: `FLUX.1 (${model})`, 
-        elapsed, 
-        shapeLabel
-      };
-    }
-  } catch (err) {}
+  const endpoints = [...new Set(candidateEndpoints)];
 
-  // 2. Fallback: Perchance AI API (Local or Remote)
-  for (const baseUrl of PERCHANCE_API_LIST) {
+  for (const baseUrl of endpoints) {
     try {
       const startTime = Date.now();
       const payload = {
@@ -216,9 +185,10 @@ export async function executeAiDraw(prompt, styleObj, shape = 'square') {
         response_format: 'url'
       };
 
-      const res = await axios.post(`${baseUrl}/generate`, payload, {
+      const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+      const res = await axios.post(`${cleanBaseUrl}/generate`, payload, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 45000
+        timeout: 90000
       });
 
       if (res.data && res.data.data && res.data.data[0]) {
@@ -228,8 +198,8 @@ export async function executeAiDraw(prompt, styleObj, shape = 'square') {
         if (item.b64_json) {
           buffer = Buffer.from(item.b64_json, 'base64');
         } else if (item.url) {
-          const imgUrl = item.url.startsWith('http') ? item.url : `${baseUrl}${item.url}`;
-          const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 25000 });
+          const imgUrl = item.url.startsWith('http') ? item.url : `${cleanBaseUrl}${item.url}`;
+          const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 35000 });
           buffer = Buffer.from(imgRes.data);
         }
 
@@ -237,76 +207,16 @@ export async function executeAiDraw(prompt, styleObj, shape = 'square') {
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
           return { 
             buffer, 
-            engine: `Perchance AI (${styleObj.perchanceStyle})`, 
+            engine: `Perchance AI (${styleObj.perchanceStyle || 'anime'})`, 
             elapsed, 
             shapeLabel
           };
         }
       }
-    } catch (err) {}
-  }
-
-  // 3. Fallback: Stable Horde SDXL
-  try {
-    const startTime = Date.now();
-    let hordeWidth = 768, hordeHeight = 512;
-    if (shape === 'portrait') { hordeWidth = 512; hordeHeight = 768; }
-    else if (shape === 'square') { hordeWidth = 512; hordeHeight = 512; }
-
-    const fullPrompt = styleObj.tags 
-      ? `${rawPrompt}, ${styleObj.tags} ### ${styleObj.negative || 'lowres, bad quality, bad anatomy'}` 
-      : `${rawPrompt} ### lowres, bad quality, bad anatomy`;
-
-    const payload = {
-      prompt: fullPrompt,
-      params: { sampler_name: 'k_euler_a', cfg_scale: 7.5, width: hordeWidth, height: hordeHeight, steps: 20, n: 1 },
-      models: ['Animagine XL', 'Dreamshaper', 'Deliberate', 'Anything Diffusion'],
-      nsfw: true,
-      censor_nsfw: false,
-      shared: true
-    };
-
-    const res = await axios.post('https://aihorde.net/api/v2/generate/async', payload, {
-      headers: { 'apikey': '0000000000', 'Client-Agent': 'wpbot:1.0' },
-      timeout: 15000
-    });
-
-    const reqId = res.data?.id;
-    if (reqId) {
-      while (Date.now() - startTime < 60000) {
-        await new Promise(r => setTimeout(r, 2500));
-        const check = await axios.get(`https://aihorde.net/api/v2/generate/check/${reqId}`, {
-          headers: { 'apikey': '0000000000', 'Client-Agent': 'wpbot:1.0' },
-          timeout: 10000
-        });
-
-        if (check.data?.done) {
-          const statusRes = await axios.get(`https://aihorde.net/api/v2/generate/status/${reqId}`, {
-            headers: { 'apikey': '0000000000', 'Client-Agent': 'wpbot:1.0' },
-            timeout: 15000
-          });
-
-          const gen = statusRes.data?.generations?.[0];
-          if (gen && gen.img) {
-            let buffer;
-            if (gen.img.startsWith('http')) {
-              const imgDl = await axios.get(gen.img, { responseType: 'arraybuffer', timeout: 20000 });
-              buffer = Buffer.from(imgDl.data);
-            } else {
-              buffer = Buffer.from(gen.img, 'base64');
-            }
-            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-            return { 
-              buffer, 
-              engine: `Stable Horde (${gen.model || 'SDXL'})`, 
-              elapsed, 
-              shapeLabel
-            };
-          }
-        }
-      }
+    } catch (err) {
+      console.error(`[Perchance AI] Error calling ${baseUrl}:`, err.message);
     }
-  } catch (err) {}
+  }
 
   return null;
 }
