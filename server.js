@@ -282,6 +282,42 @@ app.post('/api/indir', (req, res) => {
   }
 });
 
+app.post('/api/send-message', async (req, res) => {
+  const { jid, text, documentPath, fileName, mimetype } = req.body;
+  if (!jid) return res.status(400).json({ error: 'jid gereklidir.' });
+
+  try {
+    const sock = botSocketRef.current;
+    if (!sock) return res.status(503).json({ error: 'WhatsApp bot bağlı değil.' });
+
+    let cleanJid = jid.trim();
+    if (!cleanJid.includes('@')) {
+      const num = cleanJid.replace(/[^0-9]/g, '');
+      cleanJid = `${num}@s.whatsapp.net`;
+    }
+
+    if (documentPath && fs.existsSync(documentPath)) {
+      const stream = fs.createReadStream(documentPath);
+      await sock.sendMessage(cleanJid, {
+        document: { stream },
+        mimetype: mimetype || 'application/pdf',
+        fileName: fileName || path.basename(documentPath),
+        caption: text || undefined
+      });
+      return res.json({ ok: true, message: 'Doküman başarıyla gönderildi.' });
+    }
+
+    if (text) {
+      await sock.sendMessage(cleanJid, { text });
+      return res.json({ ok: true, message: 'Mesaj başarıyla gönderildi.' });
+    }
+
+    res.status(400).json({ error: 'text veya documentPath gereklidir.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/kuyruk-temizle', (req, res) => {
   const count = clearQueue();
   res.json({ ok: true, message: `${count} görev silindi.` });

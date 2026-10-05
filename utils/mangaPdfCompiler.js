@@ -49,9 +49,9 @@ export async function compileMangaPagesToPdf(imageUrls, title, options = {}) {
 
       let rawBuffer = Buffer.from(response.data);
 
-      // Convert any format (WebP, GIF, BMP, etc.) to PNG buffer via sharp for PDFKit compatibility
-      const pngBuffer = await sharp(rawBuffer).png().toBuffer();
-      const img = doc.openImage(pngBuffer);
+      // Convert any format (WebP, GIF, BMP, etc.) to JPEG buffer via sharp for PDFKit compatibility and 8-10x smaller file size
+      const imgBuffer = await sharp(rawBuffer).jpeg({ quality: 80, mozjpeg: true }).toBuffer();
+      const img = doc.openImage(imgBuffer);
 
       doc.addPage({ size: [img.width, img.height] });
       doc.image(img, 0, 0, { width: img.width, height: img.height });
