@@ -494,45 +494,172 @@ app.post('/api/hentai/queue-bulk', async (req, res) => {
   }
 });
 
-// Media Vault: List Files
+// File Explorer: Helper to categorize file types
+function getFileCategory(ext) {
+  ext = (ext || '').toLowerCase();
+  if (ext === '.pdf') return 'pdf';
+  if (['.mp4', '.mkv', '.webm', '.ts', '.avi', '.mov', '.flv'].includes(ext)) return 'video';
+  if (['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac', '.opus'].includes(ext)) return 'audio';
+  if (['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz'].includes(ext)) return 'archive';
+  if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.bmp'].includes(ext)) return 'image';
+  return 'other';
+}
+
+// File Explorer: List All Files
 app.get('/api/files', (req, res) => {
   try {
     if (!fs.existsSync(downloadsDir)) {
       fs.mkdirSync(downloadsDir, { recursive: true });
     }
-    const files = fs.readdirSync(downloadsDir).filter(f => f.endsWith('.mp4') || f.endsWith('.ts') || f.endsWith('.zip'));
-    const fileList = files.map(name => {
-      const filePath = path.join(downloadsDir, name);
-      const stats = fs.statSync(filePath);
-      return {
-        name,
-        sizeBytes: stats.size,
-        sizeFormatted: formatBytes(stats.size),
-        dateFormatted: stats.mtime.toLocaleString('tr-TR'),
-        downloadUrl: `/downloads/${encodeURIComponent(name)}`
-      };
+    const allEntries = fs.readdirSync(downloadsDir);
+    let totalBytes = 0;
+    const fileList = [];
+
+    for (const name of allEntries) {
+      if (name.startsWith('.') || name.endsWith('.tmp') || name.endsWith('.part')) continue;
+      try {
+        const filePath = path.join(downloadsDir, name);
+        const stats = fs.statSync(filePath);
+        if (!stats.isFile()) continue;
+
+        totalBytes += stats.size;
+        const ext = path.extname(name).toLowerCase();
+        fileList.push({
+          name,
+          ext,
+          category: getFileCategory(ext),
+          size: stats.size,
+          sizeBytes: stats.size,
+          sizeFormatted: formatBytes(stats.size),
+          mtime: stats.mtime.toISOString(),
+          dateFormatted: stats.mtime.toLocaleString('tr-TR'),
+          downloadUrl: `/downloads/${encodeURIComponent(name)}`
+        });
+      } catch (e) {}
+    }
+
+    // Sort by mtime descending (newest first)
+    fileList.sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
+
+    res.json({
+      success: true,
+      files: fileList,
+      totalCount: fileList.length,
+      totalBytes,
+      totalBytesFormatted: formatBytes(totalBytes)
     });
-    res.json({ success: true, files: fileList });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Media Vault: Delete File
+// File Explorer: Rename File
+app.post('/api/files/rename', (req, res) => {
+  const { oldName, newName } = req.body;
+  if (!oldName || !newName) {
+    return res.status(400).json({ success: false, error: 'Eski ve yeni dosya adı gereklidir.' });
+  }
+  try {
+    const safeOld = path.basename(oldName);
+    let safeNew = path.basename(newName);
+
+    if (!path.extname(safeNew) && path.extname(safeOld)) {
+      safeNew += path.extname(safeOld);
+    }
+
+    const oldPath = path.join(downloadsDir, safeOld);
+    const newPath = path.join(downloadsDir, safeNew);
+
+    if (!fs.existsSync(oldPath)) {
+      return res.status(404).json({ success: false, error: 'Dosya bulunamadı.' });
+    }
+    if (fs.existsSync(newPath) && safeOld !== safeNew) {
+      return res.status(400).json({ success: false, error: 'Bu isimde bir dosya zaten mevcut.' });
+    }
+
+    fs.renameSync(oldPath, newPath);
+    res.json({
+      success: true,
+      message: 'Dosya başarıyla yeniden adlandırıldı.',
+      newName: safeNew
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// File Explorer: Delete File(s)
 app.post('/api/files/delete', (req, res) => {
-  const { filename } = req.body;
-  if (!filename) return res.status(400).json({ error: 'filename parametresi gerekli.' });
+  const { filename, filenames } = req.body;
+  const filesToDelete = [];
+  if (filename) filesToDelete.push(filename);
+  if (Array.isArray(filenames)) filesToDelete.push(...filenames);
+
+  if (filesToDelete.length === 0) {
+    return res.status(400).json({ success: false, error: 'Silinecek dosya belirtilmedi.' });
+  }
+
+  let deletedCount = 0;
+  try {
+    for (const f of filesToDelete) {
+      const safeFile = path.basename(f);
+      const filePath = path.join(downloadsDir, safeFile);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        deletedCount++;
+      }
+    }
+    res.json({ success: true, message: `${deletedCount} dosya silindi.`, deletedCount });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// File Explorer: Send File directly to WhatsApp
+app.post('/api/files/send-wa', async (req, res) => {
+  const { filename, phone, caption } = req.body;
+  if (!filename) return res.status(400).json({ success: false, error: 'filename parametresi gereklidir.' });
+  if (!botSocketRef.current) {
+    return res.status(400).json({ success: false, error: 'WhatsApp bot bağlantısı aktif değil.' });
+  }
+
   try {
     const safeFile = path.basename(filename);
     const filePath = path.join(downloadsDir, safeFile);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      res.json({ success: true, message: 'Dosya silindi.' });
-    } else {
-      res.status(404).json({ error: 'Dosya bulunamadı.' });
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Dosya bulunamadı.' });
     }
+
+    const config = readConfig();
+    let num = (phone || config.adminNumber || '05332624732').replace(/[^0-9]/g, '');
+    if (num.startsWith('0')) num = '9' + num;
+    if (num.length < 10) {
+      return res.status(400).json({ success: false, error: 'Geçersiz telefon numarası.' });
+    }
+    const targetJid = `${num}@s.whatsapp.net`;
+
+    const ext = path.extname(safeFile).toLowerCase();
+    let mime = 'application/octet-stream';
+    if (ext === '.pdf') mime = 'application/pdf';
+    else if (ext === '.mp4') mime = 'video/mp4';
+    else if (ext === '.mp3') mime = 'audio/mpeg';
+    else if (ext === '.zip') mime = 'application/zip';
+
+    await queueMediaSend(targetJid, () => {
+      return {
+        document: fs.readFileSync(filePath),
+        mimetype: mime,
+        fileName: safeFile,
+        caption: caption || `📁 ${safeFile}`
+      };
+    });
+
+    res.json({
+      success: true,
+      message: `"${safeFile}" WhatsApp üzerinden ${num} numarasına gönderim kuyruğuna alındı.`
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -558,6 +685,20 @@ app.post('/api/indir/prioritize', (req, res) => {
   } else {
     res.status(404).json({ error: 'Görev bulunamadı.' });
   }
+});
+
+// Queue: Task Details
+app.get('/api/indir/task/:id', (req, res) => {
+  const { id } = req.params;
+  const active = activeTasksList.find(t => String(t.id) === String(id));
+  if (active) {
+    return res.json({ success: true, task: formatTaskPayload(active, true) });
+  }
+  const queued = downloadQueue.find(t => String(t.id) === String(id));
+  if (queued) {
+    return res.json({ success: true, task: formatTaskPayload(queued, false) });
+  }
+  return res.status(404).json({ success: false, error: 'Görev bulunamadı.' });
 });
 
 // Diagnostics & System Health
@@ -1310,6 +1451,47 @@ export function notifyStatusUpdate() {
   }
 }
 
+export function formatTaskPayload(t, isActive = false) {
+  let source = 'Genel Web';
+  const url = (t.url || '').toLowerCase();
+  if (url.includes('youtube.com') || url.includes('youtu.be')) source = 'YouTube';
+  else if (url.includes('mangaportali.com')) source = 'MangaPortalı';
+  else if (url.includes('hentaizm.fun') || url.includes('hentaizm')) source = 'HentaiZM';
+  else if (url.includes('animecix.net')) source = 'Animecix';
+  else if (url.includes('hdfilmcehennemi')) source = 'HDFilmCehennemi';
+  else if (url.includes('hdkore')) source = 'HDKore';
+  else if (url.includes('sezonlukdizi')) source = 'SezonlukDizi';
+  else if (url.includes('pornhub')) source = 'Pornhub';
+  else if (url.includes('magnet:') || url.endsWith('.torrent')) source = 'Torrent';
+
+  let recipientFormatted = t.recipientJid || 'Bilinmiyor';
+  if (recipientFormatted.includes('@')) {
+    recipientFormatted = recipientFormatted.split('@')[0];
+  }
+
+  return {
+    id: t.id,
+    title: t.title || 'İndirme Görevi',
+    url: t.url,
+    source,
+    recipientJid: t.recipientJid,
+    recipientFormatted,
+    status: t.status,
+    statusText: t.statusText || (isActive ? (t.status || 'İşleniyor...') : 'Kuyrukta bekliyor'),
+    speed: t.speed || null,
+    sizeMB: t.sizeMB || null,
+    priority: !!t.priority,
+    format: t.format || null,
+    addedTime: t.addedTime ? new Date(t.addedTime).toISOString() : null,
+    startTime: t.startTime ? new Date(t.startTime).toISOString() : null,
+    episodeBatch: t.episodeBatch || null,
+    seriesPack: t.seriesPack || null,
+    audioTrack: t.audioTrack || null,
+    burnSubtitles: !!t.burnSubtitles,
+    isActive
+  };
+}
+
 export function setupWebSocketServer(httpServer) {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   const clients = new Set();
@@ -1332,18 +1514,8 @@ export function setupWebSocketServer(httpServer) {
     ws.send(JSON.stringify({
       type: 'QUEUE_UPDATE',
       data: {
-        activeTasks: activeTasksList.map(t => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          speed: t.speed || '0.00'
-        })),
-        queue: downloadQueue.map(t => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          priority: t.priority
-        })),
+        activeTasks: activeTasksList.map(t => formatTaskPayload(t, true)),
+        queue: downloadQueue.map(t => formatTaskPayload(t, false)),
         sending: botState.sendingTasks
       }
     }));
@@ -1464,18 +1636,8 @@ export function startServer(PORT, startBotCallback) {
   setQueueUpdateCallback(() => {
     if (wsBroadcast) {
       wsBroadcast('QUEUE_UPDATE', {
-        activeTasks: activeTasksList.map(t => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          speed: t.speed || '0.00'
-        })),
-        queue: downloadQueue.map(t => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          priority: t.priority
-        })),
+        activeTasks: activeTasksList.map(t => formatTaskPayload(t, true)),
+        queue: downloadQueue.map(t => formatTaskPayload(t, false)),
         sending: botState.sendingTasks
       });
     }

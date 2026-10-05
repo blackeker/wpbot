@@ -439,6 +439,9 @@ export async function processQueue() {
           task.url, 
           from, 
           async (statusText) => {
+            if (typeof statusText === 'string') {
+              task.statusText = statusText.replace(/[*_~`]/g, '').trim();
+            }
             notifyQueueUpdate();
           }, 
           task.abortController.signal,
