@@ -42,16 +42,20 @@ export function isReplyDownloadTrigger(text, hasQuoted) {
   }
   const ltext = text.toLowerCase().trim();
 
-  // Single dot or dots
-  if (/^\.{1,3}$/.test(ltext)) return true;
+  // Multi-dots (.. or ...) are normal chat ellipses, NEVER trigger bot
+  if (/^\.{2,}$/.test(ltext)) return false;
 
-  // Starts with dot followed by command or args (e.g. ".indir", ". acil", ". 1-3", ".p")
+  // Single dot "." only triggers if quoting a message
+  if (ltext === '.') {
+    return Boolean(hasQuoted);
+  }
+
+  // Starts with dot followed by explicit command or args (e.g. ".indir", ". acil", ". 1-3", ".p")
   if (ltext.startsWith('.')) {
     const firstWord = ltext.split(/\s+/)[0];
-    if (firstWord === '.' || firstWord === '..' || firstWord === '...' || firstWord === '.indir' || firstWord === '.acil' || firstWord === '.p') {
+    if (firstWord === '.indir' || firstWord === '.acil' || firstWord === '.p' || firstWord === '.') {
       return true;
     }
-    // Any ". something"
     if (/^\.\s+/.test(ltext)) return true;
   }
 
@@ -75,9 +79,9 @@ export async function handleReplyDownload(sock, msg, from, text, ctx) {
   const quotedInfo = getQuotedMessage(msg);
   const ltext = text.toLowerCase().trim();
 
-  // If user sent a dot without quoting any message, show guidance
+  // If user sent a command without quoting any message, only show guidance for explicit .indir
   if (!quotedInfo || (!quotedInfo.quotedMsg && !quotedInfo.stanzaId)) {
-    if (/^\.{1,3}$/.test(ltext) || ltext === '.indir') {
+    if (ltext === '.indir') {
       await sock.sendMessage(from, {
         text: `💡 *Mesajı Yanıtlayarak İndirme:*\n` +
               `İndirmek istediğiniz bir linki, videoyu veya *hentaizmfav* anime afişini WhatsApp'ta *yanıtlayıp (alıntılayıp)* \`.\` yazarsanız bot otomatik olarak indirmeyi başlatır!\n\n` +
@@ -94,7 +98,7 @@ export async function handleReplyDownload(sock, msg, from, text, ctx) {
   const rawTokens = text.trim().split(/\s+/);
   const firstWord = rawTokens[0].toLowerCase();
 
-  if (['.', '..', '...', '.indir', '!indir', 'indir', 'indirhentai'].includes(firstWord)) {
+  if (['.', '.indir', '!indir', 'indir', 'indirhentai'].includes(firstWord)) {
     extraArgs = rawTokens.slice(1);
   } else if (firstWord.startsWith('.') && firstWord.length > 1) {
     extraArgs = [firstWord.slice(1), ...rawTokens.slice(1)];
@@ -159,11 +163,17 @@ export async function handleReplyDownload(sock, msg, from, text, ctx) {
     }
   }
 
-  // 5. If no target could be determined
-  await sock.sendMessage(from, {
-    text: `⚠️ Yanıtladığınız mesajda indirilebilir bir link, video veya Hentaizm anime afişi bulunamadı.\n\n` +
-          `💡 *Nasıl kullanılır?*\n` +
-          `• Bir anime afişini veya video linkini WhatsApp'ta *alıntılayıp/yanıtlayıp* \`.\` yazmanız yeterlidir.`
-  });
-  return true;
+  // 5. If no target could be determined:
+  // If the user just typed single dot '.', fail silently to avoid annoying chatter interruptions
+  const isExplicitCommand = ['indir', '!indir', '.indir'].includes(firstWord) || (firstWord === '.' && extraArgs.length > 0);
+  if (isExplicitCommand) {
+    await sock.sendMessage(from, {
+      text: `⚠️ Yanıtladığınız mesajda indirilebilir bir link, video veya Hentaizm anime afişi bulunamadı.\n\n` +
+            `💡 *Nasıl kullanılır?*\n` +
+            `• Bir anime afişini veya video linkini WhatsApp'ta *alıntılayıp/yanıtlayıp* \`.\` yazmanız yeterlidir.`
+    });
+    return true;
+  }
+
+  return false;
 }

@@ -42,9 +42,9 @@ const originalConsoleError = console.error.bind(console);
 console.error = (...args) => {
   const fullText = args.map(a => (typeof a === 'object' ? (a?.stack || a?.message || JSON.stringify(a)) : String(a))).join(' ');
   
-  // Auto-heal "Over 2000 messages into the future" libsignal ratchet desynchronization
-  if (fullText.includes('Over 2000 messages into the future') || fullText.includes('Failed to decrypt message with any known session')) {
-    const sessionMatch = fullText.match(/(?:at\s+|session-)(\d+\.\d+|\d+)/i);
+  // Auto-heal "Over 2000 messages into the future" and "Bad MAC" libsignal ratchet desynchronization
+  if (fullText.includes('Over 2000 messages into the future') || fullText.includes('Failed to decrypt message with any known session') || fullText.includes('Bad MAC')) {
+    const sessionMatch = fullText.match(/(?:at\s+|session-|async\s+)(\d+\.\d+|\d+)/i);
     if (sessionMatch) {
       const sessId = sessionMatch[1];
       const targetSession = path.join(sessionPath, `session-${sessId}.json`);

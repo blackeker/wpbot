@@ -998,19 +998,33 @@ app.post('/api/internal/send-media', async (req, res) => {
   try {
     const fileStats = fs.statSync(filePath);
     const resolvedFileName = fileName || path.basename(filePath);
-    const resolvedMimetype = mimetype || (resolvedFileName.endsWith('.mp4') ? 'video/mp4' : 'application/octet-stream');
+    const ext = path.extname(resolvedFileName).toLowerCase();
+    const isImg = ['.png', '.jpg', '.jpeg', '.webp'].includes(ext);
+    const isVid = ['.mp4', '.mkv', '.avi', '.webm', '.mov'].includes(ext);
+    const resolvedMimetype = mimetype || (isImg ? `image/${ext.replace('.', '')}` : (isVid ? 'video/mp4' : 'application/octet-stream'));
 
-    const messageContent = asDocument || fileStats.size > 100 * 1024 * 1024 ? {
-      document: { stream: fs.createReadStream(filePath) },
-      mimetype: resolvedMimetype,
-      fileName: resolvedFileName,
-      caption: caption || undefined
-    } : {
-      video: { stream: fs.createReadStream(filePath) },
-      mimetype: resolvedMimetype,
-      fileName: resolvedFileName,
-      caption: caption || undefined
-    };
+    let messageContent;
+    if (asDocument || fileStats.size > 100 * 1024 * 1024) {
+      messageContent = {
+        document: { stream: fs.createReadStream(filePath) },
+        mimetype: resolvedMimetype,
+        fileName: resolvedFileName,
+        caption: caption || undefined
+      };
+    } else if (isImg) {
+      messageContent = {
+        image: { stream: fs.createReadStream(filePath) },
+        mimetype: resolvedMimetype,
+        caption: caption || undefined
+      };
+    } else {
+      messageContent = {
+        video: { stream: fs.createReadStream(filePath) },
+        mimetype: resolvedMimetype,
+        fileName: resolvedFileName,
+        caption: caption || undefined
+      };
+    }
 
     const result = await queueMediaSend(recipientJid, messageContent);
     res.json({ ok: true, key: result?.key });

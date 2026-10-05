@@ -59,6 +59,15 @@ async function processSingleMessage(sock, msg) {
 
   if (sentMessageIds.has(msg.key?.id)) return;
 
+  // 1. Ignore old/buffered messages (older than 60 seconds) to prevent spamming after reconnecting
+  const nowSec = Math.floor(Date.now() / 1000);
+  const msgTimestamp = typeof msg.messageTimestamp === 'number'
+    ? msg.messageTimestamp
+    : (msg.messageTimestamp?.low || Number(msg.messageTimestamp) || 0);
+  if (msgTimestamp > 0 && (nowSec - msgTimestamp) > 60) {
+    return;
+  }
+
   const from = msg.key.remoteJid;
   const config = readConfig();
 
@@ -79,8 +88,6 @@ async function processSingleMessage(sock, msg) {
 
   console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}"`);
 
-
-
   const prefixes = ['!', '/', '.'];
   const matchedPrefix = prefixes.find(p => text.startsWith(p));
   const hasPrefix = Boolean(matchedPrefix);
@@ -89,6 +96,10 @@ async function processSingleMessage(sock, msg) {
   if (msg.key.fromMe) {
     const isDlLink = text.startsWith('http://') || text.startsWith('https://') || text.startsWith('magnet:') || text.toLowerCase().includes('.torrent');
     if (!hasPrefix && !isDlLink) {
+      return;
+    }
+    // Ignore casual dots or multi-dots sent from self
+    if (/^\.{1,}$/.test(ltext)) {
       return;
     }
     if (config.groupJid && from !== config.groupJid) {
@@ -161,9 +172,18 @@ async function processSingleMessage(sock, msg) {
   // 0. Pending Quality Selection / Interactive Flow Handler
   if (pendingSelections[from]) {
     const selection = pendingSelections[from];
-    
-    // --- Yapay Zeka Görsel Üretimi Adım Adım Sihirbazı (Prompt -> Kategori -> Boyut) ---
-    if (selection.type === 'ciz_flow') {
+    const selectionTime = selection.createdAt || selection.timestamp || 0;
+
+    // Auto-expire after 60 seconds of inactivity
+    if (selectionTime && (Date.now() - selectionTime > 60000)) {
+      delete pendingSelections[from];
+    } else {
+      const selectionSender = selection.sender || selection.initiator;
+      const isAuthorizedSender = !isGroupChat || !selectionSender || selectionSender === sender || isOwner;
+
+      if (isAuthorizedSender) {
+        // --- Yapay Zeka Görsel Üretimi Adım Adım Sihirbazı (Prompt -> Kategori -> Boyut) ---
+        if (selection.type === 'ciz_flow') {
       const input = text.trim().toLowerCase();
 
       if (input === 'iptal' || input === 'vazgeç' || input === 'cancel') {
@@ -224,7 +244,7 @@ async function processSingleMessage(sock, msg) {
             return;
           }
 
-          let caption = `✨ *Görsel Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${shapeLabel}\n⚡ (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+          let caption = `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${result.shapeLabel || shapeLabel}\n⚡ *Motor:* ${result.engine || 'AI'} (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
 
           await sock.sendMessage(from, {
             image: result.buffer,
@@ -636,54 +656,68 @@ async function processSingleMessage(sock, msg) {
         return;
       }
     }
+      }
+    }
   }
 
   // 0.5. Hentaizm Auto-Login Captcha Handler
   if (pendingHentaizmLogins[from]) {
-    const captchaText = text.trim();
     const loginState = pendingHentaizmLogins[from];
-    delete pendingHentaizmLogins[from];
+    const loginTime = loginState.createdAt || 0;
 
-    await sock.sendMessage(from, { text: `⏳ Güvenlik kodu gönderiliyor, lütfen bekle...` });
+    // Auto-expire captcha after 90 seconds
+    if (loginTime && (Date.now() - loginTime > 90000)) {
+      delete pendingHentaizmLogins[from];
+    } else {
+      const loginSender = loginState.sender || loginState.initiator;
+      const isAuthorizedSender = !isGroupChat || !loginSender || loginSender === sender || isOwner;
 
-    try {
-      const gotScrapingModule = await import('got-scraping');
-      const baseUrl = loginState.baseUrl || 'https://www.hentaizm2.com';
-      
-      const loginRes = await gotScrapingModule.gotScraping.post({
-        url: `${baseUrl}/login.php`,
-        cookieJar: loginState.cookieJar,
-        form: {
-          username: process.env.HENTAIZM_USERNAME || "blackeker@gmail.com",
-          password: process.env.HENTAIZM_PASSWORD || "Yusufcuk1.",
-          remember_me: "1",
-          captcha: captchaText,
-          login: "Giriş"
-        },
-        followRedirect: true,
-        headerGeneratorOptions: {
-          devices: ['desktop'],
-          locales: ['tr-TR', 'en-US'],
-          operatingSystems: ['windows']
-        }
-      });
+      if (isAuthorizedSender) {
+        const captchaText = text.trim();
+        delete pendingHentaizmLogins[from];
 
-      const cookies = loginState.cookieJar.getCookieStringSync(`${baseUrl}/`);
-      const isLogged = cookies.includes('wordpress_logged_in') || loginRes.body.includes('Profil') || loginRes.body.includes('Çıkış');
+        await sock.sendMessage(from, { text: `⏳ Güvenlik kodu gönderiliyor, lütfen bekle...` });
 
-      if (isLogged) {
-        writeConfig({ hentaizmCookies: loginState.cookieJar.toJSON() });
-        await sock.sendMessage(from, { text: "✅ Hentaizm girişi başarılı! Şimdi linki tekrar gönderebilirsin." });
         try {
-          if (fs.existsSync(loginState.captchaPath)) fs.unlinkSync(loginState.captchaPath);
-        } catch (e) {}
-      } else {
-        await sock.sendMessage(from, { text: `❌ Güvenlik kodu yanlış. Linki tekrar gönder, yeni bir kod üreteyim.` });
+          const gotScrapingModule = await import('got-scraping');
+          const baseUrl = loginState.baseUrl || 'https://www.hentaizm2.com';
+          
+          const loginRes = await gotScrapingModule.gotScraping.post({
+            url: `${baseUrl}/login.php`,
+            cookieJar: loginState.cookieJar,
+            form: {
+              username: process.env.HENTAIZM_USERNAME || "blackeker@gmail.com",
+              password: process.env.HENTAIZM_PASSWORD || "Yusufcuk1.",
+              remember_me: "1",
+              captcha: captchaText,
+              login: "Giriş"
+            },
+            followRedirect: true,
+            headerGeneratorOptions: {
+              devices: ['desktop'],
+              locales: ['tr-TR', 'en-US'],
+              operatingSystems: ['windows']
+            }
+          });
+
+          const cookies = loginState.cookieJar.getCookieStringSync(`${baseUrl}/`);
+          const isLogged = cookies.includes('wordpress_logged_in') || loginRes.body.includes('Profil') || loginRes.body.includes('Çıkış');
+
+          if (isLogged) {
+            writeConfig({ hentaizmCookies: loginState.cookieJar.toJSON() });
+            await sock.sendMessage(from, { text: "✅ Hentaizm girişi başarılı! Şimdi linki tekrar gönderebilirsin." });
+            try {
+              if (fs.existsSync(loginState.captchaPath)) fs.unlinkSync(loginState.captchaPath);
+            } catch (e) {}
+          } else {
+            await sock.sendMessage(from, { text: `❌ Güvenlik kodu yanlış. Linki tekrar gönder, yeni bir kod üreteyim.` });
+          }
+        } catch (err) {
+          await sock.sendMessage(from, { text: `❌ Giriş sırasında hata oluştu: ${err.message}` });
+        }
+        return;
       }
-    } catch (err) {
-      await sock.sendMessage(from, { text: `❌ Giriş sırasında hata oluştu: ${err.message}` });
     }
-    return;
   }
 
   // Quoted / Reply-to-download Handler (e.g. replying to an anime poster or link with "." or ". acil")

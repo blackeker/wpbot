@@ -167,20 +167,49 @@ Lütfen görsel boyutunu seçin:
 }
 
 /**
- * Generates an image using Perchance AI API, Pollinations AI, or Stable Horde.
+ * Generates an image using Pollinations AI (FLUX.1), Perchance AI API, or Stable Horde.
  */
 export async function executeAiDraw(prompt, styleObj, shape = 'square') {
   let shapeLabel = '1:1 Kare';
-  if (shape === 'portrait') shapeLabel = '9:16 Dikey';
-  if (shape === 'landscape') shapeLabel = '16:9 Yatay';
+  let width = 1024, height = 1024;
+  if (shape === 'portrait') {
+    shapeLabel = '9:16 Dikey';
+    width = 576;
+    height = 1024;
+  } else if (shape === 'landscape') {
+    shapeLabel = '16:9 Yatay';
+    width = 1024;
+    height = 576;
+  }
 
-  // 1. Perchance AI API
+  const rawPrompt = prompt ? prompt.trim() : '';
+
+  // 1. Primary: Pollinations AI FLUX.1 (High-Definition, Fast & Anatomically Superior)
+  try {
+    const startTime = Date.now();
+    const model = styleObj.pollinationsModel || (styleObj.perchanceStyle === 'anime' ? 'flux-anime' : 'flux');
+    const enrichedPrompt = styleObj.tags ? `${rawPrompt}, ${styleObj.tags}` : rawPrompt;
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(enrichedPrompt)}?width=${width}&height=${height}&model=${model}&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
+
+    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 35000 });
+    if (res.status === 200 && res.data && res.data.length > 1000) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      return { 
+        buffer: Buffer.from(res.data), 
+        engine: `FLUX.1 (${model})`, 
+        elapsed, 
+        shapeLabel
+      };
+    }
+  } catch (err) {}
+
+  // 2. Fallback: Perchance AI API (Local or Remote)
   for (const baseUrl of PERCHANCE_API_LIST) {
     try {
       const startTime = Date.now();
       const payload = {
-        prompt: styleObj.tags ? `${prompt}, ${styleObj.tags}` : prompt,
-        negative_prompt: styleObj.negative || 'blurry, low quality, bad anatomy',
+        prompt: styleObj.tags ? `${rawPrompt}, ${styleObj.tags}` : rawPrompt,
+        negative_prompt: styleObj.negative || 'blurry, low quality, bad anatomy, deformed hands, extra limbs',
         style: styleObj.perchanceStyle || 'anime',
         shape: shape,
         num_images: 1,
@@ -206,44 +235,31 @@ export async function executeAiDraw(prompt, styleObj, shape = 'square') {
 
         if (buffer && buffer.length > 0) {
           const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          return { buffer, engine: `Perchance AI (${styleObj.perchanceStyle})`, elapsed, shapeLabel };
+          return { 
+            buffer, 
+            engine: `Perchance AI (${styleObj.perchanceStyle})`, 
+            elapsed, 
+            shapeLabel
+          };
         }
       }
     } catch (err) {}
   }
 
-  // 2. Pollinations AI Flux
+  // 3. Fallback: Stable Horde SDXL
   try {
     const startTime = Date.now();
-    let width = 768, height = 768;
-    if (shape === 'portrait') { width = 576; height = 1024; }
-    else if (shape === 'landscape') { width = 1024; height = 576; }
-
-    const model = styleObj.pollinationsModel || (styleObj.perchanceStyle === 'anime' ? 'flux-anime' : 'flux');
-    const enrichedPrompt = styleObj.tags ? `${prompt}, ${styleObj.tags}` : prompt;
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(enrichedPrompt)}?width=${width}&height=${height}&model=${model}&nologo=true&seed=${Math.floor(Math.random() * 999999)}`;
-
-    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 35000 });
-    if (res.status === 200 && res.data) {
-      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      return { buffer: Buffer.from(res.data), engine: `Pollinations AI (${model})`, elapsed, shapeLabel };
-    }
-  } catch (err) {}
-
-  // 3. Stable Horde SDXL
-  try {
-    const startTime = Date.now();
-    let width = 768, height = 512;
-    if (shape === 'portrait') { width = 512; height = 768; }
-    else if (shape === 'square') { width = 512; height = 512; }
+    let hordeWidth = 768, hordeHeight = 512;
+    if (shape === 'portrait') { hordeWidth = 512; hordeHeight = 768; }
+    else if (shape === 'square') { hordeWidth = 512; hordeHeight = 512; }
 
     const fullPrompt = styleObj.tags 
-      ? `${prompt}, ${styleObj.tags} ### ${styleObj.negative || 'lowres, bad quality'}` 
-      : `${prompt} ### lowres, bad quality`;
+      ? `${rawPrompt}, ${styleObj.tags} ### ${styleObj.negative || 'lowres, bad quality, bad anatomy'}` 
+      : `${rawPrompt} ### lowres, bad quality, bad anatomy`;
 
     const payload = {
       prompt: fullPrompt,
-      params: { sampler_name: 'k_euler_a', cfg_scale: 7.5, width, height, steps: 20, n: 1 },
+      params: { sampler_name: 'k_euler_a', cfg_scale: 7.5, width: hordeWidth, height: hordeHeight, steps: 20, n: 1 },
       models: ['Animagine XL', 'Dreamshaper', 'Deliberate', 'Anything Diffusion'],
       nsfw: true,
       censor_nsfw: false,
@@ -280,7 +296,12 @@ export async function executeAiDraw(prompt, styleObj, shape = 'square') {
               buffer = Buffer.from(gen.img, 'base64');
             }
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-            return { buffer, engine: `Stable Horde (${gen.model || 'SDXL'})`, elapsed, shapeLabel };
+            return { 
+              buffer, 
+              engine: `Stable Horde (${gen.model || 'SDXL'})`, 
+              elapsed, 
+              shapeLabel
+            };
           }
         }
       }
@@ -305,11 +326,15 @@ export default {
 
     const rawText = args.join(' ').trim();
 
+    const sender = msg.key.participant || from;
+
     // 1. Eğer hiçbir prompt yazılmadıysa prompt girmesini iste
     if (!rawText) {
       pendingSelections[from] = {
         type: 'ciz_flow',
-        step: 'prompt'
+        step: 'prompt',
+        sender,
+        createdAt: Date.now()
       };
       await sock.sendMessage(from, {
         text: `🎨 *YAPAY ZEKA GÖRSEL STÜDYOSU*\n━━━━━━━━━━━━━━━━━━━━\n📝 Lütfen çizilmesini istediğiniz görseli açıklayan metni (istem / prompt) yazın:\n\n_Örnek: ` + '`karlı dağlarda koşan sihirli beyaz kurt`_'
@@ -321,7 +346,9 @@ export default {
     pendingSelections[from] = {
       type: 'ciz_flow',
       step: 'style',
-      prompt: rawText
+      prompt: rawText,
+      sender,
+      createdAt: Date.now()
     };
 
     await sock.sendMessage(from, {

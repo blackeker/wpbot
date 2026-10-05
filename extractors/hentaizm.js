@@ -86,6 +86,7 @@ export async function initiateHentaizmLogin(fromJid, pageUrl = 'https://www.hent
       cookieJar,
       captchaPath,
       baseUrl,
+      createdAt: Date.now(),
       attempts: 0
     };
 
