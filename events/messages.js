@@ -240,11 +240,11 @@ async function processSingleMessage(sock, msg) {
           const result = await executeAiDraw(prompt, styleObj, shape);
 
           if (!result || !result.buffer) {
-            await sock.sendMessage(from, { text: '❌ Görsel üretilirken Perchance AI motoru yanıt vermedi veya zaman aşımına uğradı. Lütfen birkaç saniye sonra tekrar deneyin.' });
+            await sock.sendMessage(from, { text: '❌ Görsel üretilirken yanıt vermedi veya zaman aşımına uğradı. Lütfen birkaç saniye sonra tekrar deneyin.' });
             return;
           }
 
-          let caption = `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${result.shapeLabel || shapeLabel}\n⚙️ *Motor:* ${result.engine || 'Perchance AI'} (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+          let caption = `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${result.shapeLabel || shapeLabel}\n (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
 
           await sock.sendMessage(from, {
             image: result.buffer,
