@@ -400,13 +400,28 @@ export default {
         const targetChapters = chapters.filter(c => c.number !== null && c.number >= startEp && c.number <= endEp);
 
         if (targetChapters.length > 0) {
-          const endLabel = endEp === Infinity ? (targetChapters[targetChapters.length - 1].number || 'Son') : endEp;
-          const batchTitle = `${seriesTitle || 'Manga'} (Bölüm ${startEp} - ${endLabel})`;
-          const batchUrl = `${urls[0].split('#')[0]}#batch=${startEp}-${endEp === Infinity ? 'end' : endEp}`;
+          const CHUNK_SIZE = 20;
+          const chunks = [];
+          for (let i = 0; i < targetChapters.length; i += CHUNK_SIZE) {
+            chunks.push(targetChapters.slice(i, i + CHUNK_SIZE));
+          }
 
-          addDownloadTask(batchUrl, from, batchTitle, null, priority);
+          let addedCount = 0;
+          for (let i = 0; i < chunks.length; i++) {
+            const chGroup = chunks[i];
+            const sNum = chGroup[0].number || (i * CHUNK_SIZE + 1);
+            const eNum = chGroup[chGroup.length - 1].number || (i * CHUNK_SIZE + chGroup.length);
+            const volLabel = chunks.length > 1 ? ` (Cilt ${i + 1}: Bölüm ${sNum} - ${eNum})` : ` (Bölüm ${sNum} - ${eNum})`;
+            const bTitle = `${seriesTitle || 'Manga'}${volLabel}`;
+            const bUrl = `${chGroup[0].url.split('#')[0]}#batch=${sNum}-${eNum}`;
 
-          let replyMsg = `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\n\n📖 *Bölüm Aralığı:* ${startEp} - ${endLabel} (${targetChapters.length} Bölüm)\n📑 *Format:* Tek bir birleşik PDF cilt dosyası\n\n✅ Başarıyla sıraya eklendi! Tüm sayfalar tek bir PDF kitabında birleştirilerek gönderilecektir.`;
+            try {
+              addDownloadTask(bUrl, from, bTitle, null, priority);
+              addedCount++;
+            } catch (e) {}
+          }
+
+          let replyMsg = `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\n\n📖 *Toplam Bölüm:* ${targetChapters.length}\n📦 *Format:* 20'şer bölümlük ${chunks.length} Cilt PDF\n\n✅ Toplam *${addedCount}* cilt başarıyla sıraya eklendi! Bölümler 20'şerli birleştirilip sırayla gönderilecektir.`;
           if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
           replyMsg += `\n\nSırayı görmek için: \`!kuyruk\``;
           await sock.sendMessage(from, { text: replyMsg });
@@ -426,13 +441,28 @@ export default {
         const targetChapters = chapters.filter(c => c.number !== null && c.number >= startEp && (endEp === Infinity || c.number <= endEp));
 
         if (targetChapters.length > 0) {
-          const endLabel = endEp === Infinity ? (targetChapters[targetChapters.length - 1].number || 'Son') : endEp;
-          const batchTitle = `${seriesTitle || 'Manga'} (Bölüm ${startEp} - ${endLabel})`;
-          const batchUrl = `${urls[0].split('#')[0]}#batch=${startEp}-${endEp === Infinity ? 'end' : endEp}`;
+          const CHUNK_SIZE = 20;
+          const chunks = [];
+          for (let i = 0; i < targetChapters.length; i += CHUNK_SIZE) {
+            chunks.push(targetChapters.slice(i, i + CHUNK_SIZE));
+          }
 
-          addDownloadTask(batchUrl, from, batchTitle, null, priority);
+          let addedCount = 0;
+          for (let i = 0; i < chunks.length; i++) {
+            const chGroup = chunks[i];
+            const sNum = chGroup[0].number || (i * CHUNK_SIZE + 1);
+            const eNum = chGroup[chGroup.length - 1].number || (i * CHUNK_SIZE + chGroup.length);
+            const volLabel = chunks.length > 1 ? ` (Cilt ${i + 1}: Bölüm ${sNum} - ${eNum})` : ` (Bölüm ${sNum} - ${eNum})`;
+            const bTitle = `${seriesTitle || 'Manga'}${volLabel}`;
+            const bUrl = `${chGroup[0].url.split('#')[0]}#batch=${sNum}-${eNum}`;
 
-          let replyMsg = `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\n\n📖 *Bölüm Aralığı:* ${startEp} - ${endLabel} (${targetChapters.length} Bölüm)\n📑 *Format:* Tek bir birleşik PDF cilt dosyası\n\n✅ Başarıyla sıraya eklendi! Tüm sayfalar tek bir PDF kitabında birleştirilerek gönderilecektir.`;
+            try {
+              addDownloadTask(bUrl, from, bTitle, null, priority);
+              addedCount++;
+            } catch (e) {}
+          }
+
+          let replyMsg = `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\n\n📖 *Toplam Bölüm:* ${targetChapters.length}\n📦 *Format:* 20'şer bölümlük ${chunks.length} Cilt PDF\n\n✅ Toplam *${addedCount}* cilt başarıyla sıraya eklendi! Bölümler 20'şerli birleştirilip sırayla gönderilecektir.`;
           if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
           replyMsg += `\n\nSırayı görmek için: \`!kuyruk\``;
           await sock.sendMessage(from, { text: replyMsg });
@@ -926,6 +956,45 @@ export default {
         await sock.sendMessage(from, { text: `❌ Dizi bölümleri alınırken hata oluştu: ${err.message}` });
       }
       return;
+    }
+    // MangaPortalı Seri Bağlantısı Kontrolü
+    if (singleUrl.includes('mangaportali.com') && singleUrl.includes('/series/')) {
+      const { getMangaPortaliChapters } = await import('../../extractors/mangaportali.js');
+      try {
+        const { seriesTitle, chapters } = await getMangaPortaliChapters(singleUrl);
+        if (chapters.length === 0) {
+          await sock.sendMessage(from, { text: '❌ Bu seride okunabilir bölüm bulunamadı.' });
+          return;
+        }
+
+        const CHUNK_SIZE = 20;
+        const chunks = [];
+        for (let i = 0; i < chapters.length; i += CHUNK_SIZE) {
+          chunks.push(chapters.slice(i, i + CHUNK_SIZE));
+        }
+
+        let addedCount = 0;
+        for (let i = 0; i < chunks.length; i++) {
+          const chGroup = chunks[i];
+          const sNum = chGroup[0].number || (i * CHUNK_SIZE + 1);
+          const eNum = chGroup[chGroup.length - 1].number || (i * CHUNK_SIZE + chGroup.length);
+          const volLabel = chunks.length > 1 ? ` (Cilt ${i + 1}: Bölüm ${sNum} - ${eNum})` : ` (Bölüm ${sNum} - ${eNum})`;
+          const bTitle = `${seriesTitle || 'Manga'}${volLabel}`;
+          const bUrl = `${chGroup[0].url.split('#')[0]}#batch=${sNum}-${eNum}`;
+
+          try {
+            addDownloadTask(bUrl, from, bTitle, null, priority);
+            addedCount++;
+          } catch (e) {}
+        }
+
+        let replyMsg = `📚 *${seriesTitle || 'Manga'}* - *Tüm Seri*\n\n📖 *Toplam Bölüm:* ${chapters.length}\n📦 *Format:* 20'şer bölümlük ${chunks.length} Cilt PDF\n\n✅ Toplam *${addedCount}* cilt başarıyla sıraya eklendi! Bölümler 20'şerli birleştirilip sırayla gönderilecektir.\n\nSırayı görmek için: \`!kuyruk\``;
+        await sock.sendMessage(from, { text: replyMsg });
+        return;
+      } catch (err) {
+        await sock.sendMessage(from, { text: `❌ Seri bölümleri alınırken hata oluştu: ${err.message}` });
+        return;
+      }
     }
 
     // Tekil Video / Link İndirme
