@@ -400,16 +400,16 @@ export default {
         const targetChapters = chapters.filter(c => c.number !== null && c.number >= startEp && c.number <= endEp);
 
         if (targetChapters.length > 0) {
-          await sock.sendMessage(from, { text: `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\nBölüm Aralığı: ${startEp} - ${endEp === Infinity ? 'Son' : endEp}\nToplam *${targetChapters.length}* bölüm PDF olarak sıraya ekleniyor...` });
+          const endLabel = endEp === Infinity ? (targetChapters[targetChapters.length - 1].number || 'Son') : endEp;
+          const batchTitle = `${seriesTitle || 'Manga'} (Bölüm ${startEp} - ${endLabel})`;
+          const batchUrl = `${urls[0].split('#')[0]}#batch=${startEp}-${endEp === Infinity ? 'end' : endEp}`;
 
-          let addedCount = 0;
-          for (const chap of targetChapters) {
-            try {
-              addDownloadTask(chap.url, from, chap.title, null, priority);
-              addedCount++;
-            } catch (e) {}
-          }
-          await sock.sendMessage(from, { text: `✅ *${addedCount}* manga bölümü başarıyla sıraya eklendi!\nKuyruk durumu için: \`!kuyruk\`` });
+          addDownloadTask(batchUrl, from, batchTitle, null, priority);
+
+          let replyMsg = `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\n\n📖 *Bölüm Aralığı:* ${startEp} - ${endLabel} (${targetChapters.length} Bölüm)\n📑 *Format:* Tek bir birleşik PDF cilt dosyası\n\n✅ Başarıyla sıraya eklendi! Tüm sayfalar tek bir PDF kitabında birleştirilerek gönderilecektir.`;
+          if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+          replyMsg += `\n\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
           return;
         }
       }
@@ -426,17 +426,16 @@ export default {
         const targetChapters = chapters.filter(c => c.number !== null && c.number >= startEp && (endEp === Infinity || c.number <= endEp));
 
         if (targetChapters.length > 0) {
-          const endLabel = endEp === Infinity ? 'Son' : endEp;
-          await sock.sendMessage(from, { text: `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\nBölüm Aralığı: ${startEp} - ${endLabel}\nToplam *${targetChapters.length}* bölüm PDF olarak sıraya ekleniyor...` });
+          const endLabel = endEp === Infinity ? (targetChapters[targetChapters.length - 1].number || 'Son') : endEp;
+          const batchTitle = `${seriesTitle || 'Manga'} (Bölüm ${startEp} - ${endLabel})`;
+          const batchUrl = `${urls[0].split('#')[0]}#batch=${startEp}-${endEp === Infinity ? 'end' : endEp}`;
 
-          let addedCount = 0;
-          for (const chap of targetChapters) {
-            try {
-              addDownloadTask(chap.url, from, chap.title, null, priority);
-              addedCount++;
-            } catch (e) {}
-          }
-          await sock.sendMessage(from, { text: `✅ *${addedCount}* manga bölümü başarıyla sıraya eklendi!\nKuyruk durumu için: \`!kuyruk\`` });
+          addDownloadTask(batchUrl, from, batchTitle, null, priority);
+
+          let replyMsg = `📚 *${seriesTitle || 'MangaPortalı'} Toplu İndirme!*\n\n📖 *Bölüm Aralığı:* ${startEp} - ${endLabel} (${targetChapters.length} Bölüm)\n📑 *Format:* Tek bir birleşik PDF cilt dosyası\n\n✅ Başarıyla sıraya eklendi! Tüm sayfalar tek bir PDF kitabında birleştirilerek gönderilecektir.`;
+          if (priority) replyMsg += `\n🔴 Öncelikli sıraya alındı.`;
+          replyMsg += `\n\nSırayı görmek için: \`!kuyruk\``;
+          await sock.sendMessage(from, { text: replyMsg });
           return;
         } else {
           await sock.sendMessage(from, { text: `⚠️ Belirtilen aralıkta (${startEp} - ${endEp === Infinity ? 'Son' : endEp}) bölüm bulunamadı.` });
