@@ -538,7 +538,7 @@ app.post('/api/files/delete', (req, res) => {
 
 // Queue: Cancel Task
 app.post('/api/indir/cancel', (req, res) => {
-  const { id } = req.body;
+  const id = req.body.id || req.body.taskId;
   if (!id) return res.status(400).json({ error: 'id gereklidir.' });
   const result = cancelDownloadTask(id);
   if (result) {
@@ -550,7 +550,7 @@ app.post('/api/indir/cancel', (req, res) => {
 
 // Queue: Prioritize Task
 app.post('/api/indir/prioritize', (req, res) => {
-  const { id } = req.body;
+  const id = req.body.id || req.body.taskId;
   if (!id) return res.status(400).json({ error: 'id gereklidir.' });
   const result = prioritizeDownloadTask(id);
   if (result) {

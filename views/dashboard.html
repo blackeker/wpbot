@@ -1795,12 +1795,12 @@
     if (allTasks.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-5);">Kuyrukta görev bulunmuyor.</td></tr>';
     } else {
-      tbody.innerHTML = allTasks.map(t => `
+      tbody.innerHTML = allTasks.map((t, idx) => `
         <tr>
-          <td style="font-family: var(--font-mono); font-size: 11px;">${t.id ? t.id.substring(0, 8) : '-'}</td>
+          <td style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-3);">#${idx + 1}</td>
           <td style="font-weight: 600;">${t.title || 'Görev'}</td>
-          <td><span class="badge ${t.isActive ? 'badge-white' : ''}">${t.isActive ? 'İndiriliyor' : 'Bekliyor'}</span></td>
-          <td style="font-family: var(--font-mono);">${t.speed ? t.speed + ' MB/s' : '-'}</td>
+          <td><span class="badge ${t.isActive ? 'badge-white' : ''}">${t.isActive ? (t.statusText || t.status || 'İndiriliyor') : 'Bekliyor'}</span></td>
+          <td style="font-family: var(--font-mono);">${t.isActive ? (t.speed && parseFloat(t.speed) > 0 ? t.speed + ' MB/s' : 'İşleniyor...') : '-'}</td>
           <td>
             <div style="display: flex; gap: 6px;">
               ${!t.isActive ? `<button class="btn btn-secondary btn-sm" onclick="prioritizeQueueTask('${t.id}')">Öne Al</button>` : ''}
@@ -1817,7 +1817,7 @@
       const res = await fetch('/api/indir/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId })
+        body: JSON.stringify({ id: taskId, taskId })
       });
       const data = await res.json();
       if (data.success) showToast('Görev iptal edildi.');
@@ -1832,7 +1832,7 @@
       const res = await fetch('/api/indir/prioritize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId })
+        body: JSON.stringify({ id: taskId, taskId })
       });
       const data = await res.json();
       if (data.success) showToast('Görev kuyruk başına taşındı.');
