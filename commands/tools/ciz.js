@@ -337,7 +337,7 @@ export default {
         createdAt: Date.now()
       };
       await sock.sendMessage(from, {
-        text: `🎨 *YAPAY ZEKA GÖRSEL STÜDYOSU*\n━━━━━━━━━━━━━━━━━━━━\n📝 Lütfen çizilmesini istediğiniz görseli açıklayan metni (istem / prompt) yazın:\n\n_Örnek: ` + '`karlı dağlarda koşan sihirli beyaz kurt`_'
+        text: `🎨 *Hazır Ve Nazır*\n━━━━━━━━━━━━━━━━━━━━\n📝 Lütfen çizilmesini istediğiniz görseli açıklayan metni (istem / prompt) yazın:\n\n_Örnek: ` + '`karlı dağlarda koşan sihirli beyaz kurt`_'
       });
       return;
     }

@@ -244,7 +244,7 @@ async function processSingleMessage(sock, msg) {
             return;
           }
 
-          let caption = `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${result.shapeLabel || shapeLabel}\n⚡ *Motor:* ${result.engine || 'AI'} (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+          let caption = `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${result.shapeLabel || shapeLabel}\n (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
 
           await sock.sendMessage(from, {
             image: result.buffer,
