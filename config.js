@@ -109,10 +109,10 @@ const DEFAULT_CONFIG = {
   ollamaApiKey: process.env.OLLAMA_API_KEY || "",
   ollamaEnabled: process.env.OLLAMA_ENABLED === 'true' || false,
   aiChatEnabled: true,
-  aiBotName: process.env.BOT_NAME || "Akıllı Asistan",
+  aiBotName: process.env.BOT_NAME || "Moi",
   groqModel: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
-  openrouterModel: process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free",
-  geminiModel: process.env.GEMINI_MODEL || "gemini-2.0-flash",
+  openrouterModel: process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free",
+  geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
 
   antiBan: {
     enabled: true,
@@ -236,10 +236,10 @@ export function getAiConfig() {
     ollamaEnabled: ollamaEnabled,
     hasAnyKey: Boolean(groqKey || openrouterKey || geminiKey || (ollamaEnabled && ollamaKeys.length > 0) || ollamaEnabled),
     enabled: cfg.aiChatEnabled !== false,
-    botName: cfg.aiBotName || cfg.botName || process.env.BOT_NAME || 'Kondi AI',
-    groqModel: cfg.groqModel || process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-    openrouterModel: cfg.openrouterModel || process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
-    geminiModel: cfg.geminiModel || process.env.GEMINI_MODEL || 'gemini-2.0-flash'
+    botName: cfg.aiBotName || cfg.botName || process.env.BOT_NAME || 'Moi',
+    groqModel: cfg.groqModel || process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
+    openrouterModel: cfg.openrouterModel || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free',
+    geminiModel: cfg.geminiModel || process.env.GEMINI_MODEL || 'gemini-2.5-flash'
   };
 }
 

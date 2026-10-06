@@ -924,7 +924,10 @@ async function processSingleMessage(sock, msg) {
         }
 
         if (prompt) {
-          await handleAiChat(sock, msg, from, prompt);
+          await handleAiChat(sock, msg, from, prompt, {
+            senderName: msg.pushName || senderNumber,
+            isGroup: isGroupChat
+          });
         }
       } catch (aiErr) {
         console.error('[AI AUTO CHAT ERROR]:', aiErr.message);

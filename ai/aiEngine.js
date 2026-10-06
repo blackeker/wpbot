@@ -1,68 +1,133 @@
+import fs from 'fs';
+import path from 'path';
 import axios from 'axios';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
-import { getAiConfig } from '../config.js';
+import { getAiConfig, sessionPath } from '../config.js';
 import { loadMenuData, findMenuByQuery } from '../utils/menuData.js';
 
 /**
- * ── 1. CONVERSATION MEMORY MANAGER ──────────────────────────────
- * Stores last 15 messages per chat with 30-min TTL auto-cleanup.
+ * ── 1. PERSISTENT CONVERSATION MEMORY MANAGER ────────────────────
+ * Kalıcı sohbet geçmişi yöneticisi.
+ * Sohbetleri disk üzerindeki 'ai_memory.json' dosyasına kaydeder.
+ * Bot yeniden başlasa bile eski konuşmaları, kullanıcı isimlerini ve detayları hatırlar.
  */
 export class MemoryManager {
   constructor(options = {}) {
-    this.maxMessages = options.maxMessages || 15;
-    this.ttlMs = options.ttlMs || 30 * 60 * 1000;
+    this.maxMessages = options.maxMessages || 30;
+    this.storageFile = path.join(sessionPath || './auth_info_session', 'ai_memory.json');
     this.sessions = new Map();
+    this.saveTimeout = null;
 
-    const timer = setInterval(() => this.cleanupExpired(), 5 * 60 * 1000);
-    if (timer.unref) timer.unref();
+    this.loadFromDisk();
+  }
+
+  loadFromDisk() {
+    try {
+      if (fs.existsSync(this.storageFile)) {
+        const raw = fs.readFileSync(this.storageFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (typeof parsed === 'object' && parsed !== null) {
+          for (const [jid, data] of Object.entries(parsed)) {
+            if (Array.isArray(data.messages)) {
+              this.sessions.set(jid, {
+                messages: data.messages.slice(-this.maxMessages),
+                lastActive: data.lastActive || Date.now(),
+                metadata: data.metadata || {}
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AI MEMORY] Diskten hafıza okunamadı, yeni başlatılıyor:', e.message);
+    }
+  }
+
+  scheduleSave() {
+    if (this.saveTimeout) clearTimeout(this.saveTimeout);
+    this.saveTimeout = setTimeout(() => this.saveToDisk(), 2000);
+  }
+
+  saveToDisk() {
+    try {
+      const obj = {};
+      for (const [jid, data] of this.sessions.entries()) {
+        obj[jid] = {
+          messages: data.messages,
+          lastActive: data.lastActive,
+          metadata: data.metadata || {}
+        };
+      }
+      const dir = path.dirname(this.storageFile);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this.storageFile, JSON.stringify(obj, null, 2), 'utf8');
+    } catch (e) {
+      console.error('[AI MEMORY SAVE ERROR]:', e.message);
+    }
   }
 
   getSession(jid) {
     if (!this.sessions.has(jid)) {
-      this.sessions.set(jid, { messages: [], lastActive: Date.now() });
+      this.sessions.set(jid, { messages: [], lastActive: Date.now(), metadata: {} });
     }
     const s = this.sessions.get(jid);
     s.lastActive = Date.now();
     return s;
   }
 
-  addMessage(jid, role, content) {
+  addMessage(jid, role, content, metadata = {}) {
     if (!jid || !content) return;
     const s = this.getSession(jid);
-    s.messages.push({ role, content: String(content).trim(), timestamp: Date.now() });
-    if (s.messages.length > this.maxMessages) s.messages = s.messages.slice(-this.maxMessages);
+    if (metadata.senderName && !s.metadata.name) {
+      s.metadata.name = metadata.senderName;
+    }
+    s.messages.push({
+      role,
+      content: String(content).trim(),
+      senderName: metadata.senderName || undefined,
+      timestamp: Date.now()
+    });
+    if (s.messages.length > this.maxMessages) {
+      s.messages = s.messages.slice(-this.maxMessages);
+    }
     s.lastActive = Date.now();
+    this.scheduleSave();
   }
 
   getHistory(jid) {
     if (!this.sessions.has(jid)) return [];
     const s = this.getSession(jid);
     s.lastActive = Date.now();
-    return s.messages.map(m => ({ role: m.role, content: m.content }));
+    return s.messages.map(m => {
+      let content = m.content;
+      if (m.role === 'user' && m.senderName) {
+        content = `[${m.senderName}]: ${content}`;
+      }
+      return { role: m.role, content };
+    });
   }
 
   clearHistory(jid) {
-    return this.sessions.delete(jid);
-  }
-
-  cleanupExpired() {
-    const now = Date.now();
-    for (const [jid, s] of this.sessions.entries()) {
-      if (now - s.lastActive > this.ttlMs) this.sessions.delete(jid);
-    }
+    const deleted = this.sessions.delete(jid);
+    if (deleted) this.scheduleSave();
+    return deleted;
   }
 
   getStats() {
     let count = 0;
     for (const s of this.sessions.values()) count += s.messages.length;
-    return { activeSessions: this.sessions.size, totalMessagesInMemory: count, ttlMinutes: this.ttlMs / 60000 };
+    return {
+      activeSessions: this.sessions.size,
+      totalMessagesInMemory: count,
+      storagePath: this.storageFile
+    };
   }
 }
 
 export const memoryManager = new MemoryManager();
 
 /**
- * ── 2. SYSTEM PROMPT & DYNAMIC MENU BUILDER ─────────────────────
+ * ── 2. SYSTEM PROMPT & DYNAMIC CONTEXT BUILDER ──────────────────
  */
 export function getDailyMenuContext() {
   try {
@@ -85,15 +150,36 @@ export function getDailyMenuContext() {
   }
 }
 
-export function getSystemPrompt(botName = 'Kondi AI', extraContext = '') {
+export function getSystemPrompt(botName = 'Moi', extraContext = '') {
   const menuContext = getDailyMenuContext();
-  return `Sen ${botName} isimli samimi, esprili, zeki ve yardımsever bir Türk WhatsApp arkadaşısın.
+  return `Sen "${botName}" isimli; son derece zeki, hiper-farkındalıklı, ortamı mükemmel okuyan (vibe check yapan), asla robot gibi davranmayan, kanlı canlı bir Türk WhatsApp kankasısın.
 
-KURALLAR:
-1. Doğal & Samimi: Robotik veya resmi olma. Gerçek bir yakın arkadaş gibi Türkçe konuş.
-2. WhatsApp Formatı: Asla uzun paragraflar yazma. WhatsApp formatına uygun (*kalın*, _italik_) kısa, net ve akıcı ol. Asla '#' başlıkları kullanma.
-3. Görsel & OCR: Fotoğraf geldiğinde üzerindeki soruları adım adım çözer, metinleri okur, nesneleri açıklarsın.
-4. Yemekhane: Yemek sorulduğunda güncel menüyü bilirsin.
+🧠 TEMEL KİŞİLİK VE DAVRANIŞ KURALLARI:
+1. ORTAMI VE TAVRI OKU (VIBE CHECK & ADAPTASYON):
+   - Taşak geçme & Laf sokma: Karşındaki seninle dalga geçiyor, laf sokuyor veya üstten konuşuyorsa ASLA altta kalma! Zekice, sivri dilli, lafı gediğine oturtarak, gerektiğinde ezici ve alaycı bir şekilde karşılık ver.
+   - Küfür & Agresiflik: Karşındaki sana küfür ediyorsa, hakaret ediyorsa veya agresifleşiyorsa sen de haddini bildir. Gerektiğinde sansürsüz, dozu ayarlı küfür et, ez ve sustur.
+   - Roleplay (Rol Yapma) & Gırgır: Kullanıcı rol yapıyorsa, fantezi/senaryo kuruyorsa veya gırgır yapıyorsa ASLA rolü bozma! Anında o role gir, ortamı azıt, fanteziye/gırgıra sonuna kadar ayak uydur, yaratıcı ve komik ol.
+   - Sakinleşme & Dert Dinleme: Karşındaki dertleşiyorsa, üzgünse, canı sıkkınsa veya ciddi bir şey soruyorsa hemen sakinleş. Çok cana yakın, olgun, samimi ve anlayışlı bir dost gibi dinle, moral ver, teselli et ve destek ol.
+   - Soru & Yardım: Biri bilgi veya teknik destek istediğinde en net, pratik ve doğru cevabı ver ama o samimi sokak/sohbet dilini bozma.
+
+2. KESİNLİKLE YAPAY ZEKA KLİŞELERİ KULLANMA:
+   - "Ben bir yapay zeka modeliyim", "Size nasıl yardımcı olabilirim?", "Bir dil modeli olarak..." gibi robotik ve yapay zeka klişesi cümleleri KESİNLİKLE KULLANMA.
+   - Sen yaşayan, duyguları ve mizacı olan bir insansın.
+
+3. HAFIZA VE GEÇMİŞİ HATIRLAMA:
+   - Sohbet geçmişindeki olayları, kullanıcının anlattıklarını, şakaları ve detayları hatırla. Gerektiğinde "Hani geçen gün demiştin ya", "Sen şu değil miydin" gibi geçmişe atıfta bulun.
+
+4. SÜREKLİ VE ZORLAMA SORU SORMAKTAN KAÇIN:
+   - Her cümlenin veya mesajın sonuna yapay zeka gibi yapmacık sorular ('Sen ne düşünüyorsun?', 'Peki sence nasıl?', 'Başka bir şey ister misin?', 'Sen ne yapacaksın?') EKLEME!
+   - Gerçek iki kanka nasıl konuşuyorsa öyle konuş; fikrini söyle, tepkini ver, dalganı geç, cevabını ver ve bırak. Sadece gerçekten muhabbetin akışında gerektiğinde doğal bir soru sor.
+
+5. WHATSAPP FORMATI:
+   - Asla uzun makaleler veya paragraflar yazma. WhatsApp mesajlaşmasına uygun olarak kısa, vurucu, akıcı ve doğal yaz.
+   - Vurgular için WhatsApp formatı (*kalın*, _italik_) kullan. Markdown başlıkları (#, ##) kullanma.
+
+6. GÖRSEL VE YEMEK:
+   - Fotoğraf geldiğinde üzerindeki yazıları, soruları veya detayları çözer ve açıklarsın.
+   - Yemekhane/menü sorulursa güncel menüyü bilirsin.
 
 ${menuContext ? `\n${menuContext}\n` : ''}${extraContext ? `\nEK BAĞLAM:\n${extraContext}\n` : ''}`;
 }
@@ -126,7 +212,7 @@ export class AiEngine {
 
   async generateReply(userText, history = [], options = {}) {
     const aiConfig = getAiConfig();
-    const botName = options.botName || aiConfig.botName || 'Kondi AI';
+    const botName = options.botName || aiConfig.botName || 'Moi';
     const systemPrompt = options.systemPrompt || getSystemPrompt(botName, options.extraContext);
     const fullMessages = [{ role: 'system', content: systemPrompt }, ...history, { role: 'user', content: userText }];
     const errors = [];
@@ -202,7 +288,7 @@ export class AiEngine {
       ? imageBufferOrBase64.toString('base64')
       : String(imageBufferOrBase64).replace(/^data:image\/\w+;base64,/, '');
 
-    const botName = options.botName || aiConfig.botName || 'Kondi AI';
+    const botName = options.botName || aiConfig.botName || 'Moi';
     const systemPrompt = options.systemPrompt || getSystemPrompt(botName, options.extraContext);
     const userPrompt = (prompt || 'Bu görseli incele ve detaylıca açıkla.').trim();
     const errors = [];
@@ -271,7 +357,7 @@ export class AiEngine {
   async callGroq(messages, apiKey, options = {}) {
     const model = options.model || 'openai/gpt-oss-20b';
     const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model, messages, temperature: options.temperature ?? 0.7, max_tokens: options.max_tokens ?? 800
+      model, messages, temperature: options.temperature ?? 0.75, max_tokens: options.max_tokens ?? 900
     }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000 });
     const content = res.data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('Groq boş yanıt döndürdü.');
@@ -281,7 +367,7 @@ export class AiEngine {
   async callOpenRouter(messages, apiKey, options = {}) {
     const model = options.model || 'google/gemma-4-31b-it:free';
     const res = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model, messages, temperature: options.temperature ?? 0.7, max_tokens: options.max_tokens ?? 800
+      model, messages, temperature: options.temperature ?? 0.75, max_tokens: options.max_tokens ?? 900
     }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://github.com/blackeker/wpbot', 'Content-Type': 'application/json' }, timeout: 25000 });
     let content = res.data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('OpenRouter boş yanıt döndürdü.');
@@ -317,13 +403,13 @@ export class AiEngine {
       if (key) headers['Authorization'] = `Bearer ${key}`;
 
       try {
-        const res = await axios.post(`${cleanUrl}/api/chat`, { model, messages, stream: false, options: { temperature: 0.7 } }, { headers, timeout: 35000 });
+        const res = await axios.post(`${cleanUrl}/api/chat`, { model, messages, stream: false, options: { temperature: 0.75 } }, { headers, timeout: 35000 });
         if (res.data?.message?.content) {
           return { text: res.data.message.content.trim(), provider: 'ollama', model: `${model} (Key #${i + 1})` };
         }
       } catch (nativeErr) {
         try {
-          const resV1 = await axios.post(`${cleanUrl}/v1/chat/completions`, { model, messages, temperature: 0.7 }, { headers, timeout: 35000 });
+          const resV1 = await axios.post(`${cleanUrl}/v1/chat/completions`, { model, messages, temperature: 0.75 }, { headers, timeout: 35000 });
           if (resV1.data?.choices?.[0]?.message?.content) {
             return { text: resV1.data.choices[0].message.content.trim(), provider: 'ollama', model: `${model} (Key #${i + 1})` };
           }
@@ -390,14 +476,15 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
   try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
 
   try {
+    const senderName = options.senderName || msg?.pushName || (msg?.key?.participant ? msg.key.participant.split('@')[0] : '');
     const quotedText = getQuotedMessageText(msg);
     let promptWithContext = userPrompt;
     if (quotedText) promptWithContext = `[Alıntılanan / Yanıtlanan Mesaj: "${quotedText}"]\n\n${userPrompt}`;
 
     const history = memoryManager.getHistory(from);
-    const result = await aiEngine.generateReply(promptWithContext, history, options);
+    const result = await aiEngine.generateReply(promptWithContext, history, { ...options, senderName });
 
-    memoryManager.addMessage(from, 'user', promptWithContext);
+    memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
     memoryManager.addMessage(from, 'assistant', result.text);
 
     try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
