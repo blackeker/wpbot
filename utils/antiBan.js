@@ -9,14 +9,14 @@ const logger = getModuleLogger('anti-ban');
 const DEFAULT_ANTI_BAN_CONFIG = {
   enabled: true,
   autoRead: true, // Mesaj geldiğinde okundu (mavi tik) simülasyonu
-  typingSimulation: true, // Mesaj gönderilmeden önce "yazıyor..." veya "kaydediyor..." durumu
-  minTypingDelayMs: 1800, // En kısa mesaj için minimum yazıyor süresi (1.8 saniye)
-  maxTypingDelayMs: 12000, // En uzun mesajlar için tavan yazıyor süresi (12 saniye)
-  msPerChar: 45, // Karakter başına ortalama yazma süresi (~22 karakter/sn - insansı hız)
-  jitterFactor: 0.20, // ±%20 rastgele insansı sapma
-  minIntervalBetweenSendsMs: 900, // Aynı kişiye/gruba ardışık mesajlar arasındaki minimum soğuma süresi
-  maxInboundRatePerFiveSec: 8, // Bir kullanıcının 5 saniyede gönderebileceği maksimum mesaj sayısı (Flood Koruması)
-  throttleDurationMs: 12000 // Flood yapan kullanıcıyı geçici olarak yok sayma süresi (12 saniye)
+  typingSimulation: true, // Mesaj gönderilmeden önce "yazıyor..." durumu
+  minTypingDelayMs: 300, // En kısa mesaj için minimum yazıyor süresi (300ms)
+  maxTypingDelayMs: 1500, // En uzun mesajlar için tavan yazıyor süresi (1.5 saniye)
+  msPerChar: 10, // Karakter başına yazma hızı (hızlı & akıcı)
+  jitterFactor: 0.10, // ±%10 sapma
+  minIntervalBetweenSendsMs: 300, // Ardışık mesajlar arası minimum bekleme
+  maxInboundRatePerFiveSec: 10, // 5 saniyede maksimum mesaj
+  throttleDurationMs: 8000 // Flood engeli süresi
 };
 
 /**

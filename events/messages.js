@@ -113,7 +113,13 @@ async function processSingleMessage(sock, msg) {
   const sender = msg.key.participant || from;
   const senderNumber = sender.split('@')[0];
   const isOwner = isBotOwner(msg, senderNumber);
-  const isAdmin = await isGroupAdminOrOwner(sock, msg, from);
+  let _isAdmin = null;
+  const getIsAdmin = async () => {
+    if (_isAdmin === null) {
+      _isAdmin = await isGroupAdminOrOwner(sock, msg, from);
+    }
+    return _isAdmin;
+  };
 
   // Anti-Ban: Mark incoming message as read (blue ticks) naturally & check inbound flood
   if (!msg.key.fromMe) {
@@ -731,7 +737,7 @@ async function processSingleMessage(sock, msg) {
   const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
   const hasQuoted = Boolean(contextInfo?.quotedMessage || contextInfo?.stanzaId);
   if (isReplyDownloadTrigger(text, hasQuoted)) {
-    const perm = checkCommandPermission('indir', from, { isOwner, isAdmin });
+    const perm = checkCommandPermission('indir', from, { isOwner, isAdmin: await getIsAdmin() });
     if (!perm.allowed) {
       if (!perm.silent && perm.message) {
         await sock.sendMessage(from, { text: perm.message });
@@ -747,7 +753,7 @@ async function processSingleMessage(sock, msg) {
       downloadsDir,
       formatBytes,
       isOwner,
-      isAdmin
+      isAdmin: await getIsAdmin()
     });
     if (handled) return;
   }
@@ -766,7 +772,7 @@ async function processSingleMessage(sock, msg) {
   }
 
   if (menuMatch) {
-    const perm = checkCommandPermission('yardim', from, { isOwner, isAdmin });
+    const perm = checkCommandPermission('yardim', from, { isOwner, isAdmin: await getIsAdmin() });
     if (!perm.allowed) {
       if (!perm.silent && perm.message) {
         await sock.sendMessage(from, { text: perm.message });
@@ -778,7 +784,7 @@ async function processSingleMessage(sock, msg) {
       console.log(`[COMMAND] Executing 'yardim' for ${from}...`);
       try {
         const menuArgs = menuMatch[1] ? menuMatch[1].trim().split(/\s+/) : [];
-        await yardimCmd.execute(sock, msg, from, menuArgs, { text, ltext, isOwner, isAdmin });
+        await yardimCmd.execute(sock, msg, from, menuArgs, { text, ltext, isOwner, isAdmin: await getIsAdmin() });
         console.log(`[COMMAND] Finished 'yardim' for ${from}`);
       } catch (err) {
         console.error('[Yardım Komutu] Hata:', err.message);
@@ -828,7 +834,7 @@ async function processSingleMessage(sock, msg) {
     const cmd = commands.get(canonicalName) || commands.get(commandName);
 
     if (cmd) {
-      const perm = checkCommandPermission(canonicalName || cmd.name, from, { isOwner, isAdmin });
+      const perm = checkCommandPermission(canonicalName || cmd.name, from, { isOwner, isAdmin: await getIsAdmin() });
       if (!perm.allowed) {
         if (!perm.silent && perm.message) {
           await sock.sendMessage(from, { text: perm.message });
@@ -847,7 +853,7 @@ async function processSingleMessage(sock, msg) {
           downloadsDir,
           formatBytes,
           isOwner,
-          isAdmin
+          isAdmin: await getIsAdmin()
         });
         console.log(`[COMMAND] Finished '${cmd.name}' for ${from}`);
       } catch (err) {
@@ -860,7 +866,7 @@ async function processSingleMessage(sock, msg) {
 
   // Treat as download if supported link
   if (isSupportedLink || isTorrentUrl) {
-    const perm = checkLinkPermission(text, from, { isOwner, isAdmin });
+    const perm = checkLinkPermission(text, from, { isOwner, isAdmin: await getIsAdmin() });
     if (!perm.allowed) {
       if (!perm.silent && perm.message) {
         await sock.sendMessage(from, { text: perm.message });
@@ -880,7 +886,7 @@ async function processSingleMessage(sock, msg) {
           downloadsDir,
           formatBytes,
           isOwner,
-          isAdmin
+          isAdmin: await getIsAdmin()
         });
       } catch (err) {
         console.error(`Download execution error:`, err.message);

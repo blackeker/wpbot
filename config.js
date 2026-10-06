@@ -118,13 +118,13 @@ const DEFAULT_CONFIG = {
     enabled: true,
     autoRead: true,
     typingSimulation: true,
-    minTypingDelayMs: 1800,
-    maxTypingDelayMs: 12000,
-    msPerChar: 45,
-    jitterFactor: 0.20,
-    minIntervalBetweenSendsMs: 900,
-    maxInboundRatePerFiveSec: 8,
-    throttleDurationMs: 12000
+    minTypingDelayMs: 300,
+    maxTypingDelayMs: 1500,
+    msPerChar: 10,
+    jitterFactor: 0.10,
+    minIntervalBetweenSendsMs: 300,
+    maxInboundRatePerFiveSec: 10,
+    throttleDurationMs: 8000
   },
   cronSchedules: [
     { id: "cleanup", name: "Disk Temizliği", cron: "0 4 * * *", action: "cleanup", active: true }

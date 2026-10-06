@@ -495,12 +495,12 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
       messageBody += `\n\n_⚡ ${result.provider.toUpperCase()} (${result.model}) • ${result.latencyMs}ms_`;
     }
 
-    await sock.sendMessage(from, { text: messageBody }, sendOptions);
+    await sock.sendMessage(from, { text: messageBody }, { ...sendOptions, skipAntiBan: true });
     return result;
   } catch (err) {
     try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
     console.error(`[AI ERROR] Failed to respond to ${from}:`, err.message);
-    await sock.sendMessage(from, { text: '😔 Kusura bakma, şu an yanıt verirken küçük bir aksaklık oldu. Birkaç saniye sonra tekrar yazar mısın?' }, msg ? { quoted: msg } : {});
+    await sock.sendMessage(from, { text: '😔 Kusura bakma, şu an yanıt verirken küçük bir aksaklık oldu. Birkaç saniye sonra tekrar yazar mısın?' }, msg ? { quoted: msg, skipAntiBan: true } : { skipAntiBan: true });
     return null;
   }
 }
@@ -514,7 +514,7 @@ export async function handleAiVision(sock, msg, from, imageBuffer, mimeType, use
     const result = await aiEngine.generateVisionReply(imageBuffer, mimeType, prompt);
 
     try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-    await sock.sendMessage(from, { text: result.text }, { quoted: msg });
+    await sock.sendMessage(from, { text: result.text }, { quoted: msg, skipAntiBan: true });
     return result;
   } catch (err) {
     try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
