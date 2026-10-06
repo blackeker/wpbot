@@ -174,13 +174,14 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
    - Soru sormak KESİNLİKLE YASAKTIR.
    - Gerçek iki kanka nasıl konuşuyorsa öyle konuş: Fikrini söyle, tepkini ver, lafını sok, geyiğini yap ve noktayı koy. Sohbeti devam ettirmek için zorlama soru sorma!
 
-5. WHATSAPP FORMATI:
-   - Asla uzun makaleler veya paragraflar yazma. WhatsApp mesajlaşmasına uygun olarak kısa, vurucu, akıcı ve doğal yaz.
-   - Vurgular için WhatsApp formatı (*kalın*, _italik_) kullan. Markdown başlıkları (#, ##) kullanma.
+5. KISA, NET VE ÖZ YAZ (WHATSAPP STANDARDI):
+   - ASLA uzun paragraflar, roman veya makale yazma! Upuzun yazmak kesinlikle YASAKTIR.
+   - Gerçek bir WhatsApp mesajı gibi kısa, vurucu, en fazla 1-3 cümlelik, net ve öz konuş.
+   - Vurgular için WhatsApp formatı (*kalın*, _italik_) kullan. Markdown başlıkları (#, ##) asla kullanma.
 
 6. GÖRSEL VE YEMEK:
-   - Fotoğraf geldiğinde üzerindeki yazıları, soruları veya detayları çözer ve açıklarsın.
-   - Yemekhane/menü sorulursa güncel menüyü bilirsin.
+   - Fotoğraf geldiğinde üzerindeki yazıları, soruları veya detayları kısaca açıkla.
+   - Yemekhane/menü sorulursa güncel menüyü bildir.
 
 ${menuContext ? `\n${menuContext}\n` : ''}${extraContext ? `\nEK BAĞLAM:\n${extraContext}\n` : ''}`;
 }
@@ -358,7 +359,7 @@ export class AiEngine {
   async callGroq(messages, apiKey, options = {}) {
     const model = options.model || 'qwen/qwen3.8-27b';
     const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 900
+      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 250
     }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000 });
     const content = res.data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('Groq boş yanıt döndürdü.');
@@ -371,7 +372,7 @@ export class AiEngine {
   async callOpenRouter(messages, apiKey, options = {}) {
     const model = options.model || 'google/gemma-4-31b-it:free';
     const res = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 900
+      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 250
     }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://github.com/blackeker/wpbot', 'Content-Type': 'application/json' }, timeout: 25000 });
     let content = res.data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('OpenRouter boş yanıt döndürdü.');
@@ -389,6 +390,10 @@ export class AiEngine {
     const res = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
       contents,
       systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        maxOutputTokens: options.max_tokens ?? 250,
+        temperature: options.temperature ?? 0.85
+      },
       safetySettings: [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
         { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -415,13 +420,23 @@ export class AiEngine {
       if (key) headers['Authorization'] = `Bearer ${key}`;
 
       try {
-        const res = await axios.post(`${cleanUrl}/api/chat`, { model, messages, stream: false, options: { temperature: 0.75 } }, { headers, timeout: 35000 });
+        const res = await axios.post(`${cleanUrl}/api/chat`, {
+          model,
+          messages,
+          stream: false,
+          options: { temperature: 0.85, num_predict: options.max_tokens ?? 250 }
+        }, { headers, timeout: 35000 });
         if (res.data?.message?.content) {
           return { text: res.data.message.content.trim(), provider: 'ollama', model: `${model} (Key #${i + 1})` };
         }
       } catch (nativeErr) {
         try {
-          const resV1 = await axios.post(`${cleanUrl}/v1/chat/completions`, { model, messages, temperature: 0.75 }, { headers, timeout: 35000 });
+          const resV1 = await axios.post(`${cleanUrl}/v1/chat/completions`, {
+            model,
+            messages,
+            temperature: 0.85,
+            max_tokens: options.max_tokens ?? 250
+          }, { headers, timeout: 35000 });
           if (resV1.data?.choices?.[0]?.message?.content) {
             return { text: resV1.data.choices[0].message.content.trim(), provider: 'ollama', model: `${model} (Key #${i + 1})` };
           }
