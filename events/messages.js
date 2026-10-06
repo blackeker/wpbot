@@ -893,20 +893,34 @@ async function processSingleMessage(sock, msg) {
   // Fallback to AI conversational chat if not a command and not a media link
   const aiCfg = getAiConfig();
   if (aiCfg.hasAnyKey && aiCfg.enabled) {
-    const botNumber = sock.user?.id?.split(':')[0];
+    const botNumber = sock.user?.id?.split(':')[0]?.replace(/[^0-9]/g, '') || '';
+    const botLid = sock.user?.lid ? sock.user.lid.split(':')[0] : '';
     const mentionedJids = content.extendedTextMessage?.contextInfo?.mentionedJid || [];
-    const isBotMentioned = botNumber && mentionedJids.some(j => j.includes(botNumber));
-    const isReplyToBot = botNumber && content.extendedTextMessage?.contextInfo?.participant?.includes(botNumber);
+    const isBotMentioned = Boolean(
+      (botNumber && mentionedJids.some(j => j.includes(botNumber))) ||
+      (botLid && mentionedJids.some(j => j.includes(botLid))) ||
+      (text && botNumber && text.includes(`@${botNumber}`))
+    );
 
-    // If in group, verify that AI is allowed in this group
+    const quotedParticipant = content.extendedTextMessage?.contextInfo?.participant || '';
+    const isReplyToBot = Boolean(
+      (botNumber && quotedParticipant.includes(botNumber)) ||
+      (botLid && quotedParticipant.includes(botLid))
+    );
+
+    // If in group, verify that AI is allowed in this group and bot is strictly tagged/replied
     if (isGroupChat) {
       const groupCfg = getGroupConfig(from);
       if (groupCfg.allowAi === false) {
         return; // AI is explicitly disabled in this group
       }
+      // In groups, NEVER reply unless explicitly tagged or replied to
+      if (!isBotMentioned && !isReplyToBot) {
+        return;
+      }
     }
 
-    // Auto reply in DMs, or in groups if mentioned / replied to
+    // Auto reply in DMs, or in groups when mentioned / replied to
     if (!isGroupChat || isBotMentioned || isReplyToBot) {
       let prompt = text;
       if (isBotMentioned && botNumber) {
