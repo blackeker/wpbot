@@ -11,7 +11,8 @@ import {
   cleanOldDownloads, 
   pendingHentaizmLogins, 
   downloadsDir,
-  sentMessageIds
+  sentMessageIds,
+  getAiConfig
 } from '../config.js';
 import { 
   downloadQueue, 
@@ -31,7 +32,8 @@ import {
   checkLinkPermission, 
   isGroupAdminOrOwner, 
   isBotOwner,
-  getCanonicalCommandName
+  getCanonicalCommandName,
+  getGroupConfig
 } from '../utils/permissionManager.js';
 import { simulateIncomingRead, isSenderThrottled } from '../utils/antiBan.js';
 
@@ -883,6 +885,49 @@ async function processSingleMessage(sock, msg) {
       } catch (err) {
         console.error(`Download execution error:`, err.message);
         await sock.sendMessage(from, { text: `⚠️ İndirme hatası: ${err.message}` });
+      }
+    }
+    return;
+  }
+
+  // Fallback to AI conversational chat if not a command and not a media link
+  const aiCfg = getAiConfig();
+  if (aiCfg.hasAnyKey && aiCfg.enabled) {
+    const botNumber = sock.user?.id?.split(':')[0];
+    const mentionedJids = content.extendedTextMessage?.contextInfo?.mentionedJid || [];
+    const isBotMentioned = botNumber && mentionedJids.some(j => j.includes(botNumber));
+    const isReplyToBot = botNumber && content.extendedTextMessage?.contextInfo?.participant?.includes(botNumber);
+
+    // If in group, verify that AI is allowed in this group
+    if (isGroupChat) {
+      const groupCfg = getGroupConfig(from);
+      if (groupCfg.allowAi === false) {
+        return; // AI is explicitly disabled in this group
+      }
+    }
+
+    // Auto reply in DMs, or in groups if mentioned / replied to
+    if (!isGroupChat || isBotMentioned || isReplyToBot) {
+      let prompt = text;
+      if (isBotMentioned && botNumber) {
+        prompt = text.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
+      }
+
+      // 👁️ Check for image in the message or quoted message to analyze with AI Vision
+      try {
+        const { extractImageBufferFromMessage, handleAiVision, handleAiChat } = await import('../ai/aiEngine.js');
+        const imgData = await extractImageBufferFromMessage(msg);
+        if (imgData && imgData.buffer) {
+          const visionPrompt = prompt || imgData.caption || 'Bu görseli incele, ne olduğunu, üzerindeki detayları veya soruları açıkla.';
+          await handleAiVision(sock, msg, from, imgData.buffer, imgData.mimeType, visionPrompt);
+          return;
+        }
+
+        if (prompt) {
+          await handleAiChat(sock, msg, from, prompt);
+        }
+      } catch (aiErr) {
+        console.error('[AI AUTO CHAT ERROR]:', aiErr.message);
       }
     }
   }

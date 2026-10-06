@@ -39,10 +39,10 @@ export const CATEGORIES = {
     commands: ['hatirlat', 'qr', 'kisalt', 'sozluk', 'wiki']
   },
   ai: {
-    name: 'Yapay Zeka & Görsel (DM)',
-    icon: '🎨',
-    description: 'Yapay zeka ile görsel üretimi',
-    commands: ['ciz']
+    name: 'Yapay Zeka & Sohbet',
+    icon: '🤖',
+    description: 'Yapay zeka ile doğal sohbet, soru-cevap ve görsel üretimi',
+    commands: ['ai', 'ciz']
   },
   hentai: {
     name: 'Yetişkin & Hentai (18+)',
@@ -112,6 +112,7 @@ export const ALIAS_MAP = {
   'wiki': 'wiki', 'vikipedi': 'wiki', 'wikipedia': 'wiki',
 
   // AI
+  'ai': 'ai', 'sor': 'ai', 'gpt': 'ai', 'bot': 'ai', 'sohbet': 'ai', 'yapayzeka': 'ai',
   'ciz': 'ciz', 'çiz': 'ciz', 'resim': 'ciz', 'imagine': 'ciz', 'gorsel': 'ciz', 'görsel': 'ciz', 'airesim': 'ciz', 'aiciz': 'ciz', 'omniart': 'ciz', 'perchance': 'ciz',
 
   // Hentai
@@ -148,6 +149,7 @@ export const DEFAULT_GROUP_CONFIG = {
   allowedCommands: [],
   allowLinks: true,
   allowAdultLinks: false,
+  allowAi: true, // Default: AI responds in groups when mentioned or configured
   silent: false
 };
 
@@ -199,6 +201,7 @@ export function getGroupConfig(groupJid) {
     allowedCommands: groupSettings.allowedCommands ?? DEFAULT_GROUP_CONFIG.allowedCommands,
     allowLinks: groupSettings.allowLinks !== undefined ? groupSettings.allowLinks : DEFAULT_GROUP_CONFIG.allowLinks,
     allowAdultLinks: groupSettings.allowAdultLinks !== undefined ? groupSettings.allowAdultLinks : DEFAULT_GROUP_CONFIG.allowAdultLinks,
+    allowAi: groupSettings.allowAi !== undefined ? groupSettings.allowAi : DEFAULT_GROUP_CONFIG.allowAi,
     silent: groupSettings.silent !== undefined ? groupSettings.silent : DEFAULT_GROUP_CONFIG.silent,
     mode: groupSettings.mode || DEFAULT_GROUP_CONFIG.mode
   };
