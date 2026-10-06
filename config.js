@@ -110,7 +110,7 @@ const DEFAULT_CONFIG = {
   ollamaEnabled: process.env.OLLAMA_ENABLED === 'true' || false,
   aiChatEnabled: true,
   aiBotName: process.env.BOT_NAME || "Moi",
-  groqModel: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+  groqModel: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
   openrouterModel: process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free",
   geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
 
@@ -237,7 +237,7 @@ export function getAiConfig() {
     hasAnyKey: Boolean(groqKey || openrouterKey || geminiKey || (ollamaEnabled && ollamaKeys.length > 0) || ollamaEnabled),
     enabled: cfg.aiChatEnabled !== false,
     botName: cfg.aiBotName || cfg.botName || process.env.BOT_NAME || 'Moi',
-    groqModel: cfg.groqModel || process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
+    groqModel: cfg.groqModel || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
     openrouterModel: cfg.openrouterModel || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free',
     geminiModel: cfg.geminiModel || process.env.GEMINI_MODEL || 'gemini-2.5-flash'
   };

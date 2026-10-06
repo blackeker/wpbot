@@ -355,19 +355,22 @@ export class AiEngine {
   }
 
   async callGroq(messages, apiKey, options = {}) {
-    const model = options.model || 'openai/gpt-oss-20b';
+    const model = options.model || 'qwen/qwen3.8-27b';
     const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model, messages, temperature: options.temperature ?? 0.75, max_tokens: options.max_tokens ?? 900
+      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 900
     }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000 });
     const content = res.data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('Groq boş yanıt döndürdü.');
+    if (content.toLowerCase().includes('sorry, but i can\'t help') || content.toLowerCase().includes('bu konuda yardımcı olamam')) {
+      throw new Error('Groq güvenlik filtresi nedeniyle yanıt reddedildi, fallback devrede.');
+    }
     return { text: content.trim(), provider: 'groq', model };
   }
 
   async callOpenRouter(messages, apiKey, options = {}) {
     const model = options.model || 'google/gemma-4-31b-it:free';
     const res = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model, messages, temperature: options.temperature ?? 0.75, max_tokens: options.max_tokens ?? 900
+      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 900
     }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://github.com/blackeker/wpbot', 'Content-Type': 'application/json' }, timeout: 25000 });
     let content = res.data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('OpenRouter boş yanıt döndürdü.');
@@ -383,7 +386,15 @@ export class AiEngine {
     contents.push({ role: 'user', parts: [{ text: userText }] });
 
     const res = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      contents, systemInstruction: { parts: [{ text: systemPrompt }] }
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+      ]
     }, { headers: { 'Content-Type': 'application/json' }, timeout: 20000 });
     const textPart = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!textPart) throw new Error('Gemini boş yanıt döndürdü.');
