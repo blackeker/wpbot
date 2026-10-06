@@ -149,7 +149,7 @@ export const DEFAULT_GROUP_CONFIG = {
   allowedCommands: [],
   allowLinks: true,
   allowAdultLinks: false,
-  allowAi: true, // Default: AI responds in groups when mentioned or configured
+  allowAi: false, // Default: AI is DISABLED in all groups by default (only enabled from web panel / admin)
   silent: false
 };
 
