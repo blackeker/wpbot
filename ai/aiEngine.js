@@ -186,37 +186,6 @@ ${menuContext ? `\n${menuContext}\n` : ''}${extraContext ? `\nEK BAĞLAM:\n${ext
 }
 
 /**
- * Zorlama ve yapay soru kalıplarını temizleyen filtre
- */
-export function cleanResponseText(text) {
-  if (!text || typeof text !== 'string') return '';
-  let cleaned = text.trim();
-
-  // 1. Cümle sonundaki yapay soru kalıplarını ve eklerini temizle (markdown dahil)
-  const trailingQuestionPatterns = [
-    /(?:[\n\r]+|\s+)[*_~]*(?:peki\s+)?(?:sen\s+)?(?:ne\s+düşünüyorsun|sence\s+nasıl|ne\s+dersin|ne\s+yapalım|sen\s+ne\s+yapacaksın|söyle\s+bakalım|nasıl\s+bitireceğiz|var\s+mı\s+bir\s+isteğin|başka\s+bir\s+şey\s+var\s+mı|anlat\s+bakalım|nasıl\s+gidiyor|nasıl\s+yapalım)[^.!?\n]*\?*[*_~]*$/i,
-    /(?:,\s*|\s+)[*_~]*(?:değil\s+mi|öyle\s+değil\s+mi|tamam\s+mı|anladın\s+mı)\s*\?*[*_~]*$/i,
-    /(?:[\n\r]+|\s+)[*_~]*[^.!?\n]*(?:heyecanlandırıcı\s+değil\s+mi|güzel\s+değil\s+mi|harika\s+değil\s+mi|öyle\s+mi)\s*\?*[*_~]*$/i
-  ];
-
-  for (const pattern of trailingQuestionPatterns) {
-    cleaned = cleaned.replace(pattern, '').trim();
-  }
-
-  // 2. Eğer metnin en son paragrafı sadece kısa bir soru cümlesiyse temizle
-  const paragraphs = cleaned.split(/\n+/);
-  if (paragraphs.length > 1) {
-    const lastP = paragraphs[paragraphs.length - 1].trim();
-    if (lastP.endsWith('?') && lastP.length < 80 && (lastP.includes('sen') || lastP.includes('mi') || lastP.includes('mı') || lastP.includes('nasıl') || lastP.includes('ne '))) {
-      paragraphs.pop();
-      cleaned = paragraphs.join('\n\n').trim();
-    }
-  }
-
-  return cleaned;
-}
-
-/**
  * ── 3. MULTI-PROVIDER FALLBACK ENGINE (TEXT + VISION) ───────────
  */
 export class AiEngine {
@@ -257,7 +226,7 @@ export class AiEngine {
         const res = await this.callGroq(fullMessages, groqKey, options);
         this.stats.groq.success++;
         this.stats.groq.lastUsed = new Date();
-        return { ...res, text: cleanResponseText(res.text), latencyMs: Date.now() - startTime };
+        return { ...res, latencyMs: Date.now() - startTime };
       } catch (err) {
         this.stats.groq.errors++;
         errors.push({ provider: 'groq', error: err.message });
@@ -272,7 +241,7 @@ export class AiEngine {
         const res = await this.callOpenRouter(fullMessages, orKey, options);
         this.stats.openrouter.success++;
         this.stats.openrouter.lastUsed = new Date();
-        return { ...res, text: cleanResponseText(res.text), latencyMs: Date.now() - startTime };
+        return { ...res, latencyMs: Date.now() - startTime };
       } catch (err) {
         this.stats.openrouter.errors++;
         errors.push({ provider: 'openrouter', error: err.message });
@@ -287,7 +256,7 @@ export class AiEngine {
         const res = await this.callGemini(systemPrompt, history, userText, geminiKey, options);
         this.stats.gemini.success++;
         this.stats.gemini.lastUsed = new Date();
-        return { ...res, text: cleanResponseText(res.text), latencyMs: Date.now() - startTime };
+        return { ...res, latencyMs: Date.now() - startTime };
       } catch (err) {
         this.stats.gemini.errors++;
         errors.push({ provider: 'gemini', error: err.message });
@@ -303,7 +272,7 @@ export class AiEngine {
         const res = await this.callOllama(fullMessages, ollamaUrl, { ...options, apiKeys: ollamaKeys });
         this.stats.ollama.success++;
         this.stats.ollama.lastUsed = new Date();
-        return { ...res, text: cleanResponseText(res.text), latencyMs: Date.now() - startTime };
+        return { ...res, latencyMs: Date.now() - startTime };
       } catch (err) {
         this.stats.ollama.errors++;
         errors.push({ provider: 'ollama', error: err.message });
