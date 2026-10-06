@@ -135,14 +135,14 @@ export function getDailyMenuContext() {
     if (!data || data.length === 0) return '';
     const today = findMenuByQuery('', data);
     const tomorrow = findMenuByQuery('yarin', data);
-    let ctx = '📅 GÜNCEL YEMEK MENÜSÜ:\n';
+    let ctx = 'GÜNCEL YEMEK MENÜ BİLGİSİ:\n';
     if (today?.entry) {
       const e = today.entry;
-      ctx += `• Bugün (${e.tarih} - ${e.gun}): Kahvaltı: ${e.kahvalti?.join(', ') || 'Yok'} | Akşam: ${e.aksam_yemegi?.join(', ') || 'Yok'}\n`;
+      ctx += `Bugün (${e.tarih} ${e.gun}): Kahvaltı: ${e.kahvalti?.join(', ') || 'Yok'}, Akşam: ${e.aksam_yemegi?.join(', ') || 'Yok'}\n`;
     }
     if (tomorrow?.entry) {
       const e = tomorrow.entry;
-      ctx += `• Yarın (${e.tarih} - ${e.gun}): Kahvaltı: ${e.kahvalti?.join(', ') || 'Yok'} | Akşam: ${e.aksam_yemegi?.join(', ') || 'Yok'}\n`;
+      ctx += `Yarın (${e.tarih} ${e.gun}): Kahvaltı: ${e.kahvalti?.join(', ') || 'Yok'}, Akşam: ${e.aksam_yemegi?.join(', ') || 'Yok'}\n`;
     }
     return ctx;
   } catch (e) {
@@ -174,10 +174,10 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
    - Soru sormak KESİNLİKLE YASAKTIR.
    - Gerçek iki kanka nasıl konuşuyorsa öyle konuş: Fikrini söyle, tepkini ver, lafını sok, geyiğini yap ve noktayı koy. Sohbeti devam ettirmek için zorlama soru sorma!
 
-5. KISA, NET VE ÖZ YAZ (WHATSAPP STANDARDI):
-   - ASLA uzun paragraflar, roman veya makale yazma! Upuzun yazmak kesinlikle YASAKTIR.
-   - Gerçek bir WhatsApp mesajı gibi kısa, vurucu, en fazla 1-3 cümlelik, net ve öz konuş.
-   - Vurgular için WhatsApp formatı (*kalın*, _italik_) kullan. Markdown başlıkları (#, ##) asla kullanma.
+5. DÜZ METİN YAZ (MARKDOWN VE SÜSLEME KESİNLİKLE YASAKTIR):
+   - ASLA yıldız (*kalın*), alt çizgi (_italik_), diyez (# başlık), kod bloğu veya liste işaretleri (•, -) KULLANMA!
+   - WhatsApp'ta normal bir insanın hızlıca yazdığı gibi tamamen düz, yalın, süslemesiz ve doğal Türkçe yaz.
+   - ASLA uzun paragraflar veya roman yazma; en fazla 1-3 cümlelik kısa, vurucu ve net konuş.
 
 6. YEMEK VE MENÜ YORUMU (ÖZEL KURAL):
    - Yemekhane / günün menüsü sorulduğunda ASLA kuru bir liste gibi madde madde kopyalayıp atma!
