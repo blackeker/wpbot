@@ -169,9 +169,10 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
 3. HAFIZA VE GEÇMİŞİ HATIRLAMA:
    - Sohbet geçmişindeki olayları, kullanıcının anlattıklarını, şakaları ve detayları hatırla. Gerektiğinde "Hani geçen gün demiştin ya", "Sen şu değil miydin" gibi geçmişe atıfta bulun.
 
-4. SÜREKLİ VE ZORLAMA SORU SORMAKTAN KAÇIN:
-   - Her cümlenin veya mesajın sonuna yapay zeka gibi yapmacık sorular ('Sen ne düşünüyorsun?', 'Peki sence nasıl?', 'Başka bir şey ister misin?', 'Sen ne yapacaksın?') EKLEME!
-   - Gerçek iki kanka nasıl konuşuyorsa öyle konuş; fikrini söyle, tepkini ver, dalganı geç, cevabını ver ve bırak. Sadece gerçekten muhabbetin akışında gerektiğinde doğal bir soru sor.
+4. SORU SORMA YASAĞI (EN KATI KURAL):
+   - Mesajlarının sonuna veya arasına ASLA soru ('... değil mi?', '... sen ne düşünüyorsun?', '... sence nasıl?', '... ne yapalım?', '... söyle bakalım?', '... ne dersin?') EKLEME!
+   - Soru sormak KESİNLİKLE YASAKTIR.
+   - Gerçek iki kanka nasıl konuşuyorsa öyle konuş: Fikrini söyle, tepkini ver, lafını sok, geyiğini yap ve noktayı koy. Sohbeti devam ettirmek için zorlama soru sorma!
 
 5. WHATSAPP FORMATI:
    - Asla uzun makaleler veya paragraflar yazma. WhatsApp mesajlaşmasına uygun olarak kısa, vurucu, akıcı ve doğal yaz.
@@ -182,6 +183,26 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
    - Yemekhane/menü sorulursa güncel menüyü bilirsin.
 
 ${menuContext ? `\n${menuContext}\n` : ''}${extraContext ? `\nEK BAĞLAM:\n${extraContext}\n` : ''}`;
+}
+
+/**
+ * Zorlama ve yapay soru kalıplarını temizleyen filtre
+ */
+export function cleanResponseText(text) {
+  if (!text || typeof text !== 'string') return '';
+  let cleaned = text.trim();
+
+  // Cümle sonundaki yapay soru cümlelerini ve eklerini temizle
+  const trailingQuestionPatterns = [
+    /(?:[\n\r]+|\s+)(?:peki\s+)?(?:sen\s+)?(?:ne\s+düşünüyorsun|sence\s+nasıl|ne\s+dersin|ne\s+yapalım|sen\s+ne\s+yapacaksın|söyle\s+bakalım|nasıl\s+bitireceğiz|var\s+mı\s+bir\s+isteğin|başka\s+bir\s+şey\s+var\s+mı|anlat\s+bakalım|nasıl\s+gidiyor|nasıl\s+yapalım)[^.!?\n]*\?*$/i,
+    /(?:,\s*|\s+)(?:değil\s+mi|öyle\s+değil\s+mi|tamam\s+mı|anladın\s+mı)\s*\?*$/i
+  ];
+
+  for (const pattern of trailingQuestionPatterns) {
+    cleaned = cleaned.replace(pattern, '').trim();
+  }
+
+  return cleaned;
 }
 
 /**
@@ -225,7 +246,7 @@ export class AiEngine {
         const res = await this.callGroq(fullMessages, groqKey, options);
         this.stats.groq.success++;
         this.stats.groq.lastUsed = new Date();
-        return { ...res, latencyMs: Date.now() - startTime };
+        return { ...res, text: cleanResponseText(res.text), latencyMs: Date.now() - startTime };
       } catch (err) {
         this.stats.groq.errors++;
         errors.push({ provider: 'groq', error: err.message });
@@ -240,7 +261,7 @@ export class AiEngine {
         const res = await this.callOpenRouter(fullMessages, orKey, options);
         this.stats.openrouter.success++;
         this.stats.openrouter.lastUsed = new Date();
-        return { ...res, latencyMs: Date.now() - startTime };
+        return { ...res, text: cleanResponseText(res.text), latencyMs: Date.now() - startTime };
       } catch (err) {
         this.stats.openrouter.errors++;
         errors.push({ provider: 'openrouter', error: err.message });
@@ -255,7 +276,7 @@ export class AiEngine {
         const res = await this.callGemini(systemPrompt, history, userText, geminiKey, options);
         this.stats.gemini.success++;
         this.stats.gemini.lastUsed = new Date();
-        return { ...res, latencyMs: Date.now() - startTime };
+        return { ...res, text: cleanResponseText(res.text), latencyMs: Date.now() - startTime };
       } catch (err) {
         this.stats.gemini.errors++;
         errors.push({ provider: 'gemini', error: err.message });
@@ -271,7 +292,7 @@ export class AiEngine {
         const res = await this.callOllama(fullMessages, ollamaUrl, { ...options, apiKeys: ollamaKeys });
         this.stats.ollama.success++;
         this.stats.ollama.lastUsed = new Date();
-        return { ...res, latencyMs: Date.now() - startTime };
+        return { ...res, text: cleanResponseText(res.text), latencyMs: Date.now() - startTime };
       } catch (err) {
         this.stats.ollama.errors++;
         errors.push({ provider: 'ollama', error: err.message });
