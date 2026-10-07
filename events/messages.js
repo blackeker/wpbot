@@ -730,16 +730,21 @@ async function processSingleMessage(sock, msg) {
           });
 
           const cookies = loginState.cookieJar.getCookieStringSync(`${baseUrl}/`);
-          const isLogged = cookies.includes('wordpress_logged_in') || loginRes.body.includes('Profil') || loginRes.body.includes('Çıkış');
+          const isLogged = cookies.includes('remember_me') || 
+                           cookies.includes('wordpress_logged_in') || 
+                           loginRes.body.includes('Profil') || 
+                           loginRes.body.includes('Çıkış') || 
+                           loginRes.body.includes('çıkış') ||
+                           !loginRes.body.includes('Güvenlik Kodu');
 
           if (isLogged) {
             writeConfig({ hentaizmCookies: loginState.cookieJar.toJSON() });
-            await sock.sendMessage(from, { text: "✅ Hentaizm girişi başarılı! Şimdi linki tekrar gönderebilirsin." });
+            await sock.sendMessage(from, { text: "✅ Hentaizm girişi başarılı! Oturum kaydedildi, şimdi dilediğin hentai linkini gönderebilirsin." });
             try {
               if (fs.existsSync(loginState.captchaPath)) fs.unlinkSync(loginState.captchaPath);
             } catch (e) {}
           } else {
-            await sock.sendMessage(from, { text: `❌ Güvenlik kodu yanlış. Linki tekrar gönder, yeni bir kod üreteyim.` });
+            await sock.sendMessage(from, { text: `❌ Güvenlik kodu yanlış girildi. Lütfen yeni gelen kodu yazın.` });
           }
         } catch (err) {
           await sock.sendMessage(from, { text: `❌ Giriş sırasında hata oluştu: ${err.message}` });

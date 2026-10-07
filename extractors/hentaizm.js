@@ -4,12 +4,12 @@ import axios from 'axios';
 import { CookieJar } from 'tough-cookie';
 import fs from 'fs';
 import path from 'path';
-import { readConfig, writeConfig, pendingHentaizmLogins, botSocketRef, downloadsDir } from '../config.js';
-export
+import { readConfig, writeConfig, pendingHentaizmLogins, botSocketRef, downloadsDir, getAiConfig } from '../config.js';
+
 // ==========================================
 // HENTAIZM DECRYPTER AND RESOLVER FUNCTIONS
 // ==========================================
-function decryptHentaizmString(encoded) {
+export function decryptHentaizmString(encoded) {
   try {
     if (!encoded) return "";
     let cleaned = encoded.replace(/-/g, '+').replace(/_/g, '/');
@@ -36,7 +36,86 @@ export function cleanHentaizmTitle(rawTitle) {
   return title.trim().replace(/^[-|_|\s]+|[-|_|\s]+$/g, '').trim();
 }
 
-// Triggers a login captcha request to the user
+// Automatic AI-Powered Captcha Solver & Login
+export async function attemptAutoHentaizmLogin(baseUrl = 'https://www.hentaizm2.com') {
+  try {
+    const cookieJar = new CookieJar();
+    const headerOpts = {
+      devices: ['desktop'],
+      locales: ['tr-TR', 'en-US'],
+      operatingSystems: ['windows']
+    };
+
+    // 1. Visit login page to establish session cookie
+    await gotScraping.get({
+      url: `${baseUrl}/login.php`,
+      cookieJar,
+      headerGeneratorOptions: headerOpts
+    });
+
+    // 2. Fetch captcha image
+    const captchaRes = await gotScraping.get({
+      url: `${baseUrl}/captcha.php`,
+      cookieJar,
+      responseType: 'buffer',
+      headerGeneratorOptions: headerOpts
+    });
+
+    const capBase64 = (captchaRes.rawBody || captchaRes.body).toString('base64');
+    const aiConfig = getAiConfig();
+    let solvedCaptcha = null;
+
+    if (aiConfig.geminiApiKey) {
+      try {
+        const gm = aiConfig.geminiModel || 'gemini-2.5-flash';
+        const aiRes = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${aiConfig.geminiApiKey}`, {
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: 'Read the 4 characters/digits in this captcha image. Respond with ONLY the exact 4 characters, nothing else.' },
+                { inlineData: { mimeType: 'image/png', data: capBase64 } }
+              ]
+            }
+          ]
+        }, { timeout: 12000 });
+        solvedCaptcha = aiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()?.replace(/[^a-zA-Z0-9]/g, '');
+      } catch (aiErr) {
+        console.warn('[Hentaizm Auto-Login] AI captcha solve failed:', aiErr.message);
+      }
+    }
+
+    if (solvedCaptcha && solvedCaptcha.length === 4) {
+      console.log(`[Hentaizm Auto-Login] AI solved captcha: "${solvedCaptcha}", logging in...`);
+      const loginRes = await gotScraping.post({
+        url: `${baseUrl}/login.php`,
+        cookieJar,
+        form: {
+          username: process.env.HENTAIZM_USERNAME || "blackeker@gmail.com",
+          password: process.env.HENTAIZM_PASSWORD || "Yusufcuk1.",
+          remember_me: "1",
+          captcha: solvedCaptcha
+        },
+        headers: { "Referer": `${baseUrl}/login.php` },
+        followRedirect: true
+      });
+
+      const cookies = cookieJar.getCookieStringSync(`${baseUrl}/`);
+      const isLogged = cookies.includes('remember_me') || cookies.includes('wordpress_logged_in') || loginRes.body.includes('Profil') || loginRes.body.includes('Çıkış') || loginRes.body.includes('çıkış');
+
+      if (isLogged) {
+        console.log('[Hentaizm Auto-Login] Automatic login successful! Cookies saved.');
+        writeConfig({ hentaizmCookies: cookieJar.toJSON() });
+        return cookieJar;
+      }
+    }
+  } catch (err) {
+    console.error('[Hentaizm Auto-Login] Error:', err.message);
+  }
+  return null;
+}
+
+// Triggers a login captcha request to the user as manual fallback
 export async function initiateHentaizmLogin(fromJid, pageUrl = 'https://www.hentaizm2.com') {
   try {
     const sock = botSocketRef.current;
@@ -440,9 +519,30 @@ export async function extractHentaizm(pageUrl, fromJid = null) {
     const $ = cheerio.load(html);
 
     // Check if we hit the login warning wall
-    if (html.includes('Videoları görmek için üye girişi yapmanız gerekiyor') || html.includes('login.php') && $('#player-area').text().includes('üye girişi')) {
+    if (html.includes('Videoları görmek için üye girişi yapmanız gerekiyor') || (html.includes('login.php') && $('#player-area').text().includes('üye girişi'))) {
+      console.log(`[Hentaizm] Login required. Attempting AI auto-login...`);
+      let baseUrl = 'https://www.hentaizm2.com';
+      try { baseUrl = new URL(pageUrl).origin; } catch (e) {}
+
+      const newJar = await attemptAutoHentaizmLogin(baseUrl);
+      if (newJar) {
+        console.log(`[Hentaizm] Auto-login succeeded! Retrying page fetch with new session...`);
+        const retryRes = await gotScraping.get({
+          url: pageUrl,
+          cookieJar: newJar,
+          headerGeneratorOptions: {
+            devices: ['desktop'],
+            locales: ['tr-TR', 'en-US'],
+            operatingSystems: ['windows']
+          }
+        });
+        if (!retryRes.body.includes('Videoları görmek için üye girişi yapmanız gerekiyor')) {
+          return extractHentaizm(pageUrl, fromJid);
+        }
+      }
+
       if (fromJid) {
-        console.log(`[Hentaizm] Login required for task. Initiating auto-login trigger for ${fromJid}...`);
+        console.log(`[Hentaizm] Auto-login could not complete. Initiating manual captcha login trigger for ${fromJid}...`);
         await initiateHentaizmLogin(fromJid, pageUrl);
         throw new Error("Üye girişi gerekiyor. WhatsApp üzerinden gönderilen doğrulama kodunu yanıtlayın.");
       } else {
@@ -517,12 +617,16 @@ export async function extractHentaizm(pageUrl, fromJid = null) {
         const animeData = await getHentaizmSeasonEpisodes(pageUrl);
         if (animeData && animeData.episodes && animeData.episodes.length > 0) {
           const firstEp = animeData.episodes[0];
-          console.log(`[Hentaizm] Video oynatıcı yerine bölüm listesi bulundu (${animeData.seriesName}). 1. bölüm çözümleniyor: ${firstEp.url}`);
-          const result = await extractHentaizm(firstEp.url, fromJid);
-          return {
-            ...result,
-            title: result.title || `${animeData.seriesName} - ${firstEp.name}`
-          };
+          const cleanCur = pageUrl.split('?')[0].replace(/\/+$/, '');
+          const cleanFirst = (firstEp.url || '').split('?')[0].replace(/\/+$/, '');
+          if (cleanFirst && cleanFirst !== cleanCur) {
+            console.log(`[Hentaizm] Video oynatıcı yerine bölüm listesi bulundu (${animeData.seriesName}). 1. bölüm çözümleniyor: ${firstEp.url}`);
+            const result = await extractHentaizm(firstEp.url, fromJid);
+            return {
+              ...result,
+              title: result.title || `${animeData.seriesName} - ${firstEp.name}`
+            };
+          }
         }
       }
       throw new Error("Video kaynak linki hentaizm sayfasından ayıklanamadı.");
