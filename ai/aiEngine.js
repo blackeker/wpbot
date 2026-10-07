@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import { downloadMediaMessage, downloadContentFromMessage } from '@whiskeysockets/baileys';
 import { getAiConfig, sessionPath } from '../config.js';
 import { loadMenuData, findMenuByQuery } from '../utils/menuData.js';
 
@@ -296,11 +296,53 @@ export class AiEngine {
 
     const botName = options.botName || aiConfig.botName || 'Moi';
     const systemPrompt = options.systemPrompt || getSystemPrompt(botName, options.extraContext);
-    const userPrompt = (prompt || 'Bu görseli incele ve detaylıca açıkla.').trim();
+    const userPrompt = (prompt || 'Bu görseli incele, ne olduğunu, üzerindeki detayları veya soruları açıkla.').trim();
     const errors = [];
     const startTime = Date.now();
 
-    // 1. Ollama Cloud Vision (gemma4:31b Multimodal)
+    // 1. Google Gemini Vision (Primary High-Accuracy Multimodal)
+    const geminiKey = options.geminiApiKey || aiConfig.geminiApiKey;
+    if (geminiKey && !this.isCoolingDown('gemini')) {
+      const gm = options.model || aiConfig.geminiModel || 'gemini-2.5-flash';
+      try {
+        const res = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${geminiKey}`, {
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: `${systemPrompt}\n\nKullanıcı: ${userPrompt}` },
+                { inlineData: { mimeType: mimeType || 'image/jpeg', data: base64Data } }
+              ]
+            }
+          ],
+          generationConfig: {
+            maxOutputTokens: options.max_tokens ?? 350,
+            temperature: options.temperature ?? 0.7
+          },
+          safetySettings: [
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+          ]
+        }, { headers: { 'Content-Type': 'application/json' }, timeout: 25000 });
+
+        const textPart = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textPart) {
+          this.stats.gemini.success++;
+          this.stats.gemini.lastUsed = new Date();
+          return { text: textPart.trim(), provider: 'gemini-vision', model: gm, latencyMs: Date.now() - startTime };
+        }
+      } catch (gErr) {
+        errors.push({ provider: `gemini-${gm}`, error: gErr.response?.data?.error?.message || gErr.message });
+        if (this.isRateLimitOrQuota(gErr)) {
+          this.setCooldown('gemini', 60000);
+        }
+      }
+    }
+
+    // 2. Ollama Cloud Vision (gemma4:31b / llava Multimodal)
     const ollamaUrl = options.ollamaUrl || aiConfig.ollamaUrl || 'https://ollama.com';
     const ollamaKeys = options.ollamaApiKeys || aiConfig.ollamaApiKeys || [aiConfig.ollamaApiKey];
     if (ollamaUrl && !this.isCoolingDown('ollama')) {
@@ -316,13 +358,14 @@ export class AiEngine {
                 { role: 'user', content: userPrompt, images: [base64Data] }
               ],
               stream: false,
-              options: { temperature: 0.4 }
+              options: { temperature: 0.7, num_predict: options.max_tokens ?? 350 }
             }, {
               headers: { 'Authorization': `Bearer ${ollamaKeys[i]}`, 'Content-Type': 'application/json' },
               timeout: 40000
             });
             if (res.data?.message?.content) {
               this.stats.ollama.success++;
+              this.stats.ollama.lastUsed = new Date();
               return { text: res.data.message.content.trim(), provider: 'ollama-vision', model: `${model} (Key #${i + 1})`, latencyMs: Date.now() - startTime };
             }
           } catch (kErr) { lastErr = kErr; }
@@ -331,23 +374,6 @@ export class AiEngine {
       } catch (err) {
         this.stats.ollama.errors++;
         errors.push({ provider: 'ollama-vision', error: err.message });
-      }
-    }
-
-    // 2. Gemini Vision
-    const geminiKey = options.geminiApiKey || aiConfig.geminiApiKey;
-    if (geminiKey && !this.isCoolingDown('gemini')) {
-      for (const gm of ['gemini-2.5-flash', 'gemini-flash-latest']) {
-        try {
-          const res = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${geminiKey}`, {
-            contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nKullanıcı: ${userPrompt}` }, { inlineData: { mimeType: mimeType || 'image/jpeg', data: base64Data } }] }]
-          }, { headers: { 'Content-Type': 'application/json' }, timeout: 25000 });
-          const textPart = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (textPart) {
-            this.stats.gemini.success++;
-            return { text: textPart.trim(), provider: 'gemini-vision', model: gm, latencyMs: Date.now() - startTime };
-          }
-        } catch (gErr) { errors.push({ provider: `gemini-${gm}`, error: gErr.message }); }
       }
     }
 
@@ -479,23 +505,103 @@ export function getQuotedMessageText(msg) {
   return (q.conversation || q.extendedTextMessage?.text || q.imageMessage?.caption || q.videoMessage?.caption || '').trim() || null;
 }
 
+async function streamToBuffer(stream) {
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
 export async function extractImageBufferFromMessage(msg) {
   if (!msg?.message) return null;
-  const raw = msg.message?.ephemeralMessage?.message || msg.message?.viewOnceMessage?.message || msg.message;
+  const raw = msg.message?.ephemeralMessage?.message ||
+              msg.message?.viewOnceMessage?.message ||
+              msg.message?.viewOnceMessageV2?.message ||
+              msg.message?.documentWithCaptionMessage?.message ||
+              msg.message;
 
+  // 1. Direct Image Message
   if (raw.imageMessage) {
     try {
-      const buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
-      return { buffer, mimeType: raw.imageMessage.mimetype || 'image/jpeg', caption: raw.imageMessage.caption || '' };
+      const stream = await downloadContentFromMessage(raw.imageMessage, 'image');
+      const buffer = await streamToBuffer(stream);
+      if (buffer && buffer.length > 0) {
+        return { buffer, mimeType: raw.imageMessage.mimetype || 'image/jpeg', caption: raw.imageMessage.caption || '' };
+      }
+    } catch (e1) {
+      try {
+        const buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
+        if (buffer && buffer.length > 0) {
+          return { buffer, mimeType: raw.imageMessage.mimetype || 'image/jpeg', caption: raw.imageMessage.caption || '' };
+        }
+      } catch (e2) {}
+    }
+  }
+
+  // 2. Direct Sticker Message
+  if (raw.stickerMessage) {
+    try {
+      const stream = await downloadContentFromMessage(raw.stickerMessage, 'sticker');
+      const buffer = await streamToBuffer(stream);
+      if (buffer && buffer.length > 0) {
+        return { buffer, mimeType: raw.stickerMessage.mimetype || 'image/webp', caption: '' };
+      }
     } catch (e) {}
   }
 
-  const ctx = raw.extendedTextMessage?.contextInfo || raw.imageMessage?.contextInfo || raw.videoMessage?.contextInfo;
-  if (ctx?.quotedMessage?.imageMessage) {
+  // 3. Direct Document Image Message
+  if (raw.documentMessage && raw.documentMessage.mimetype?.startsWith('image/')) {
     try {
-      const quotedObj = { key: { remoteJid: msg.key?.remoteJid, id: ctx.stanzaId, participant: ctx.participant }, message: ctx.quotedMessage };
-      const buffer = await downloadMediaMessage(quotedObj, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
-      return { buffer, mimeType: ctx.quotedMessage.imageMessage.mimetype || 'image/jpeg', caption: ctx.quotedMessage.imageMessage.caption || '' };
+      const stream = await downloadContentFromMessage(raw.documentMessage, 'document');
+      const buffer = await streamToBuffer(stream);
+      if (buffer && buffer.length > 0) {
+        return { buffer, mimeType: raw.documentMessage.mimetype || 'image/jpeg', caption: raw.documentMessage.caption || '' };
+      }
+    } catch (e) {}
+  }
+
+  // 4. Quoted Image / Sticker / Document Message
+  const ctx = raw.extendedTextMessage?.contextInfo || raw.imageMessage?.contextInfo || raw.videoMessage?.contextInfo || raw.documentMessage?.contextInfo;
+  const quoted = ctx?.quotedMessage?.ephemeralMessage?.message ||
+                 ctx?.quotedMessage?.viewOnceMessage?.message ||
+                 ctx?.quotedMessage?.viewOnceMessageV2?.message ||
+                 ctx?.quotedMessage?.documentWithCaptionMessage?.message ||
+                 ctx?.quotedMessage;
+
+  if (quoted?.imageMessage) {
+    try {
+      const stream = await downloadContentFromMessage(quoted.imageMessage, 'image');
+      const buffer = await streamToBuffer(stream);
+      if (buffer && buffer.length > 0) {
+        return { buffer, mimeType: quoted.imageMessage.mimetype || 'image/jpeg', caption: quoted.imageMessage.caption || '' };
+      }
+    } catch (e1) {
+      try {
+        const quotedObj = { key: { remoteJid: msg.key?.remoteJid, id: ctx.stanzaId, participant: ctx.participant }, message: ctx.quotedMessage };
+        const buffer = await downloadMediaMessage(quotedObj, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
+        if (buffer && buffer.length > 0) {
+          return { buffer, mimeType: quoted.imageMessage.mimetype || 'image/jpeg', caption: quoted.imageMessage.caption || '' };
+        }
+      } catch (e2) {}
+    }
+  }
+
+  if (quoted?.stickerMessage) {
+    try {
+      const stream = await downloadContentFromMessage(quoted.stickerMessage, 'sticker');
+      const buffer = await streamToBuffer(stream);
+      if (buffer && buffer.length > 0) {
+        return { buffer, mimeType: quoted.stickerMessage.mimetype || 'image/webp', caption: '' };
+      }
+    } catch (e) {}
+  }
+
+  if (quoted?.documentMessage && quoted.documentMessage.mimetype?.startsWith('image/')) {
+    try {
+      const stream = await downloadContentFromMessage(quoted.documentMessage, 'document');
+      const buffer = await streamToBuffer(stream);
+      if (buffer && buffer.length > 0) {
+        return { buffer, mimeType: quoted.documentMessage.mimetype || 'image/jpeg', caption: quoted.documentMessage.caption || '' };
+      }
     } catch (e) {}
   }
 
@@ -541,8 +647,12 @@ export async function handleAiVision(sock, msg, from, imageBuffer, mimeType, use
   try { await sock.sendPresenceUpdate('composing', from); } catch (e) {}
 
   try {
-    const prompt = userPrompt || 'Bu görseli detaylıca incele, ne olduğunu ve üzerindeki detayları veya soruları açıkla.';
+    const senderName = msg?.pushName || (msg?.key?.participant ? msg.key.participant.split('@')[0] : '');
+    const prompt = userPrompt || 'Bu görseli incele, ne olduğunu ve üzerindeki detayları veya soruları açıkla.';
     const result = await aiEngine.generateVisionReply(imageBuffer, mimeType, prompt);
+
+    memoryManager.addMessage(from, 'user', `[Görsel Gönderildi: "${prompt}"]`, { senderName });
+    memoryManager.addMessage(from, 'assistant', result.text);
 
     try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
     await sock.sendMessage(from, { text: result.text }, { quoted: msg, skipAntiBan: true });
@@ -550,7 +660,7 @@ export async function handleAiVision(sock, msg, from, imageBuffer, mimeType, use
   } catch (err) {
     try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
     console.error(`[VISION ERROR] Failed to process image for ${from}:`, err.message);
-    await sock.sendMessage(from, { text: '😔 Görseli incelerken bir sorun oluştu. Lütfen tekrar göndermeyi deneyin.' }, { quoted: msg });
+    await sock.sendMessage(from, { text: '😔 Görseli incelerken bir sorun oluştu. Lütfen tekrar göndermeyi deneyin.' }, { quoted: msg, skipAntiBan: true });
     return null;
   }
 }

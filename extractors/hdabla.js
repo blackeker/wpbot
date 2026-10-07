@@ -141,8 +141,8 @@ export async function extractHdabla(pageUrl) {
       console.error("[HDABLA] iFrame player fetch failed:", e.message);
     }
 
-    if (!finalVideoUrl) {
-      finalVideoUrl = playerUrl;
+    if (!finalVideoUrl || (!finalVideoUrl.includes('.m3u8') && !finalVideoUrl.includes('.mp4'))) {
+      throw new Error("Video akış linki bulunamadı veya video kaynak sunucudan silinmiş.");
     }
 
     return {

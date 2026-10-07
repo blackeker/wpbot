@@ -87,9 +87,25 @@ async function processSingleMessage(sock, msg) {
   ).trim();
   const ltext = text.toLowerCase().trim();
 
-  if (!text) return;
+  // Check if message contains media (image, sticker, image-document) or quoted media
+  const hasDirectMedia = Boolean(
+    content.imageMessage || 
+    content.stickerMessage || 
+    (content.documentMessage?.mimetype?.startsWith('image/'))
+  );
+  const msgContext = content.extendedTextMessage?.contextInfo || 
+                     content.imageMessage?.contextInfo || 
+                     content.videoMessage?.contextInfo ||
+                     content.documentMessage?.contextInfo;
+  const hasQuotedMedia = Boolean(
+    msgContext?.quotedMessage?.imageMessage || 
+    msgContext?.quotedMessage?.stickerMessage || 
+    (msgContext?.quotedMessage?.documentMessage?.mimetype?.startsWith('image/'))
+  );
 
-  console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}"`);
+  if (!text && !hasDirectMedia && !hasQuotedMedia) return;
+
+  console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}" | Media: ${hasDirectMedia || hasQuotedMedia}`);
 
   const prefixes = ['!', '/', '.'];
   const matchedPrefix = prefixes.find(p => text.startsWith(p));
@@ -901,14 +917,20 @@ async function processSingleMessage(sock, msg) {
   if (aiCfg.hasAnyKey && aiCfg.enabled) {
     const botNumber = sock.user?.id?.split(':')[0]?.replace(/[^0-9]/g, '') || '';
     const botLid = sock.user?.lid ? sock.user.lid.split(':')[0] : '';
-    const mentionedJids = content.extendedTextMessage?.contextInfo?.mentionedJid || [];
+    const msgContextInfo = content.extendedTextMessage?.contextInfo || 
+                           content.imageMessage?.contextInfo || 
+                           content.videoMessage?.contextInfo || 
+                           content.documentMessage?.contextInfo || 
+                           content.stickerMessage?.contextInfo;
+
+    const mentionedJids = msgContextInfo?.mentionedJid || [];
     const isBotMentioned = Boolean(
       (botNumber && mentionedJids.some(j => j.includes(botNumber))) ||
       (botLid && mentionedJids.some(j => j.includes(botLid))) ||
       (text && botNumber && text.includes(`@${botNumber}`))
     );
 
-    const quotedParticipant = content.extendedTextMessage?.contextInfo?.participant || '';
+    const quotedParticipant = msgContextInfo?.participant || '';
     const isReplyToBot = Boolean(
       (botNumber && quotedParticipant.includes(botNumber)) ||
       (botLid && quotedParticipant.includes(botLid))
