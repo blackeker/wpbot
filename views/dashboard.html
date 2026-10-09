@@ -936,6 +936,10 @@
         <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         <span>Dosya Yöneticisi</span>
       </a>
+      <a class="nav-link" onclick="switchNavTab('view-once-vault')">
+        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Tek Gönderimlik Kasa</span>
+      </a>
       <a class="nav-link" onclick="switchNavTab('group-permissions')">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Grup İzinleri</span>
@@ -1373,6 +1377,61 @@
       </section>
 
       <!-- ======================================================== -->
+      <!-- VIEW: VIEW-ONCE VAULT (TEK GÖNDERİMLİK MEDYA KASASI) -->
+      <!-- ======================================================== -->
+      <section class="view-panel" id="view-view-once-vault">
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <div>
+              <span class="card-title">👁️ Tek Gönderimlik Medya Kasası</span>
+              <p style="color: var(--text-4); font-size: 12px; margin-top: 4px;">
+                WhatsApp sohbet ve gruplarından yakalanan "tek seferlik" (view-once) fotoğraflar, videolar ve ses kayıtları otomatik olarak buraya arşivlenir.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" onclick="loadViewOnceVault()">Yenile</button>
+              <button class="btn btn-danger btn-sm" onclick="clearAllViewOnceMedia()">Kasayı Temizle</button>
+            </div>
+          </div>
+
+          <!-- Vault Stats -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px;">
+            <div style="background: var(--bg-2); border: 1px solid var(--border-1); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-4); font-weight: 600;">TOPLAM</div>
+              <div id="vo-stat-total" style="font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 4px;">0</div>
+            </div>
+            <div style="background: var(--bg-2); border: 1px solid var(--border-1); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-4); font-weight: 600;">FOTOĞRAF</div>
+              <div id="vo-stat-images" style="font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 4px;">0</div>
+            </div>
+            <div style="background: var(--bg-2); border: 1px solid var(--border-1); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-4); font-weight: 600;">VİDEO</div>
+              <div id="vo-stat-videos" style="font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 4px;">0</div>
+            </div>
+            <div style="background: var(--bg-2); border: 1px solid var(--border-1); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-4); font-weight: 600;">SES KAYDI</div>
+              <div id="vo-stat-audios" style="font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 4px;">0</div>
+            </div>
+          </div>
+
+          <!-- Vault Filter Tabs -->
+          <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+            <button class="pill active" onclick="filterViewOnce('all', this)">Tümü</button>
+            <button class="pill" onclick="filterViewOnce('image', this)">Fotoğraflar</button>
+            <button class="pill" onclick="filterViewOnce('video', this)">Videolar</button>
+            <button class="pill" onclick="filterViewOnce('audio', this)">Ses Kayıtları</button>
+          </div>
+
+          <!-- Vault Grid Container -->
+          <div id="view-once-grid" class="fe-grid" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+            <div style="grid-column: 1 / -1; text-align: center; color: var(--text-5); padding: 36px;">
+              Henüz yakalanan tek gönderimlik medya bulunmuyor.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
       <!-- VIEW: GROUP PERMISSIONS -->
       <!-- ======================================================== -->
       <section class="view-panel" id="view-group-permissions">
@@ -1559,7 +1618,16 @@
                 <label class="form-label">VDS Genel IP ve Web Port</label>
                 <div class="grid-2" style="margin-bottom: 0;">
                   <input type="text" id="setting-vds-ip" class="input-text" placeholder="111.235.150.157">
-                  <input type="number" id="setting-vds-port" class="input-text" placeholder="7860">
+                  <input type="number" id="setting-vds-port" class="input-text" placeholder="3000">
+                </div>
+              </div>
+
+              <div class="form-group" style="padding: 12px; background: var(--bg-2); border-radius: var(--radius-md); border: 1px solid var(--border-1);">
+                <label class="form-label">👁️ Tek Gönderimlik Medya (View-Once) Hedefi</label>
+                <input type="text" id="setting-viewonce-target" class="input-text" placeholder="Örn: 905551234567 veya Grup JID (Boş bırakılırsa kendinize iletilir)">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
+                  <span style="font-size: 13px; color: var(--text-2);">WhatsApp'a Otomatik İlet</span>
+                  <input type="checkbox" id="setting-viewonce-autoforward" checked style="accent-color: #ffffff; width: 18px; height: 18px; cursor: pointer;">
                 </div>
               </div>
 
@@ -1798,6 +1866,7 @@
     'series-wizard': { title: 'Dizi & Anime Sihirbazı', sub: 'Toplu Bölüm Yakalama & İndirme' },
     'hentai-bulk': { title: 'Hentai & Manga Sihirbazı', sub: 'MangaPortalı & HentaiZM Toplu İndirici' },
     'media-vault': { title: 'Dosya Yöneticisi', sub: 'Sunucu Dosya Gezgini & Medya Oynatıcı' },
+    'view-once-vault': { title: 'Tek Gönderimlik Kasa', sub: 'Yakalanan Tek Gönderimlik Fotoğraf, Video ve Sesler' },
     'group-permissions': { title: 'Grup İzinleri', sub: 'Grup Bazlı Komut Kısıtlama & Modlar' },
     'whatsapp-station': { title: 'WhatsApp Bağlantısı', sub: 'QR, Eşleşme Kodu & Oturum Yedekleme' },
     'cron-station': { title: 'Zamanlanmış Görevler', sub: 'Cron Otomasyon Motoru' },
@@ -1861,6 +1930,7 @@
 
     // Tab-specific initializers
     if (tabId === 'media-vault') loadMediaVault();
+    if (tabId === 'view-once-vault') loadViewOnceVault();
     if (tabId === 'group-permissions') loadGroupPermissionsAction();
     if (tabId === 'cron-station') loadCronAction();
     if (tabId === 'settings-station') loadSettingsAction();
@@ -3168,6 +3238,210 @@
   }
 
   /* =========================================================================
+     VIEW-ONCE VAULT (TEK GÖNDERİMLİK MEDYA KASASI)
+     ========================================================================= */
+  let viewOnceItems = [];
+  let viewOnceCurrentFilter = 'all';
+
+  async function loadViewOnceVault() {
+    const grid = document.getElementById('view-once-grid');
+    grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-4); padding: 36px;">Yükleniyor...</div>';
+
+    try {
+      const res = await fetch('/api/view-once');
+      const data = await res.json();
+      viewOnceItems = data.items || [];
+
+      // Update counters
+      const total = viewOnceItems.length;
+      const images = viewOnceItems.filter(i => i.mediaType === 'image').length;
+      const videos = viewOnceItems.filter(i => i.mediaType === 'video').length;
+      const audios = viewOnceItems.filter(i => i.mediaType === 'audio').length;
+
+      document.getElementById('vo-stat-total').innerText = total;
+      document.getElementById('vo-stat-images').innerText = images;
+      document.getElementById('vo-stat-videos').innerText = videos;
+      document.getElementById('vo-stat-audios').innerText = audios;
+
+      renderViewOnceGrid();
+    } catch (e) {
+      grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #ef4444; padding: 24px;">Yükleme hatası: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function filterViewOnce(type, btn) {
+    viewOnceCurrentFilter = type;
+    btn.parentElement.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    renderViewOnceGrid();
+  }
+
+  function renderViewOnceGrid() {
+    const grid = document.getElementById('view-once-grid');
+    const filtered = viewOnceCurrentFilter === 'all' 
+      ? viewOnceItems 
+      : viewOnceItems.filter(i => i.mediaType === viewOnceCurrentFilter);
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; color: var(--text-5); padding: 48px; border: 1px dashed var(--border-1); border-radius: var(--radius-lg);">
+          <div style="font-size: 32px; margin-bottom: 8px;">👁️</div>
+          <div style="font-size: 14px; font-weight: 600; color: var(--text-3);">Bu kategoride tek gönderimlik medya bulunmuyor.</div>
+          <div style="font-size: 12px; color: var(--text-5); margin-top: 4px;">WhatsApp'tan gelen tek gönderimlik fotoğraflar otomatik olarak yakalanır.</div>
+        </div>
+      `;
+      return;
+    }
+
+    grid.innerHTML = filtered.map(item => {
+      const isImg = item.mediaType === 'image';
+      const isVid = item.mediaType === 'video';
+      const isAud = item.mediaType === 'audio';
+
+      let mediaPreviewHtml = '';
+      if (isImg) {
+        mediaPreviewHtml = `
+          <div style="height: 180px; width: 100%; background: #000; border-radius: var(--radius-sm); overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="openMediaPreview('${item.downloadUrl}', 'image')">
+            <img src="${item.downloadUrl}" alt="View Once" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+          </div>
+        `;
+      } else if (isVid) {
+        mediaPreviewHtml = `
+          <div style="height: 180px; width: 100%; background: #000; border-radius: var(--radius-sm); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer;" onclick="openMediaPreview('${item.downloadUrl}', 'video')">
+            <video src="${item.downloadUrl}" style="max-height: 100%; max-width: 100%; object-fit: contain;" preload="metadata"></video>
+            <div style="position: absolute; background: rgba(0,0,0,0.6); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #fff;">▶</div>
+          </div>
+        `;
+      } else if (isAud) {
+        mediaPreviewHtml = `
+          <div style="height: 90px; width: 100%; background: var(--bg-2); border-radius: var(--radius-sm); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+            <div style="font-size: 12px; color: var(--text-3); margin-bottom: 6px;">🎙️ Ses Kaydı</div>
+            <audio src="${item.downloadUrl}" controls style="width: 100%; height: 32px;"></audio>
+          </div>
+        `;
+      } else {
+        mediaPreviewHtml = `
+          <div style="height: 100px; width: 100%; background: var(--bg-2); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 24px;">
+            📄
+          </div>
+        `;
+      }
+
+      return `
+        <div class="card" style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border-2); border-radius: var(--radius-md); background: var(--bg-1);">
+          ${mediaPreviewHtml}
+
+          <div style="font-size: 12px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: #ffffff;">👤 ${escapeHtml(item.pushName)}</span>
+              <span class="badge" style="background: var(--bg-3); font-size: 10px;">${escapeHtml(item.ext.toUpperCase())}</span>
+            </div>
+            <div style="color: var(--text-4); font-size: 11px; font-family: var(--font-mono);">
+              📞 +${escapeHtml(item.senderNumber)}
+            </div>
+            <div style="color: var(--text-4); font-size: 11px;">
+              📍 ${item.isGroup ? `Grup: ${escapeHtml(item.groupName || 'Bilinmiyor')}` : 'Özel Sohbet'}
+            </div>
+            ${item.caption ? `<div style="color: var(--text-2); font-size: 11px; background: var(--bg-2); padding: 4px 6px; border-radius: 4px; margin-top: 4px;">💬 ${escapeHtml(item.caption)}</div>` : ''}
+            <div style="display: flex; justify-content: space-between; color: var(--text-5); font-size: 10px; margin-top: 4px;">
+              <span>🕒 ${escapeHtml(item.dateFormatted)}</span>
+              <span>💾 ${escapeHtml(item.sizeFormatted)}</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 6px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border-1);">
+            <a href="${item.downloadUrl}" download="${item.filename}" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center; text-decoration: none;">İndir</a>
+            <button class="btn btn-primary btn-sm" onclick="forwardViewOncePrompt('${item.filename}')" title="WhatsApp'a İlet" style="flex: 1;">İlet</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteViewOnceMedia('${item.filename}')" title="Sil">Sil</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function deleteViewOnceMedia(filename) {
+    if (!confirm('Bu tek gönderimlik medyayı kalıcı olarak silmek istiyor musunuz?')) return;
+    try {
+      const res = await fetch(`/api/view-once/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Medya silindi.');
+        loadViewOnceVault();
+      }
+    } catch (e) {
+      showToast('Silinemedi: ' + e.message);
+    }
+  }
+
+  async function forwardViewOncePrompt(filename) {
+    const phone = prompt('Medyayı iletmek istediğiniz telefon numarasını girin (Örn: 905551234567 veya boş bırakarak varsayılan hedefe iletin):');
+    if (phone === null) return;
+
+    showToast('Medya WhatsApp üzerinden iletiliyor...');
+    try {
+      const res = await fetch('/api/view-once/forward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, targetPhone: phone ? phone.trim() : undefined })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message);
+      } else {
+        showToast('Hata: ' + (data.error || 'İletilemedi'));
+      }
+    } catch (e) {
+      showToast('Hata: ' + e.message);
+    }
+  }
+
+  async function clearAllViewOnceMedia() {
+    if (!confirm('Kasadaki TÜM tek gönderimlik medyaları kalıcı olarak silmek istediğinize emin misiniz?')) return;
+    try {
+      const res = await fetch('/api/view-once/clear', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Kasa temizlendi.');
+        loadViewOnceVault();
+      }
+    } catch (e) {
+      showToast('Hata: ' + e.message);
+    }
+  }
+
+  function openMediaPreview(downloadUrl, type) {
+    const modal = document.getElementById('file-preview-modal');
+    const titleEl = document.getElementById('preview-modal-title');
+    const badgeEl = document.getElementById('preview-modal-type-badge');
+    const dlLink = document.getElementById('preview-modal-download-link');
+    const bodyEl = document.getElementById('preview-modal-body');
+
+    const filename = decodeURIComponent(downloadUrl.split('/').pop());
+    titleEl.innerText = filename;
+    badgeEl.innerText = (type || 'MEDYA').toUpperCase();
+    dlLink.href = downloadUrl;
+
+    if (type === 'image') {
+      bodyEl.innerHTML = `<img src="${downloadUrl}" style="max-width: 100%; max-height: 75vh; object-fit: contain; padding: 12px; display: block; margin: 0 auto;">`;
+    } else if (type === 'video') {
+      bodyEl.innerHTML = `<video id="modal-preview-video" playsinline controls style="width: 100%; max-height: 520px;" src="${downloadUrl}"></video>`;
+      setTimeout(() => {
+        const vid = document.getElementById('modal-preview-video');
+        if (vid) vid.play().catch(() => {});
+      }, 100);
+    } else if (type === 'audio') {
+      bodyEl.innerHTML = `
+        <div style="padding: 48px 24px; text-align: center; width: 100%;">
+          <div style="font-size: 48px; margin-bottom: 16px;">🎙️</div>
+          <div style="font-weight: 600; color: #fff; margin-bottom: 20px; font-size: 15px;">${escapeHtml(filename)}</div>
+          <audio controls autoplay style="width: 80%; max-width: 480px;" src="${downloadUrl}"></audio>
+        </div>
+      `;
+    }
+    modal.classList.add('active');
+  }
+
+  /* =========================================================================
      CRON & SETTINGS
      ========================================================================= */
   async function loadCronAction() {
@@ -3240,15 +3514,21 @@
   async function loadSettingsAction() {
     try {
       const res = await fetch('/api/settings');
-      const cfg = await res.json();
-      if (cfg.maxConcurrentDownloads) {
-        document.getElementById('setting-queue-limit').value = cfg.maxConcurrentDownloads;
-        document.getElementById('queue-limit-val').innerText = cfg.maxConcurrentDownloads;
+      const data = await res.json();
+      const cfg = data.settings || data;
+      if (cfg.maxConcurrentDownloads || cfg.concurrencyLimit) {
+        const limit = cfg.maxConcurrentDownloads || cfg.concurrencyLimit;
+        document.getElementById('setting-queue-limit').value = limit;
+        document.getElementById('queue-limit-val').innerText = limit;
       }
       if (cfg.proxyUrl) document.getElementById('setting-proxy-url').value = cfg.proxyUrl;
       if (cfg.dashboardUser) document.getElementById('setting-dash-user').value = cfg.dashboardUser;
       if (cfg.vdsIp) document.getElementById('setting-vds-ip').value = cfg.vdsIp;
       if (cfg.port) document.getElementById('setting-vds-port').value = cfg.port;
+      if (cfg.viewOnceTargetJid) document.getElementById('setting-viewonce-target').value = cfg.viewOnceTargetJid;
+      if (cfg.viewOnceAutoForward !== undefined) {
+        document.getElementById('setting-viewonce-autoforward').checked = Boolean(cfg.viewOnceAutoForward);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -3260,18 +3540,29 @@
 
   async function saveSettingsAction(e) {
     if (e) e.preventDefault();
-    const maxConcurrentDownloads = parseInt(document.getElementById('setting-queue-limit').value, 10);
+    const concurrencyLimit = parseInt(document.getElementById('setting-queue-limit').value, 10);
     const proxyUrl = document.getElementById('setting-proxy-url').value.trim();
     const dashboardUser = document.getElementById('setting-dash-user').value.trim();
     const dashboardPass = document.getElementById('setting-dash-pass').value;
     const vdsIp = document.getElementById('setting-vds-ip').value.trim();
     const port = parseInt(document.getElementById('setting-vds-port').value, 10);
+    const viewOnceTargetJid = document.getElementById('setting-viewonce-target').value.trim();
+    const viewOnceAutoForward = document.getElementById('setting-viewonce-autoforward').checked;
 
     try {
       const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ maxConcurrentDownloads, proxyUrl, dashboardUser, dashboardPass, vdsIp, port })
+        body: JSON.stringify({ 
+          concurrencyLimit, 
+          proxyUrl, 
+          dashboardUser, 
+          dashboardPass, 
+          vdsIp, 
+          port,
+          viewOnceTargetJid,
+          viewOnceAutoForward
+        })
       });
       const data = await res.json();
       if (data.success) showToast('Sistem ayarları güncellendi!');

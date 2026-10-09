@@ -558,6 +558,164 @@ app.get('/api/files', (req, res) => {
   }
 });
 
+// ─── View-Once Vault APIs ───
+const viewOnceDir = path.join(downloadsDir, 'view_once');
+
+app.get('/api/view-once', (req, res) => {
+  try {
+    if (!fs.existsSync(viewOnceDir)) {
+      fs.mkdirSync(viewOnceDir, { recursive: true });
+    }
+    const entries = fs.readdirSync(viewOnceDir);
+    const items = [];
+
+    for (const name of entries) {
+      if (name.endsWith('.meta.json') || name.startsWith('.')) continue;
+      try {
+        const filePath = path.join(viewOnceDir, name);
+        const stats = fs.statSync(filePath);
+        if (!stats.isFile()) continue;
+
+        const metaPath = `${filePath}.meta.json`;
+        let meta = null;
+        if (fs.existsSync(metaPath)) {
+          try {
+            meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+          } catch (e) {}
+        }
+
+        const ext = path.extname(name).toLowerCase();
+        let mediaType = 'image';
+        if (['.mp4', '.mkv', '.webm', '.mov'].includes(ext)) mediaType = 'video';
+        else if (['.mp3', '.m4a', '.wav', '.ogg', '.opus'].includes(ext)) mediaType = 'audio';
+        else if (ext === '.pdf' || ext === '.bin' || ext === '.doc') mediaType = 'document';
+
+        // Extract sender from filename if meta is absent (viewonce_TIMESTAMP_SENDER.ext)
+        let senderNumber = meta?.senderNumber || '';
+        if (!senderNumber) {
+          const parts = name.split('_');
+          if (parts.length >= 3) {
+            senderNumber = parts[2].split('.')[0];
+          }
+        }
+
+        items.push({
+          filename: name,
+          mediaType: meta?.mediaType || mediaType,
+          ext: ext.replace('.', ''),
+          sizeBytes: stats.size,
+          sizeFormatted: formatBytes(stats.size),
+          mtime: stats.mtime.toISOString(),
+          dateFormatted: stats.mtime.toLocaleString('tr-TR'),
+          downloadUrl: `/downloads/view_once/${encodeURIComponent(name)}`,
+          senderNumber: senderNumber || 'Bilinmiyor',
+          pushName: meta?.pushName || 'WhatsApp Kullanıcısı',
+          groupName: meta?.groupName || null,
+          isGroup: Boolean(meta?.isGroup),
+          caption: meta?.caption || ''
+        });
+      } catch (e) {}
+    }
+
+    items.sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
+
+    res.json({
+      success: true,
+      items,
+      count: items.length
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/view-once/:filename', (req, res) => {
+  try {
+    const safeFile = path.basename(req.params.filename);
+    const filePath = path.join(viewOnceDir, safeFile);
+    const metaPath = `${filePath}.meta.json`;
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    if (fs.existsSync(metaPath)) {
+      fs.unlinkSync(metaPath);
+    }
+
+    res.json({ success: true, message: 'Tek gönderimlik medya silindi.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/view-once/forward', async (req, res) => {
+  const { filename, targetPhone, targetJid: customJid } = req.body;
+  if (!filename) return res.status(400).json({ success: false, error: 'Dosya adı gereklidir.' });
+  if (!botSocketRef.current) return res.status(503).json({ success: false, error: 'WhatsApp bot bağlı değil.' });
+
+  try {
+    const safeFile = path.basename(filename);
+    const filePath = path.join(viewOnceDir, safeFile);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Medya dosyası bulunamadı.' });
+    }
+
+    let finalJid = customJid;
+    if (!finalJid && targetPhone) {
+      const clean = targetPhone.replace(/[^0-9]/g, '');
+      finalJid = `${clean}@s.whatsapp.net`;
+    }
+    if (!finalJid) {
+      const config = readConfig();
+      finalJid = config.viewOnceTargetJid || config.depotGroupJid || config.adminNumber;
+      if (finalJid && !finalJid.includes('@')) {
+        finalJid = `${finalJid.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+      }
+    }
+    if (!finalJid && botSocketRef.current?.user?.id) {
+      const selfNum = botSocketRef.current.user.id.split(':')[0].replace(/[^0-9]/g, '');
+      finalJid = `${selfNum}@s.whatsapp.net`;
+    }
+
+    if (!finalJid) {
+      return res.status(400).json({ success: false, error: 'Hedef WhatsApp numarası veya grubu bulunamadı.' });
+    }
+
+    const ext = path.extname(safeFile).toLowerCase();
+    const buffer = fs.readFileSync(filePath);
+    const caption = `👁️ *Tek Gönderimlik Kasa Medyası*\n📁 Dosya: ${safeFile}`;
+
+    if (['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+      await botSocketRef.current.sendMessage(finalJid, { image: buffer, caption });
+    } else if (['.mp4', '.mkv', '.webm', '.mov'].includes(ext)) {
+      await botSocketRef.current.sendMessage(finalJid, { video: buffer, caption, mimetype: 'video/mp4' });
+    } else if (['.mp3', '.m4a', '.wav', '.ogg', '.opus'].includes(ext)) {
+      await botSocketRef.current.sendMessage(finalJid, { audio: buffer, mimetype: 'audio/mp4', ptt: true });
+      await botSocketRef.current.sendMessage(finalJid, { text: caption });
+    } else {
+      await botSocketRef.current.sendMessage(finalJid, { document: buffer, fileName: safeFile, caption, mimetype: 'application/octet-stream' });
+    }
+
+    res.json({ success: true, message: `Medya ${finalJid} adresine başarıyla iletildi.` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/view-once/clear', (req, res) => {
+  try {
+    if (fs.existsSync(viewOnceDir)) {
+      const entries = fs.readdirSync(viewOnceDir);
+      for (const e of entries) {
+        try { fs.unlinkSync(path.join(viewOnceDir, e)); } catch (err) {}
+      }
+    }
+    res.json({ success: true, message: 'Tek gönderimlik medya kasası temizlendi.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // File Explorer: Rename File
 app.post('/api/files/rename', (req, res) => {
   const { oldName, newName } = req.body;

@@ -47,7 +47,13 @@ export function isViewOnceMessage(rawMsg) {
     rawMsg.imageMessage?.viewOnce ||
     rawMsg.videoMessage?.viewOnce ||
     rawMsg.audioMessage?.viewOnce ||
-    rawMsg.documentMessage?.viewOnce
+    rawMsg.documentMessage?.viewOnce ||
+    rawMsg.ephemeralMessage?.message?.viewOnceMessage ||
+    rawMsg.ephemeralMessage?.message?.viewOnceMessageV2 ||
+    rawMsg.ephemeralMessage?.message?.viewOnceMessageV2Extension ||
+    rawMsg.ephemeralMessage?.message?.imageMessage?.viewOnce ||
+    rawMsg.ephemeralMessage?.message?.videoMessage?.viewOnce ||
+    rawMsg.ephemeralMessage?.message?.audioMessage?.viewOnce
   ) return true;
 
   try {
@@ -68,7 +74,6 @@ export function isViewOnceMessage(rawMsg) {
 
 export async function autoForwardViewOnceMedia(sock, msg, from) {
   try {
-    const targetJid = '905332624732@s.whatsapp.net';
     const rawMsg = msg.message;
     if (!rawMsg) return;
 
@@ -78,9 +83,10 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
                 rawMsg.videoMessage?.contextInfo || 
                 rawMsg.documentMessage?.contextInfo ||
                 content?.extendedTextMessage?.contextInfo ||
-                content?.imageMessage?.contextInfo;
+                content?.imageMessage?.contextInfo ||
+                content?.videoMessage?.contextInfo;
 
-    const isDirectViewOnce = isViewOnceMessage(rawMsg);
+    const isDirectViewOnce = isViewOnceMessage(rawMsg) || isViewOnceMessage(content);
     const isQuotedViewOnce = isViewOnceMessage(ctx?.quotedMessage);
 
     if (!isDirectViewOnce && !isQuotedViewOnce) return;
@@ -91,6 +97,8 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
                    rawMsg?.viewOnceMessage?.message?.imageMessage || 
                    rawMsg?.viewOnceMessageV2?.message?.imageMessage || 
                    rawMsg?.viewOnceMessageV2Extension?.message?.imageMessage || 
+                   rawMsg?.ephemeralMessage?.message?.viewOnceMessage?.message?.imageMessage ||
+                   rawMsg?.ephemeralMessage?.message?.viewOnceMessageV2?.message?.imageMessage ||
                    quoted?.imageMessage || 
                    ctx?.quotedMessage?.viewOnceMessage?.message?.imageMessage || 
                    ctx?.quotedMessage?.viewOnceMessageV2?.message?.imageMessage;
@@ -99,6 +107,8 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
                    rawMsg?.viewOnceMessage?.message?.videoMessage || 
                    rawMsg?.viewOnceMessageV2?.message?.videoMessage || 
                    rawMsg?.viewOnceMessageV2Extension?.message?.videoMessage || 
+                   rawMsg?.ephemeralMessage?.message?.viewOnceMessage?.message?.videoMessage ||
+                   rawMsg?.ephemeralMessage?.message?.viewOnceMessageV2?.message?.videoMessage ||
                    quoted?.videoMessage || 
                    ctx?.quotedMessage?.viewOnceMessage?.message?.videoMessage || 
                    ctx?.quotedMessage?.viewOnceMessageV2?.message?.videoMessage;
@@ -107,6 +117,7 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
                    rawMsg?.viewOnceMessage?.message?.audioMessage || 
                    rawMsg?.viewOnceMessageV2?.message?.audioMessage || 
                    rawMsg?.viewOnceMessageV2Extension?.message?.audioMessage || 
+                   rawMsg?.ephemeralMessage?.message?.viewOnceMessage?.message?.audioMessage ||
                    quoted?.audioMessage;
 
     const docMsg = content?.documentMessage || 
@@ -153,7 +164,8 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     const sender = ctx?.participant || msg.key?.participant || msg.participant || from;
     const senderNumber = (sender || '').split('@')[0];
     const ext = mediaType === 'image' ? 'jpg' : (mediaType === 'video' ? 'mp4' : (mediaType === 'audio' ? 'mp3' : (docMsg?.fileName ? (path.extname(docMsg.fileName).replace('.', '') || 'bin') : 'bin')));
-    const savedPath = path.join(viewOnceDir, `viewonce_${Date.now()}_${senderNumber}.${ext}`);
+    const savedFilename = `viewonce_${Date.now()}_${senderNumber}.${ext}`;
+    const savedPath = path.join(viewOnceDir, savedFilename);
     try { fs.writeFileSync(savedPath, buffer); } catch (e) {}
 
     const isGroup = from.endsWith('@g.us');
@@ -172,6 +184,56 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     const typeLabel = mediaType === 'image' ? 'Fotoğraf' : (mediaType === 'video' ? 'Video' : (mediaType === 'audio' ? 'Ses Kaydı' : 'Belge/Dosya'));
     const timeStr = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
 
+    // Metadata JSON dosyasını da kaydet (Web Dashboard için)
+    const metaPath = `${savedPath}.meta.json`;
+    const metaData = {
+      id: msg.key?.id,
+      mediaType,
+      ext,
+      filename: savedFilename,
+      downloadUrl: `/downloads/view_once/${encodeURIComponent(savedFilename)}`,
+      senderNumber,
+      senderJid: sender,
+      pushName,
+      isGroup,
+      groupName: isGroup ? groupName : null,
+      chatJid: from,
+      caption: captionText || '',
+      timestamp: new Date().toISOString(),
+      dateFormatted: timeStr,
+      sizeBytes: buffer.length
+    };
+    try { fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2), 'utf8'); } catch (e) {}
+
+    // Dinamik hedef JID belirleme
+    const config = readConfig();
+    if (config.viewOnceAutoForward === false) {
+      console.log(`[VIEW-ONCE SNIPER] Medya yerel kasaya kaydedildi (${savedFilename}), otomatik iletim ayarlardan kapalı.`);
+      return;
+    }
+
+    let targetJid = null;
+    if (config.viewOnceTargetJid) {
+      const clean = config.viewOnceTargetJid.trim();
+      targetJid = clean.includes('@') ? clean : `${clean.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
+    } else if (config.depotGroupJid) {
+      targetJid = config.depotGroupJid;
+    } else if (config.ownerNumber || process.env.OWNER_NUMBER) {
+      const num = (config.ownerNumber || process.env.OWNER_NUMBER).replace(/[^0-9]/g, '');
+      if (num) targetJid = `${num}@s.whatsapp.net`;
+    } else if (config.adminNumber) {
+      const num = config.adminNumber.replace(/[^0-9]/g, '');
+      if (num) targetJid = `${num}@s.whatsapp.net`;
+    } else if (sock?.user?.id) {
+      const selfNum = sock.user.id.split(':')[0].replace(/[^0-9]/g, '');
+      if (selfNum) targetJid = `${selfNum}@s.whatsapp.net`;
+    }
+
+    if (!targetJid) {
+      console.log(`[VIEW-ONCE SNIPER] Medya kasaya arşivlendi (${savedFilename}). İletim için hedef numara/grup ayarlanmadı.`);
+      return;
+    }
+
     let caption = `👁️ *Tek Gönderimlik ${typeLabel} Yakalandı!*\n━━━━━━━━━━━━━━━━━━━━\n👤 *Gönderen:* ${pushName} (+${senderNumber})\n📍 *Kaynak:* ${isGroup ? `Grup: ${groupName}` : 'Özel Sohbet'}\n🕒 *Zaman:* ${timeStr}`;
     if (docMsg?.fileName) {
       caption += `\n📁 *Dosya Adı:* ${docMsg.fileName}`;
@@ -179,7 +241,7 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     if (captionText) {
       caption += `\n📝 *Açıklama:* ${captionText}`;
     }
-    caption += `\n💾 *Sunucuda Kayıt Yeri:* ${path.basename(savedPath)}\n━━━━━━━━━━━━━━━━━━━━`;
+    caption += `\n💾 *Sunucuda Kayıt Yeri:* ${savedFilename}\n━━━━━━━━━━━━━━━━━━━━`;
 
     console.log(`[VIEW-ONCE SNIPER] Captured ${mediaType} from ${senderNumber} in ${from}. Forwarding to ${targetJid}...`);
 
