@@ -1,6 +1,9 @@
+import path from 'path';
+import { downloadContentFromMessage, downloadMediaMessage } from '@whiskeysockets/baileys';
 import { hentaiFavStore } from './hentaiFavStore.js';
 import { commands, messageStore } from '../bot.js';
 import { checkLinkPermission } from './permissionManager.js';
+import { unwrapMessage } from '../events/messages.js';
 
 export function getQuotedMessage(msg) {
   const raw = msg?.message?.ephemeralMessage?.message || msg?.message?.viewOnceMessage?.message || msg?.message;
@@ -66,12 +69,20 @@ export function isReplyDownloadTrigger(text, hasQuoted) {
     if (/^\.\s+/.test(ltext)) return true;
   }
 
-  // Quoting a message and saying "indir", "!indir", "indirhentai", "hepsi"
+  // Quoting a message and saying "indir", "!indir", "indirhentai", "hepsi", "bunu indir", "kaydet", "bana at"
   if (hasQuoted) {
-    if (ltext === 'indir' || ltext.startsWith('indir ') ||
-        ltext === '!indir' || ltext.startsWith('!indir ') ||
-        ltext === 'indirhentai' || ltext.startsWith('indirhentai ') ||
-        ltext === 'hepsi' || ltext === 'tümü') {
+    if (
+      ltext === 'indir' || ltext.startsWith('indir ') ||
+      ltext === '!indir' || ltext.startsWith('!indir ') ||
+      ltext === 'indirhentai' || ltext.startsWith('indirhentai ') ||
+      ltext === 'hepsi' || ltext === 'tümü' ||
+      ltext.includes('indir') ||
+      ltext.includes('kaydet') ||
+      ltext.includes('bana at') ||
+      ltext.includes('bunu at') ||
+      ltext.includes('bunu gönder') ||
+      ltext.includes('indirip at')
+    ) {
       return true;
     }
   }
@@ -189,7 +200,81 @@ export async function handleReplyDownload(sock, msg, from, text, ctx) {
     }
   }
 
-  // 5. If no target could be determined:
+  // 5. Check if the quoted message itself contains direct media (image, video, audio, document, viewOnce)
+  const qContent = unwrapMessage(quotedInfo.quotedMsg);
+  const qImg = qContent?.imageMessage || 
+               quotedInfo.quotedMsg?.imageMessage || 
+               quotedInfo.quotedMsg?.viewOnceMessage?.message?.imageMessage || 
+               quotedInfo.quotedMsg?.viewOnceMessageV2?.message?.imageMessage ||
+               quotedInfo.quotedMsg?.viewOnceMessageV2Extension?.message?.imageMessage;
+
+  const qVid = qContent?.videoMessage || 
+               quotedInfo.quotedMsg?.videoMessage || 
+               quotedInfo.quotedMsg?.viewOnceMessage?.message?.videoMessage || 
+               quotedInfo.quotedMsg?.viewOnceMessageV2?.message?.videoMessage ||
+               quotedInfo.quotedMsg?.viewOnceMessageV2Extension?.message?.videoMessage;
+
+  const qAud = qContent?.audioMessage || 
+               quotedInfo.quotedMsg?.audioMessage || 
+               quotedInfo.quotedMsg?.viewOnceMessage?.message?.audioMessage || 
+               quotedInfo.quotedMsg?.viewOnceMessageV2?.message?.audioMessage ||
+               quotedInfo.quotedMsg?.viewOnceMessageV2Extension?.message?.audioMessage;
+
+  const qDoc = qContent?.documentMessage || 
+               quotedInfo.quotedMsg?.documentMessage || 
+               quotedInfo.quotedMsg?.viewOnceMessage?.message?.documentMessage || 
+               quotedInfo.quotedMsg?.viewOnceMessageV2?.message?.documentMessage ||
+               quotedInfo.quotedMsg?.viewOnceMessageV2Extension?.message?.documentMessage ||
+               qContent?.documentWithCaptionMessage?.message?.documentMessage;
+
+  const qMedia = qImg || qVid || qAud || qDoc;
+  if (qMedia) {
+    const mediaType = qImg ? 'image' : (qVid ? 'video' : (qAud ? 'audio' : 'document'));
+    let buffer = null;
+
+    try {
+      const stream = await downloadContentFromMessage(qMedia, mediaType);
+      const chunks = [];
+      for await (const chunk of stream) chunks.push(chunk);
+      buffer = Buffer.concat(chunks);
+    } catch (e1) {
+      try {
+        const quotedObj = { 
+          key: { remoteJid: from, id: quotedInfo.stanzaId, participant: quotedInfo.participant }, 
+          message: quotedInfo.quotedMsg 
+        };
+        buffer = await downloadMediaMessage(quotedObj, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
+      } catch (e2) {}
+    }
+
+    if (buffer && buffer.length > 0) {
+      const ext = mediaType === 'image' ? 'jpg' : (mediaType === 'video' ? 'mp4' : (mediaType === 'audio' ? 'mp3' : (qDoc?.fileName ? (path.extname(qDoc.fileName).replace('.', '') || 'bin') : 'bin')));
+      const captionText = qMedia.caption || '';
+      let replyCaption = `📥 *Medya Başarıyla İndirildi!*\n━━━━━━━━━━━━━━━━━━━━`;
+      if (captionText) replyCaption += `\n📝 *Açıklama:* ${captionText}`;
+      replyCaption += `\n━━━━━━━━━━━━━━━━━━━━`;
+
+      console.log(`[REPLY MEDIA DOWNLOAD] Sending downloaded ${mediaType} (${buffer.length} bytes) to ${from}...`);
+
+      if (mediaType === 'image') {
+        await sock.sendMessage(from, { image: buffer, caption: replyCaption }, { quoted: msg, skipAntiBan: true });
+      } else if (mediaType === 'video') {
+        await sock.sendMessage(from, { video: buffer, caption: replyCaption, mimetype: qVid?.mimetype || 'video/mp4' }, { quoted: msg, skipAntiBan: true });
+      } else if (mediaType === 'audio') {
+        await sock.sendMessage(from, { audio: buffer, mimetype: qAud?.mimetype || 'audio/mp4', ptt: Boolean(qAud?.ptt) }, { quoted: msg, skipAntiBan: true });
+      } else if (mediaType === 'document') {
+        await sock.sendMessage(from, { 
+          document: buffer, 
+          caption: replyCaption, 
+          fileName: qDoc?.fileName || `medya_${Date.now()}.${ext}`, 
+          mimetype: qDoc?.mimetype || 'application/octet-stream' 
+        }, { quoted: msg, skipAntiBan: true });
+      }
+      return true;
+    }
+  }
+
+  // 6. If no target could be determined:
   // If the user just typed single dot '.', fail silently to avoid annoying chatter interruptions
   const isExplicitCommand = ['indir', '!indir', '.indir'].includes(firstWord) || (firstWord === '.' && extraArgs.length > 0);
   if (isExplicitCommand) {

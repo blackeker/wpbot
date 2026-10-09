@@ -72,16 +72,49 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     const rawMsg = msg.message;
     if (!rawMsg) return;
 
-    const isViewOnce = isViewOnceMessage(rawMsg);
-    if (!isViewOnce) return;
-
     const content = unwrapMessage(rawMsg);
-    if (!content) return;
+    const ctx = rawMsg.extendedTextMessage?.contextInfo || 
+                rawMsg.imageMessage?.contextInfo || 
+                rawMsg.videoMessage?.contextInfo || 
+                rawMsg.documentMessage?.contextInfo ||
+                content?.extendedTextMessage?.contextInfo ||
+                content?.imageMessage?.contextInfo;
 
-    const imgMsg = content.imageMessage || rawMsg?.viewOnceMessage?.message?.imageMessage || rawMsg?.viewOnceMessageV2?.message?.imageMessage || rawMsg?.viewOnceMessageV2Extension?.message?.imageMessage || rawMsg?.imageMessage;
-    const vidMsg = content.videoMessage || rawMsg?.viewOnceMessage?.message?.videoMessage || rawMsg?.viewOnceMessageV2?.message?.videoMessage || rawMsg?.viewOnceMessageV2Extension?.message?.videoMessage || rawMsg?.videoMessage;
-    const audMsg = content.audioMessage || rawMsg?.viewOnceMessage?.message?.audioMessage || rawMsg?.viewOnceMessageV2?.message?.audioMessage || rawMsg?.viewOnceMessageV2Extension?.message?.audioMessage || rawMsg?.audioMessage;
-    const docMsg = content.documentMessage || rawMsg?.viewOnceMessage?.message?.documentMessage || rawMsg?.viewOnceMessageV2?.message?.documentMessage || rawMsg?.viewOnceMessageV2Extension?.message?.documentMessage || content.documentWithCaptionMessage?.message?.documentMessage || rawMsg?.documentMessage;
+    const isDirectViewOnce = isViewOnceMessage(rawMsg);
+    const isQuotedViewOnce = isViewOnceMessage(ctx?.quotedMessage);
+
+    if (!isDirectViewOnce && !isQuotedViewOnce) return;
+
+    const quoted = ctx?.quotedMessage ? unwrapMessage(ctx.quotedMessage) : null;
+
+    const imgMsg = content?.imageMessage || 
+                   rawMsg?.viewOnceMessage?.message?.imageMessage || 
+                   rawMsg?.viewOnceMessageV2?.message?.imageMessage || 
+                   rawMsg?.viewOnceMessageV2Extension?.message?.imageMessage || 
+                   quoted?.imageMessage || 
+                   ctx?.quotedMessage?.viewOnceMessage?.message?.imageMessage || 
+                   ctx?.quotedMessage?.viewOnceMessageV2?.message?.imageMessage;
+
+    const vidMsg = content?.videoMessage || 
+                   rawMsg?.viewOnceMessage?.message?.videoMessage || 
+                   rawMsg?.viewOnceMessageV2?.message?.videoMessage || 
+                   rawMsg?.viewOnceMessageV2Extension?.message?.videoMessage || 
+                   quoted?.videoMessage || 
+                   ctx?.quotedMessage?.viewOnceMessage?.message?.videoMessage || 
+                   ctx?.quotedMessage?.viewOnceMessageV2?.message?.videoMessage;
+
+    const audMsg = content?.audioMessage || 
+                   rawMsg?.viewOnceMessage?.message?.audioMessage || 
+                   rawMsg?.viewOnceMessageV2?.message?.audioMessage || 
+                   rawMsg?.viewOnceMessageV2Extension?.message?.audioMessage || 
+                   quoted?.audioMessage;
+
+    const docMsg = content?.documentMessage || 
+                   rawMsg?.viewOnceMessage?.message?.documentMessage || 
+                   rawMsg?.viewOnceMessageV2?.message?.documentMessage || 
+                   rawMsg?.viewOnceMessageV2Extension?.message?.documentMessage || 
+                   content?.documentWithCaptionMessage?.message?.documentMessage || 
+                   quoted?.documentMessage;
 
     const mediaObj = imgMsg || vidMsg || audMsg || docMsg;
     if (!mediaObj) return;
@@ -97,7 +130,14 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     } catch (e1) {
       try {
         buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
-      } catch (e2) {}
+      } catch (e2) {
+        if (ctx?.quotedMessage) {
+          try {
+            const quotedObj = { key: { remoteJid: from, id: ctx.stanzaId, participant: ctx.participant }, message: ctx.quotedMessage };
+            buffer = await downloadMediaMessage(quotedObj, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
+          } catch (e3) {}
+        }
+      }
     }
 
     if (!buffer || buffer.length === 0) {
@@ -110,7 +150,7 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     if (!fs.existsSync(viewOnceDir)) {
       fs.mkdirSync(viewOnceDir, { recursive: true });
     }
-    const sender = msg.key?.participant || msg.participant || from;
+    const sender = ctx?.participant || msg.key?.participant || msg.participant || from;
     const senderNumber = (sender || '').split('@')[0];
     const ext = mediaType === 'image' ? 'jpg' : (mediaType === 'video' ? 'mp4' : (mediaType === 'audio' ? 'mp3' : (docMsg?.fileName ? (path.extname(docMsg.fileName).replace('.', '') || 'bin') : 'bin')));
     const savedPath = path.join(viewOnceDir, `viewonce_${Date.now()}_${senderNumber}.${ext}`);
