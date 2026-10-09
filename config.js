@@ -77,7 +77,7 @@ setInterval(cleanLeftoverCacheFiles, 6 * 60 * 60 * 1000);
 // Config file reader/writer helpers with full defaults
 const DEFAULT_CONFIG = {
   whatsappPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || "",
-  port: parseInt(process.env.PORT || "7860", 10),
+  port: parseInt(process.env.PORT || "3000", 10),
   vdsIp: process.env.VDS_IP || "111.235.150.203",
   perchanceAiApi: process.env.PERCHANCE_AI_API || "http://111.235.150.203:8000",
   pingUrl: process.env.PING_URL || "",

@@ -89,8 +89,13 @@ function safeCompare(a, b) {
 
 function basicAuth(req, res, next) {
   const config = readConfig();
-  const user = config.dashboardUser || 'admin';
-  const pass = config.dashboardPass || process.env.DASHBOARD_PASS || 'admin12345';
+  const user = config.dashboardUser || process.env.DASHBOARD_USER || 'admin';
+  const pass = config.dashboardPass || process.env.DASHBOARD_PASS || '';
+
+  // If no password configured, permit direct access (e.g. in development/preview environments)
+  if (!pass) {
+    return next();
+  }
 
   const ip = getClientIp(req);
   const now = Date.now();
@@ -158,7 +163,7 @@ app.get('/api/extract', async (req, res) => {
     if (result && result.filePath) {
       const config = readConfig();
       const vdsIp = config.vdsIp || '111.235.150.157';
-      const port = config.port || 7860;
+      const port = config.port || parseInt(process.env.PORT || '3000', 10);
       const filename = path.basename(result.filePath);
       result.downloadUrl = `http://${vdsIp}:${port}/downloads/${encodeURIComponent(filename)}`;
     }
@@ -258,7 +263,7 @@ app.get('/api/extract/:site', async (req, res) => {
     if (result && result.filePath) {
       const config = readConfig();
       const vdsIp = config.vdsIp || '111.235.150.157';
-      const port = config.port || 7860;
+      const port = config.port || parseInt(process.env.PORT || '3000', 10);
       const filename = path.basename(result.filePath);
       result.downloadUrl = `http://${vdsIp}:${port}/downloads/${encodeURIComponent(filename)}`;
     }
@@ -1321,7 +1326,7 @@ app.post('/api/request-qr', async (req, res) => {
 
 // HTTP Server Dashboard UI
 app.get('/', (req, res) => {
-  const PORT = process.env.PORT || 7860;
+  const PORT = parseInt(process.env.PORT || '3000', 10);
   const viewsDir = path.join(path.resolve(), 'views');
   try {
     let html = fs.readFileSync(path.join(viewsDir, 'dashboard.html'), 'utf8');

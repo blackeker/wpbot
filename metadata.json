@@ -1,0 +1,8 @@
+{
+  "name": "HD WP Bot & Web Dashboard",
+  "description": "WhatsApp Media Downloader and Bot Manager with Web Dashboard and Streaming",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

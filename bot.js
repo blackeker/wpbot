@@ -98,7 +98,7 @@ import { sendHumanizedMessage } from './utils/antiBan.js';
 const appLogger = getModuleLogger('bot');
 
 const logger = pino({ level: 'silent' });
-const PORT = process.env.PORT || 7860;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 // Dynamic Command Loader
 export const commands = new Map();

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import qrcode from 'qrcode-terminal';
 import QRCodeImage from 'qrcode';
 import { botState, pairingState, sessionPath, backupSession, backupCredsFile } from '../config.js';

@@ -5,8 +5,9 @@
   "main": "bot.js",
   "type": "module",
   "scripts": {
+    "build": "node -e 'console.log(\"Build ready\")'",
     "start": "node bot.js",
-    "dev": "node --watch-path=bot.js --watch-path=server.js --watch-path=queue.js --watch-path=pipelines.js --watch-path=downloader.js --watch-path=extractor.js --watch-path=cache.js --watch-path=config.js --watch-path=tracker.js --watch-path=commands --watch-path=extractors --watch-path=events --watch-path=utils --watch-path=views bot.js",
+    "dev": "node bot.js",
     "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop wpbot",
     "pm2:restart": "pm2 restart wpbot",
@@ -31,6 +32,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
+    "sharp": "^0.35.5",
     "tough-cookie": "^4.1.3",
     "webtorrent": "^3.0.21",
     "ws": "^8.21.3"

@@ -6,7 +6,12 @@ import { extractVideoUrl, gotScraping } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
 import { notifyQueueUpdate } from './queue.js';
 import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig, getProxyUrl } from './config.js';
-import WebTorrent from 'webtorrent';
+// WebTorrent native addon stub (node-datachannel native binary is unsupported in cloud container)
+class WebTorrent {
+  constructor() {
+    throw new Error('Torrent indirmeleri bu bulut sunucu ortamında desteklenmemektedir.');
+  }
+}
 import { getCachedResult, saveToCache, deleteFromCache } from './cache.js';
 import { getModuleLogger } from './utils/logger.js';
 import { ffmpegPath, replaceTurkishChars, getMediaStreamInfo, convertVttToSrt, withRetry } from './pipelines/helpers.js';
