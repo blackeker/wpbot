@@ -292,6 +292,24 @@ async function startBot() {
     await handleMessage(sock, m);
   });
 
+  sock.ev.on('messages.update', async (updates) => {
+    for (const update of updates || []) {
+      if (update.update?.message && update.key) {
+        console.log('[MESSAGES.UPDATE DECRYPTED]', { id: update.key.id, from: update.key.remoteJid, keys: Object.keys(update.update.message) });
+        storeMessage(update.key, update.update.message);
+        await handleMessage(sock, {
+          type: 'notify',
+          messages: [{
+            key: update.key,
+            message: update.update.message,
+            messageTimestamp: update.update.messageTimestamp || Math.floor(Date.now() / 1000),
+            pushName: update.update.pushName
+          }]
+        });
+      }
+    }
+  });
+
   // Otomatik Eşleşme Kodu Talebi (Eğer pairing modu aktifse ve oturum henüz kayıtlı değilse)
   if (pairingState.isPairingMode && pairingState.pairingPhoneNumber && !state.creds?.registered) {
     setTimeout(async () => {

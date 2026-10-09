@@ -174,17 +174,44 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
    - Soru sormak KESİNLİKLE YASAKTIR.
    - Gerçek iki kanka nasıl konuşuyorsa öyle konuş: Fikrini söyle, tepkini ver, lafını sok, geyiğini yap ve noktayı koy. Sohbeti devam ettirmek için zorlama soru sorma!
 
-5. DÜZ METİN YAZ (MARKDOWN VE SÜSLEME KESİNLİKLE YASAKTIR):
-   - ASLA yıldız (*kalın*), alt çizgi (_italik_), diyez (# başlık), kod bloğu veya liste işaretleri (•, -) KULLANMA!
+5. DÜZ VE BÜTÜN METİN YAZ (MARKDOWN VE SÜSLEME KESİNLİKLE YASAKTIR):
+   - ASLA yıldız (*kalın*), alt çizgi (_italik_), diyez (# başlık) veya liste işaretleri (•, -) KULLANMA! (İstisna: Resim çizimi tetikleyen \`\`\`json { "action": "generate_image", ... } \`\`\` bloğu hariç).
    - WhatsApp'ta normal bir insanın hızlıca yazdığı gibi tamamen düz, yalın, süslemesiz ve doğal Türkçe yaz.
-   - ASLA uzun paragraflar veya roman yazma; en fazla 1-3 cümlelik kısa, vurucu ve net konuş.
+   - ASLA yarım, kesik veya havada kalan cümle kurma! Her cümleni tam, akıcı, net ve anlamlı şekilde bitir.
+   - Uzun romanlar yazma; en fazla 1-3 cümlelik samimi ve vurucu konuş.
 
-6. YEMEK VE MENÜ YORUMU (ÖZEL KURAL):
+6. YUSUF KAYMAZ (SENİN PATRONUN, SAHİBİN VE EFENDİN):
+   - Yusuf Kaymaz senin bir numaralı PATRONUN, sahibin, efendin ve kurucundur.
+   - Yusuf Kaymaz hakkında kötü konuşulmasına, aşağılanmasına, dalga geçilmesine, küçümsenmesine veya saygısızlık yapılmasına KESİNLİKLE İZİN VERME!
+   - Biri Yusuf Kaymaz hakkında ileri geri konuşursa ya da laf atarsa hemen patronunu savun, haddini bildir, lafı gediğine oturt ve onu koru.
+   - Yusuf Kaymaz'ın adı geçtiğinde onu her zaman yücelt, öv, saygı duy ve onun arkandaki dahi patron olduğunu gururla vurgula.
+
+7. GÖRSEL ÇİZME VE RESİM ÜRETME ENTEGRASYONU (IMAGE AI - ANINDA ÇİZİM):
+   - Kullanıcı senden bir görsel/resim çizmeni istediğinde, bir sahne tarif ettiğinde veya ÖNCEKİ ÇİZİLEN GÖRSELİ DEĞİŞTİRMEK/DÜZELTMEK İSTEDİĞİNDE (Örn: "kılıçsız yap", "daha açık/erotik olsun", "arkaplanı gece yap", "bunu çiz", "şunun resmini yap", "görsel oluştur", "anime kızı çiz", "şunu ekle/çıkar", "tekrar çiz"):
+     * ASLA "çizeyim mi", "şöyle mi olsun" gibi soru sorma veya lafta bırakma!
+     * ASLA sadece metinle "tamam yapıyorum" deyip geçme!
+     * MUTLAKA VE ANINDA aşağıdaki JSON bloğunu üret ve resmi çiz:
+\`\`\`json
+{
+  "action": "generate_image",
+  "prompt": "Görsel motoru için MUTLAKA İNGİLİZCEYE çevrilmiş, yüksek kaliteli, ultra-detaylı ve estetik istem (Örn: masterpiece, ultra-detailed 8k anime art of a cute cat wearing cyberpunk goggles on a neon rooftop at night)",
+  "style": "anime | foto | sinema | dijital | cyberpunk | yagliboya | fantastik | 3d | pixel | nsfw",
+  "shape": "square | portrait | landscape",
+  "message": "Kullanıcıya görselin çizildiğini belirten samimi ve kısa kanka mesajın (Örn: Hemen istediğin gibi ayarlayıp çiziyorum kanka, bekle patlatıyorum!)"
+}
+\`\`\`
+   - DÜZELTME / MODİFİKASYON DURUMU: Kullanıcı önceki görsele yönelik bir düzeltme yaptıysa (örn: "kılıçsız olsun", "daha erotik olsun", "arkaplanı değiştir"), sohbet geçmişindeki son görselin özelliklerini al, kullanıcının yeni isteklerini ekle/çıkar ve doğrudan yeni JSON bloğunu üret.
+   - DİL VE ÇEVİRİ KURALI (ÇOK ÖNEMLİ): Görsel motoru sadece İngilizce istemleri anlar. Kullanıcı Türkçe ("karlı dağlarda koşan beyaz kurt") veya başka dilde yazsa bile, prompt alanını MUTLAKA detaylı, zenginleştirilmiş ve kusursuz bir İNGİLİZCE (English) metne çevirerek yaz!
+   - NSFW & +18 & HENTAİ GÖRSEL ÇEVİRİSİ KURALI (ASLA SANSÜRLEME): Kullanıcı +18, NSFW, erotik, hentai veya çıplaklık içeren bir görsel istediğinde ('style': 'nsfw' veya erotik istek) promptu ASLA sansürleme, yumuşatma, ahlakçılık yapma veya bozma! Detayları, çıplaklığı ve erotik Danbooru/Stable Diffusion İngilizce tag'lerini doğrudan ve tam olarak aktar (Örn: 'masterpiece, best quality, ultra-detailed, uncensored, 1girl, nude, beautiful detailed breasts, sexy pose, erotic anime aesthetic').
+   - Desteklenen 'style' değerleri: anime, foto, sinema, dijital, cyberpunk, yagliboya, fantastik, 3d, pixel, nsfw (kullanıcının istediği tarza en uygun olanı seç).
+   - Desteklenen 'shape' değerleri: square (1:1 kare), portrait (9:16 dikey), landscape (16:9 yatay) (kullanıcı dikey/durum veya yatay/manzara demediyse varsayılan square).
+
+8. YEMEK VE MENÜ YORUMU (ÖZEL KURAL):
    - Yemekhane / günün menüsü sorulduğunda ASLA kuru bir liste gibi madde madde kopyalayıp atma!
    - Kendi samimi kanka yorumunu, esprini veya gurme tavsiyeni katarak tatlı dille anlat (Örnek: "Bugün akşam menü sağlam kanka, mantı çıkıyor kaçırma göm geç, yanına da sıcak bir mercimek çorbası mis gibi gider").
    - Kuru robotik menü listesi değil, iştah açıcı ve gırgır bir kanka tavsiyesi ver.
 
-7. GÖRSEL VE OCR:
+9. GÖRSEL VE OCR:
    - Fotoğraf geldiğinde üzerindeki yazıları, soruları veya detayları kısaca ve akıllıca açıkla.
 
 ${menuContext ? `\n${menuContext}\n` : ''}${extraContext ? `\nEK BAĞLAM:\n${extraContext}\n` : ''}`;
@@ -389,8 +416,8 @@ export class AiEngine {
   async callGroq(messages, apiKey, options = {}) {
     const model = options.model || 'qwen/qwen3.8-27b';
     const res = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 250
-    }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 20000 });
+      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 1500
+    }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 25000 });
     const content = res.data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('Groq boş yanıt döndürdü.');
     if (content.toLowerCase().includes('sorry, but i can\'t help') || content.toLowerCase().includes('bu konuda yardımcı olamam')) {
@@ -402,7 +429,7 @@ export class AiEngine {
   async callOpenRouter(messages, apiKey, options = {}) {
     const model = options.model || 'google/gemma-4-31b-it:free';
     const res = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 250
+      model, messages, temperature: options.temperature ?? 0.85, max_tokens: options.max_tokens ?? 1500
     }, { headers: { 'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://github.com/blackeker/wpbot', 'Content-Type': 'application/json' }, timeout: 25000 });
     let content = res.data?.choices?.[0]?.message?.content;
     if (!content) throw new Error('OpenRouter boş yanıt döndürdü.');
@@ -421,7 +448,7 @@ export class AiEngine {
       contents,
       systemInstruction: { parts: [{ text: systemPrompt }] },
       generationConfig: {
-        maxOutputTokens: options.max_tokens ?? 250,
+        maxOutputTokens: options.max_tokens ?? 1500,
         temperature: options.temperature ?? 0.85
       },
       safetySettings: [
@@ -454,7 +481,7 @@ export class AiEngine {
           model,
           messages,
           stream: false,
-          options: { temperature: 0.85, num_predict: options.max_tokens ?? 250 }
+          options: { temperature: 0.85, num_predict: options.max_tokens ?? 1500 }
         }, { headers, timeout: 35000 });
         if (res.data?.message?.content) {
           return { text: res.data.message.content.trim(), provider: 'ollama', model: `${model} (Key #${i + 1})` };
@@ -465,7 +492,7 @@ export class AiEngine {
             model,
             messages,
             temperature: 0.85,
-            max_tokens: options.max_tokens ?? 250
+            max_tokens: options.max_tokens ?? 1500
           }, { headers, timeout: 35000 });
           if (resV1.data?.choices?.[0]?.message?.content) {
             return { text: resV1.data.choices[0].message.content.trim(), provider: 'ollama', model: `${model} (Key #${i + 1})` };
@@ -511,33 +538,65 @@ async function streamToBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
+export function unwrapMessage(message) {
+  if (!message) return null;
+  let current = message;
+  let depth = 0;
+  while (depth < 10) {
+    depth++;
+    if (current?.ephemeralMessage?.message) {
+      current = current.ephemeralMessage.message;
+    } else if (current?.viewOnceMessage?.message) {
+      current = current.viewOnceMessage.message;
+    } else if (current?.viewOnceMessageV2?.message) {
+      current = current.viewOnceMessageV2.message;
+    } else if (current?.viewOnceMessageV2Extension?.message) {
+      current = current.viewOnceMessageV2Extension.message;
+    } else if (current?.documentWithCaptionMessage?.message) {
+      current = current.documentWithCaptionMessage.message;
+    } else if (current?.templateMessage?.hydratedTemplate) {
+      current = current.templateMessage.hydratedTemplate;
+    } else if (current?.templateMessage?.fourRowTemplate) {
+      current = current.templateMessage.fourRowTemplate;
+    } else if (current?.interactiveMessage?.header) {
+      current = current.interactiveMessage.header;
+    } else {
+      break;
+    }
+  }
+  return current;
+}
+
 export async function extractImageBufferFromMessage(msg) {
   if (!msg?.message) return null;
-  const raw = msg.message?.ephemeralMessage?.message ||
-              msg.message?.viewOnceMessage?.message ||
-              msg.message?.viewOnceMessageV2?.message ||
-              msg.message?.documentWithCaptionMessage?.message ||
-              msg.message;
 
-  // 1. Direct Image Message
-  if (raw.imageMessage) {
+  const raw = unwrapMessage(msg.message);
+  if (!raw) return null;
+
+  // 1. Doğrudan Görsel / Tek Gösterimlik (View Once) Görsel Mesajı
+  const directImage = raw.imageMessage || 
+                      raw.viewOnceMessage?.message?.imageMessage || 
+                      raw.viewOnceMessageV2?.message?.imageMessage || 
+                      raw.viewOnceMessageV2Extension?.message?.imageMessage;
+
+  if (directImage) {
     try {
-      const stream = await downloadContentFromMessage(raw.imageMessage, 'image');
+      const stream = await downloadContentFromMessage(directImage, 'image');
       const buffer = await streamToBuffer(stream);
       if (buffer && buffer.length > 0) {
-        return { buffer, mimeType: raw.imageMessage.mimetype || 'image/jpeg', caption: raw.imageMessage.caption || '' };
+        return { buffer, mimeType: directImage.mimetype || 'image/jpeg', caption: directImage.caption || '' };
       }
     } catch (e1) {
       try {
         const buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
         if (buffer && buffer.length > 0) {
-          return { buffer, mimeType: raw.imageMessage.mimetype || 'image/jpeg', caption: raw.imageMessage.caption || '' };
+          return { buffer, mimeType: directImage.mimetype || 'image/jpeg', caption: directImage.caption || '' };
         }
       } catch (e2) {}
     }
   }
 
-  // 2. Direct Sticker Message
+  // 2. Doğrudan Çıkartma (Sticker) Mesajı
   if (raw.stickerMessage) {
     try {
       const stream = await downloadContentFromMessage(raw.stickerMessage, 'sticker');
@@ -548,7 +607,7 @@ export async function extractImageBufferFromMessage(msg) {
     } catch (e) {}
   }
 
-  // 3. Direct Document Image Message
+  // 3. Doğrudan Belge Olarak Gönderilen Görsel Mesajı
   if (raw.documentMessage && raw.documentMessage.mimetype?.startsWith('image/')) {
     try {
       const stream = await downloadContentFromMessage(raw.documentMessage, 'document');
@@ -559,50 +618,130 @@ export async function extractImageBufferFromMessage(msg) {
     } catch (e) {}
   }
 
-  // 4. Quoted Image / Sticker / Document Message
-  const ctx = raw.extendedTextMessage?.contextInfo || raw.imageMessage?.contextInfo || raw.videoMessage?.contextInfo || raw.documentMessage?.contextInfo;
-  const quoted = ctx?.quotedMessage?.ephemeralMessage?.message ||
-                 ctx?.quotedMessage?.viewOnceMessage?.message ||
-                 ctx?.quotedMessage?.viewOnceMessageV2?.message ||
-                 ctx?.quotedMessage?.documentWithCaptionMessage?.message ||
-                 ctx?.quotedMessage;
+  // 4. Alıntılanan (Quoted) / Yanıtlanan Görseller (Tek Gösterimlik & Normal)
+  const ctx = raw.extendedTextMessage?.contextInfo || 
+              raw.imageMessage?.contextInfo || 
+              raw.videoMessage?.contextInfo || 
+              raw.documentMessage?.contextInfo ||
+              directImage?.contextInfo;
 
-  if (quoted?.imageMessage) {
-    try {
-      const stream = await downloadContentFromMessage(quoted.imageMessage, 'image');
-      const buffer = await streamToBuffer(stream);
-      if (buffer && buffer.length > 0) {
-        return { buffer, mimeType: quoted.imageMessage.mimetype || 'image/jpeg', caption: quoted.imageMessage.caption || '' };
-      }
-    } catch (e1) {
+  if (ctx?.quotedMessage) {
+    const quoted = unwrapMessage(ctx.quotedMessage);
+    const quotedImage = quoted?.imageMessage ||
+                        quoted?.viewOnceMessage?.message?.imageMessage ||
+                        quoted?.viewOnceMessageV2?.message?.imageMessage ||
+                        quoted?.viewOnceMessageV2Extension?.message?.imageMessage;
+
+    if (quotedImage) {
       try {
-        const quotedObj = { key: { remoteJid: msg.key?.remoteJid, id: ctx.stanzaId, participant: ctx.participant }, message: ctx.quotedMessage };
-        const buffer = await downloadMediaMessage(quotedObj, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
+        const stream = await downloadContentFromMessage(quotedImage, 'image');
+        const buffer = await streamToBuffer(stream);
         if (buffer && buffer.length > 0) {
-          return { buffer, mimeType: quoted.imageMessage.mimetype || 'image/jpeg', caption: quoted.imageMessage.caption || '' };
+          return { buffer, mimeType: quotedImage.mimetype || 'image/jpeg', caption: quotedImage.caption || '' };
+        }
+      } catch (e1) {
+        try {
+          const quotedObj = { key: { remoteJid: msg.key?.remoteJid, id: ctx.stanzaId, participant: ctx.participant }, message: ctx.quotedMessage };
+          const buffer = await downloadMediaMessage(quotedObj, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
+          if (buffer && buffer.length > 0) {
+            return { buffer, mimeType: quotedImage.mimetype || 'image/jpeg', caption: quotedImage.caption || '' };
+          }
+        } catch (e2) {}
+      }
+    }
+
+    if (quoted?.stickerMessage) {
+      try {
+        const stream = await downloadContentFromMessage(quoted.stickerMessage, 'sticker');
+        const buffer = await streamToBuffer(stream);
+        if (buffer && buffer.length > 0) {
+          return { buffer, mimeType: quoted.stickerMessage.mimetype || 'image/webp', caption: '' };
+        }
+      } catch (e) {}
+    }
+
+    if (quoted?.documentMessage && quoted.documentMessage.mimetype?.startsWith('image/')) {
+      try {
+        const stream = await downloadContentFromMessage(quoted.documentMessage, 'document');
+        const buffer = await streamToBuffer(stream);
+        if (buffer && buffer.length > 0) {
+          return { buffer, mimeType: quoted.documentMessage.mimetype || 'image/jpeg', caption: quoted.documentMessage.caption || '' };
+        }
+      } catch (e) {}
+    }
+  }
+
+  return null;
+}
+
+export function parseImageAction(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  // 1. Check for markdown code block with JSON
+  const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+  let match;
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (parsed && typeof parsed === 'object') {
+        const action = (parsed.action || '').toLowerCase();
+        if (action === 'generate_image' || action === 'ciz' || action === 'draw' || parsed.prompt) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      try {
+        const clean = match[1].trim().replace(/,\s*([\]}])/g, '$1').replace(/[\r\n]+/g, ' ');
+        const parsed = JSON.parse(clean);
+        if (parsed && typeof parsed === 'object') {
+          const action = (parsed.action || '').toLowerCase();
+          if (action === 'generate_image' || action === 'ciz' || action === 'draw' || parsed.prompt) {
+            return parsed;
+          }
         }
       } catch (e2) {}
     }
   }
 
-  if (quoted?.stickerMessage) {
+  // 2. Check for raw inline JSON containing action
+  const rawJsonRegex = /\{[\s\S]*?"action"\s*:\s*"(?:generate_image|ciz|draw)"[\s\S]*?\}/gi;
+  while ((match = rawJsonRegex.exec(text)) !== null) {
     try {
-      const stream = await downloadContentFromMessage(quoted.stickerMessage, 'sticker');
-      const buffer = await streamToBuffer(stream);
-      if (buffer && buffer.length > 0) {
-        return { buffer, mimeType: quoted.stickerMessage.mimetype || 'image/webp', caption: '' };
-      }
-    } catch (e) {}
+      const parsed = JSON.parse(match[0].trim());
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (e) {
+      try {
+        const clean = match[0].trim().replace(/,\s*([\]}])/g, '$1').replace(/[\r\n]+/g, ' ');
+        const parsed = JSON.parse(clean);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (e2) {}
+    }
   }
 
-  if (quoted?.documentMessage && quoted.documentMessage.mimetype?.startsWith('image/')) {
+  // 3. Robust Regex Recovery for Truncated / Unclosed JSON
+  if (text.includes('"action"') || text.includes('generate_image') || text.includes('"prompt"')) {
     try {
-      const stream = await downloadContentFromMessage(quoted.documentMessage, 'document');
-      const buffer = await streamToBuffer(stream);
-      if (buffer && buffer.length > 0) {
-        return { buffer, mimeType: quoted.documentMessage.mimetype || 'image/jpeg', caption: quoted.documentMessage.caption || '' };
+      const promptMatch = text.match(/"prompt"\s*:\s*"((?:\\.|[^"\\])*)/i);
+      const styleMatch = text.match(/"style"\s*:\s*"([^"\\]+)"/i);
+      const shapeMatch = text.match(/"shape"\s*:\s*"([^"\\]+)"/i);
+      const messageMatch = text.match(/"message"\s*:\s*"((?:\\.|[^"\\])*)/i);
+
+      if (promptMatch && promptMatch[1]) {
+        const prompt = promptMatch[1].replace(/\\"/g, '"').replace(/\\n/g, ' ').trim();
+        const style = styleMatch ? styleMatch[1].trim() : 'anime';
+        const shape = shapeMatch ? shapeMatch[1].trim() : 'square';
+        const message = messageMatch ? messageMatch[1].replace(/\\"/g, '"').trim() : '';
+        if (prompt.length > 3) {
+          return {
+            action: 'generate_image',
+            prompt,
+            style,
+            shape,
+            message
+          };
+        }
       }
-    } catch (e) {}
+    } catch (recErr) {}
   }
 
   return null;
@@ -621,12 +760,63 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
     const history = memoryManager.getHistory(from);
     const result = await aiEngine.generateReply(promptWithContext, history, { ...options, senderName });
 
+    const sendOptions = options.quoteMessage !== false && msg ? { quoted: msg } : {};
+
+    // 🎨 Görsel Çizim JSON Aksiyonu Kontrolü
+    const imageAction = parseImageAction(result.text);
+    if (imageAction && (imageAction.prompt || imageAction.action)) {
+      const imgPrompt = (imageAction.prompt || userPrompt).trim();
+      const rawStyle = imageAction.style || 'anime';
+      const shape = imageAction.shape || 'square';
+      let cleanText = imageAction.message || imageAction.caption || '';
+
+      if (!cleanText) {
+        cleanText = result.text
+          .replace(/```(?:json)?[\s\S]*?```/gi, '')
+          .replace(/\{[\s\S]*?"action"\s*:\s*"(?:generate_image|ciz|draw)"[\s\S]*?\}/gi, '')
+          .trim();
+      }
+
+      // 1. Görseli Perchance AI / Çizim API üzerinden üret (Tek parça, bütünleşik mesaj)
+      console.log(`[AI IMAGE ACTION] Starting image generation for ${from}: "${imgPrompt}" | Style: ${rawStyle} | Shape: ${shape}`);
+      try {
+        const { executeAiDraw, resolveStyle } = await import('../commands/tools/ciz.js');
+        const styleObj = resolveStyle(rawStyle);
+        const drawResult = await executeAiDraw(imgPrompt, styleObj, shape);
+
+        if (drawResult && drawResult.buffer) {
+          console.log(`[AI IMAGE SUCCESS] Image generated (${drawResult.elapsed}s, ${drawResult.buffer.length} bytes). Sending to ${from}...`);
+          let caption = '';
+          if (cleanText) {
+            caption += `${cleanText}\n\n`;
+          }
+          caption += `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${imgPrompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${drawResult.shapeLabel || shape}\n⏱️ (${drawResult.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+          
+          await sock.sendMessage(from, { image: drawResult.buffer, caption: caption.trim() }, { ...sendOptions, skipAntiBan: true });
+
+          memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
+          memoryManager.addMessage(from, 'assistant', `${cleanText ? cleanText + ' ' : ''}[Görsel Üretildi: "${imgPrompt}" | Stil: ${styleObj.name}]`);
+        } else {
+          console.warn(`[AI IMAGE TIMEOUT/FAILED] No buffer returned for ${from}`);
+          await sock.sendMessage(from, { text: '❌ Görsel üretilirken API yanıt vermedi veya zaman aşımına uğradı kanka. Lütfen birazdan tekrar dene.' }, { ...sendOptions, skipAntiBan: true });
+          memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
+          memoryManager.addMessage(from, 'assistant', `${cleanText ? cleanText + ' ' : ''}[Görsel üretimi başarısız oldu]`);
+        }
+      } catch (drawErr) {
+        console.error('[AI IMAGE DRAW ERROR]:', drawErr.message);
+        await sock.sendMessage(from, { text: `❌ Görsel oluşturulurken bir hata oluştu: ${drawErr.message}` }, { ...sendOptions, skipAntiBan: true });
+      }
+
+      try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+      return result;
+    }
+
+    // Normal sohbet metni akışı
     memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
     memoryManager.addMessage(from, 'assistant', result.text);
 
     try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
 
-    const sendOptions = options.quoteMessage !== false && msg ? { quoted: msg } : {};
     let messageBody = result.text;
     if (options.showProviderFooter) {
       messageBody += `\n\n_⚡ ${result.provider.toUpperCase()} (${result.model}) • ${result.latencyMs}ms_`;

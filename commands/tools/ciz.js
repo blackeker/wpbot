@@ -152,7 +152,11 @@ Lütfen görsel boyutunu seçin:
 /**
  * Generates an image exclusively using Perchance AI API.
  */
-export async function executeAiDraw(prompt, styleObj, shape = 'square') {
+export async function executeAiDraw(prompt, styleInput, shape = 'square') {
+  const styleObj = (typeof styleInput === 'object' && styleInput !== null && styleInput.name)
+    ? styleInput
+    : resolveStyle(styleInput);
+
   let shapeLabel = '1:1 Kare';
   if (shape === 'portrait') {
     shapeLabel = '9:16 Dikey';
@@ -161,6 +165,21 @@ export async function executeAiDraw(prompt, styleObj, shape = 'square') {
   }
 
   const rawPrompt = prompt ? prompt.trim() : '';
+  let processedPrompt = rawPrompt;
+
+  // Otomatik Türkçe -> İngilizce Prompt Çevirisi & Zenginleştirme
+  if (/[ığüşöçİĞÜŞÖÇ]/.test(rawPrompt)) {
+    try {
+      const { translateToEnglish } = await import('../../utils/translator.js');
+      const translated = await translateToEnglish(rawPrompt);
+      if (translated && translated.trim().length > 0) {
+        processedPrompt = translated.trim();
+      }
+    } catch (tErr) {
+      console.warn('[CIZ TRANSLATE ERROR]:', tErr.message);
+    }
+  }
+
   const config = readConfig();
 
   // Candidate Perchance endpoints
@@ -177,7 +196,7 @@ export async function executeAiDraw(prompt, styleObj, shape = 'square') {
     try {
       const startTime = Date.now();
       const payload = {
-        prompt: styleObj.tags ? `${rawPrompt}, ${styleObj.tags}` : rawPrompt,
+        prompt: styleObj.tags ? `${processedPrompt}, ${styleObj.tags}` : processedPrompt,
         negative_prompt: styleObj.negative || 'blurry, low quality, bad anatomy, deformed hands, extra limbs',
         style: styleObj.perchanceStyle || 'anime',
         shape: shape,
