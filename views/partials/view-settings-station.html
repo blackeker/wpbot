@@ -1,0 +1,106 @@
+<section class="view-panel" id="view-settings-station">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">⚙️ Temel Sistem Ayarları</span>
+            </div>
+            <form id="settings-form" onsubmit="saveSettingsAction(event)">
+              <div class="form-group">
+                <label class="form-label">Maksimum Eşzamanlı İndirme Sınırı: <span id="queue-limit-val">3</span></label>
+                <input type="range" id="setting-queue-limit" min="1" max="10" value="3" class="input-text" oninput="updateQueueLimitFromSlider(this.value)">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Proxy Sunucu Adresi (Opsiyonel)</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="setting-proxy-url" class="input-text" placeholder="http://kullanici:sifre@ip:port">
+                  <button type="button" class="btn btn-secondary" onclick="testProxyAction()">Test Et</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Dashboard Giriş Kullanıcı Adı & Şifresi</label>
+                <div class="grid-2" style="margin-bottom: 0;">
+                  <input type="text" id="setting-dash-user" class="input-text" placeholder="Kullanıcı Adı">
+                  <input type="password" id="setting-dash-pass" class="input-text" placeholder="Yeni Şifre">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">VDS Genel IP ve Web Port</label>
+                <div class="grid-2" style="margin-bottom: 0;">
+                  <input type="text" id="setting-vds-ip" class="input-text" placeholder="111.235.150.157">
+                  <input type="number" id="setting-vds-port" class="input-text" placeholder="3000">
+                </div>
+              </div>
+
+              <div class="form-group" style="padding: 12px; background: var(--bg-2); border-radius: var(--radius-md); border: 1px solid var(--border-1);">
+                <label class="form-label">👁️ Tek Gönderimlik Medya & Depo Grubu</label>
+                <div class="form-group" style="margin-bottom: 8px;">
+                  <span style="font-size: 12px; color: var(--text-3);">Depo Grubu JID (Medyanın gizlice atılacağı grup):</span>
+                  <input type="text" id="setting-depot-group-jid" class="input-text" placeholder="Örn: 120363xxx@g.us (Grup Seçimi sekmesinden de seçilebilir)">
+                </div>
+                <div class="form-group" style="margin-bottom: 8px;">
+                  <span style="font-size: 12px; color: var(--text-3);">Bot Sahibi Numarası (Owner Number):</span>
+                  <input type="text" id="setting-owner-number" class="input-text" placeholder="905332624732">
+                </div>
+                <div class="form-group" style="margin-bottom: 8px;">
+                  <span style="font-size: 12px; color: var(--text-3);">Özel View-Once Hedefi (Opsiyonel):</span>
+                  <input type="text" id="setting-viewonce-target" class="input-text" placeholder="Örn: 905332624732 veya boş bırakın">
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
+                  <span style="font-size: 13px; color: var(--text-2);">WhatsApp'a Otomatik İlet</span>
+                  <input type="checkbox" id="setting-viewonce-autoforward" checked style="accent-color: #ffffff; width: 18px; height: 18px; cursor: pointer;">
+                </div>
+              </div>
+
+              <div class="form-group" style="padding: 12px; background: var(--bg-2); border-radius: var(--radius-md); border: 1px solid var(--border-1);">
+                <label class="form-label">🤖 Yapay Zeka (AI) API Anahtarları & Model</label>
+                <div class="form-group" style="margin-bottom: 8px;">
+                  <span style="font-size: 12px; color: var(--text-3);">Google Gemini API Key:</span>
+                  <input type="text" id="setting-gemini-key" class="input-text" placeholder="AIzaSy... veya AQ.Ab8...">
+                </div>
+                <div class="grid-2" style="margin-bottom: 8px;">
+                  <div>
+                    <span style="font-size: 12px; color: var(--text-3);">Gemini Modeli:</span>
+                    <input type="text" id="setting-gemini-model" class="input-text" placeholder="gemini-3.8-flash">
+                  </div>
+                  <div>
+                    <span style="font-size: 12px; color: var(--text-3);">Bot İsmi:</span>
+                    <input type="text" id="setting-ai-botname" class="input-text" placeholder="Moi">
+                  </div>
+                </div>
+                <div class="form-group" style="margin-bottom: 8px;">
+                  <span style="font-size: 12px; color: var(--text-3);">Groq API Key (Opsiyonel):</span>
+                  <input type="text" id="setting-groq-key" class="input-text" placeholder="gsk_...">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <span style="font-size: 12px; color: var(--text-3);">OpenRouter API Key (Opsiyonel):</span>
+                  <input type="text" id="setting-openrouter-key" class="input-text" placeholder="sk-or-v1-...">
+                </div>
+              </div>
+
+              <div style="margin-bottom: 14px; padding: 10px 14px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; color: #93c5fd;">Tüm ayarları doğrudan ham JSON olarak düzenlemek ister misiniz?</span>
+                <button type="button" class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="switchNavTab('config-editor')">config.json Kod Editörü ↗</button>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block">Ayarları Güncelle & Kaydet</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🍪 Cookie & Çerez Doğrulama</span>
+            </div>
+            <p style="color: var(--text-3); font-size: 13px; margin-bottom: 14px;">
+              Premium siteler ve yaş doğrulaması gerektiren kaynaklar için `cookies.txt` dosyasını kontrol edin.
+            </p>
+
+            <button class="btn btn-secondary btn-block" onclick="verifyCookiesAction()">Çerez Dosyasını Doğrula</button>
+            <div id="cookies-status-output" style="margin-top: 14px; padding: 12px; background: var(--bg-2); border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 12px; color: var(--text-3);">
+              Henüz test edilmedi.
+            </div>
+          </div>
+        </div>
+      </section>

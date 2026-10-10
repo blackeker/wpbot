@@ -1,0 +1,81 @@
+<section class="view-panel" id="view-view-once-vault">
+        <!-- DEPOT GROUP SELECTOR CARD -->
+        <div class="card" style="margin-bottom: 20px; background: var(--bg-1); border: 1px solid var(--border-2);">
+          <div class="card-header">
+            <div>
+              <span class="card-title">📦 Aktif Depo Grubu (Gizli İletim Hedefi)</span>
+              <p style="color: var(--text-4); font-size: 12px; margin-top: 4px;">
+                Tek gönderimlik fotoğraflar, videolar ve sesler orijinal sohbete ASLA geri atılmaz (sırıtmaz). Doğrudan buradaki seçtiğiniz <b>Depo Grubuna</b> aktarılır.
+              </p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="fetchDynamicGroupsAction()" id="btn-fetch-groups">
+              🔄 WhatsApp Gruplarını Getir
+            </button>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+              <select id="depot-group-select" class="input-select" style="flex: 1; min-width: 260px; padding: 10px 14px; background: var(--bg-input); color: #fff; border: 1px solid var(--border-2); border-radius: var(--radius-md);">
+                <option value="">-- Depo Grubu Seçin (Önce Grupları Getir'e basın) --</option>
+              </select>
+              <button class="btn btn-primary" onclick="saveDepotGroupAction()">💾 Depo Olarak Kaydet</button>
+              <button class="btn btn-secondary" onclick="testDepotGroupAction()" title="Gruba test mesajı gönder">🔔 Test Et</button>
+            </div>
+
+            <div id="depot-group-current-badge" style="font-size: 12px; padding: 10px 14px; background: var(--bg-2); border-radius: var(--radius-md); border: 1px solid var(--border-1); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <span id="depot-group-current-text" style="color: var(--text-3); font-family: var(--font-mono);">Mevcut Depo: Yükleniyor...</span>
+              <span id="depot-status-indicator" class="badge" style="background: var(--bg-3); font-weight: 700;">Seçilmedi</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <div>
+              <span class="card-title">👁️ Tek Gönderimlik Medya Kasası</span>
+              <p style="color: var(--text-4); font-size: 12px; margin-top: 4px;">
+                WhatsApp sohbet ve gruplarından yakalanan "tek seferlik" (view-once) fotoğraflar, videolar ve ses kayıtları otomatik olarak buraya arşivlenir.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" onclick="loadViewOnceVault()">Yenile</button>
+              <button class="btn btn-danger btn-sm" onclick="clearAllViewOnceMedia()">Kasayı Temizle</button>
+            </div>
+          </div>
+
+          <!-- Vault Stats -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px;">
+            <div style="background: var(--bg-2); border: 1px solid var(--border-1); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-4); font-weight: 600;">TOPLAM</div>
+              <div id="vo-stat-total" style="font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 4px;">0</div>
+            </div>
+            <div style="background: var(--bg-2); border: 1px solid var(--border-1); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-4); font-weight: 600;">FOTOĞRAF</div>
+              <div id="vo-stat-images" style="font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 4px;">0</div>
+            </div>
+            <div style="background: var(--bg-2); border: 1px solid var(--border-1); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-4); font-weight: 600;">VİDEO</div>
+              <div id="vo-stat-videos" style="font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 4px;">0</div>
+            </div>
+            <div style="background: var(--bg-2); border: 1px solid var(--border-1); padding: 12px; border-radius: var(--radius-md); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-4); font-weight: 600;">SES KAYDI</div>
+              <div id="vo-stat-audios" style="font-size: 20px; font-weight: 800; color: #ffffff; margin-top: 4px;">0</div>
+            </div>
+          </div>
+
+          <!-- Vault Filter Tabs -->
+          <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+            <button class="pill active" onclick="filterViewOnce('all', this)">Tümü</button>
+            <button class="pill" onclick="filterViewOnce('image', this)">Fotoğraflar</button>
+            <button class="pill" onclick="filterViewOnce('video', this)">Videolar</button>
+            <button class="pill" onclick="filterViewOnce('audio', this)">Ses Kayıtları</button>
+          </div>
+
+          <!-- Vault Grid Container -->
+          <div id="view-once-grid" class="fe-grid" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+            <div style="grid-column: 1 / -1; text-align: center; color: var(--text-5); padding: 36px;">
+              Henüz yakalanan tek gönderimlik medya bulunmuyor.
+            </div>
+          </div>
+        </div>
+      </section>

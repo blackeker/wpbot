@@ -1,0 +1,52 @@
+<section class="view-panel" id="view-hentai-bulk">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📖 Hentai & Manga Toplu İndirme Sihirbazı</span>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-secondary btn-sm active" id="hentai-mode-scan-btn" onclick="switchHentaiMode('scan')">Kategori Tara</button>
+              <button class="btn btn-secondary btn-sm" id="hentai-mode-manual-btn" onclick="switchHentaiMode('manual')">Manuel Linkler</button>
+            </div>
+          </div>
+
+          <div id="hentai-scan-container">
+            <div class="form-group">
+              <label class="form-label">HentaiZM / Manga URL veya Kategori</label>
+              <input type="text" id="hentai-scan-url" class="input-text" placeholder="https://hentaizm.fun/... veya https://mangaportali.com/series/...">
+            </div>
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+              <div style="flex: 1;">
+                <label class="form-label">Başlangıç Sayfası</label>
+                <input type="number" id="hentai-scan-start-page" class="input-text" value="1" min="1">
+              </div>
+              <div style="flex: 1;">
+                <label class="form-label">Bitiş Sayfası</label>
+                <input type="number" id="hentai-scan-end-page" class="input-text" value="1" min="1">
+              </div>
+              <div style="display: flex; align-items: flex-end;">
+                <button class="btn btn-primary" onclick="scanHentaiListingAction()" id="hentai-scan-btn">İçerikleri Tara</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="hentai-manual-container" style="display: none;">
+            <div class="form-group">
+              <label class="form-label">Her Satıra Bir Link Yapıştırın</label>
+              <textarea id="hentai-manual-links" class="input-textarea" placeholder="https://hentaizm.fun/video-1&#10;https://hentaizm.fun/video-2&#10;https://mangaportali.com/reader/..."></textarea>
+            </div>
+          </div>
+
+          <div id="hentai-results-panel" style="display: none; margin-top: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+              <span id="hentai-results-counter" style="font-weight: 700; color: #fff;">0 içerik bulundu</span>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="toggleSelectAllHentai(true)">Tümünü Seç</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleSelectAllHentai(false)">Kaldır</button>
+              </div>
+            </div>
+
+            <div id="hentai-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; max-height: 380px; overflow-y: auto; margin-bottom: 16px;"></div>
+
+            <button class="btn btn-primary btn-block" onclick="queueSelectedHentai()" id="hentai-bulk-queue-btn">Seçili İçerikleri Kuyruğa Al</button>
+          </div>
+        </div>
+      </section>

@@ -1,0 +1,111 @@
+<!-- BOTTOM NAVIGATION BAR (MOBILE ONLY) -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-item active" onclick="switchNavTab('overview')">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+    <span>Genel</span>
+  </div>
+  <div class="bottom-nav-item" onclick="switchNavTab('queue-manager')">
+    <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg>
+    <span>Kuyruk</span>
+  </div>
+  <div class="bottom-nav-item" onclick="switchNavTab('series-wizard')">
+    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    <span>Dizi</span>
+  </div>
+  <div class="bottom-nav-item" onclick="switchNavTab('media-vault')">
+    <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    <span>Dosyalar</span>
+  </div>
+  <div class="bottom-nav-item" onclick="switchNavTab('config-editor')">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <span>Config</span>
+  </div>
+  <div class="bottom-nav-item" onclick="toggleMobileSidebar()">
+    <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    <span>Menü</span>
+  </div>
+</nav>
+
+<!-- VIDEO PLAYER MODAL -->
+<div class="modal-backdrop" id="video-player-modal">
+  <div class="modal-box" style="max-width: 800px; padding: 18px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+      <h3 id="modal-video-title" style="font-size: 14px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Video Oynatıcı</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeVideoModal()">✕ Kapat</button>
+    </div>
+    <div style="background: #000; border-radius: var(--radius-md); overflow: hidden;">
+      <video id="modal-plyr-video" playsinline controls style="width: 100%; max-height: 480px;"></video>
+    </div>
+  </div>
+</div>
+
+<!-- MULTI-FORMAT FILE PREVIEW MODAL (PDF / AUDIO / VIDEO / IMAGE) -->
+<div class="modal-backdrop" id="file-preview-modal">
+  <div class="modal-box" style="max-width: 900px; padding: 18px; width: 95%;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px;">
+      <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; flex: 1;">
+        <span class="badge badge-white" id="preview-modal-type-badge">DOSYA</span>
+        <h3 id="preview-modal-title" style="font-size: 14px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Önizleme</h3>
+      </div>
+      <div style="display: flex; gap: 8px; flex-shrink: 0;">
+        <a id="preview-modal-download-link" href="#" download class="btn btn-secondary btn-sm">⬇️ İndir</a>
+        <button class="btn btn-secondary btn-sm" onclick="closeFilePreviewModal()">✕ Kapat</button>
+      </div>
+    </div>
+    <div id="preview-modal-body" style="background: #09090b; border: 1px solid var(--border-1); border-radius: var(--radius-md); overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 320px;">
+      <!-- Dynamic Preview Body -->
+    </div>
+  </div>
+</div>
+
+<!-- FILE SEND TO WHATSAPP MODAL -->
+<div class="modal-backdrop" id="file-send-wa-modal">
+  <div class="modal-box" style="max-width: 480px; padding: 22px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="badge badge-white">WhatsApp</span>
+        <h3 style="font-size: 15px; font-weight: 700; color: #fff;">Dosyayı Gönder</h3>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="closeSendWaModal()">✕ Kapat</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Gönderilecek Dosya</label>
+      <input type="text" id="wa-send-file-name" class="input-text" readonly style="background: var(--bg-2); color: #ffffff; font-weight: 600;">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Alıcı Telefon Numarası veya JID</label>
+      <input type="text" id="wa-send-phone-input" class="input-text" placeholder="905332624732 veya 05332624732">
+      <small style="color: var(--text-4); font-size: 11px; margin-top: 5px; display: block;">Varsayılan: 05332624732. Numaranın başına 90 veya 0 ekleyebilirsiniz.</small>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Başlık / Açıklama Notu (Opsiyonel)</label>
+      <input type="text" id="wa-send-caption-input" class="input-text" placeholder="Örn: Solo Leveling Cilt 1">
+    </div>
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <button class="btn btn-secondary" style="flex: 1;" onclick="closeSendWaModal()">Vazgeç</button>
+      <button class="btn btn-primary" style="flex: 1;" id="wa-send-submit-btn" onclick="submitSendFileToWa()">WhatsApp'a Gönder 🚀</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUEUE TASK DETAIL MODAL -->
+<div class="modal-backdrop" id="queue-task-detail-modal">
+  <div class="modal-box" style="max-width: 640px; padding: 22px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="badge badge-white" id="task-modal-id-badge">#1</span>
+        <h3 style="font-size: 15px; font-weight: 700; color: #fff;">Görev Detay Bilgileri</h3>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="closeTaskDetailModal()">✕ Kapat</button>
+    </div>
+    <div id="task-modal-content">
+      <!-- Injected Task Details -->
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+      <button class="btn btn-secondary btn-sm" onclick="closeTaskDetailModal()">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>

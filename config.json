@@ -1,0 +1,31 @@
+{
+  "whatsappPhoneNumber": "",
+  "port": 3000,
+  "vdsIp": "111.235.150.203",
+  "ownerNumber": "905332624732",
+  "depotGroupJid": "",
+  "viewOnceAutoForward": true,
+  "viewOnceTargetJid": "",
+  "aiChatEnabled": true,
+  "aiBotName": "Moi",
+  "geminiApiKey": "AQ.Ab8RN6Jv2fsDksHbCF0YZCexREmUX8mf3gxMPZ7LYDlGwYznxA",
+  "geminiModel": "gemini-3.8-flash",
+  "groqApiKey": "",
+  "groqModel": "qwen/qwen3.8-27b",
+  "openrouterApiKey": "",
+  "openrouterModel": "google/gemma-4-31b-it:free",
+  "ollamaUrl": "https://ollama.com",
+  "ollamaModel": "gemma4:31b",
+  "ollamaApiKey": "",
+  "ollamaEnabled": false,
+  "concurrencyLimit": 2,
+  "downloadRetentionHours": 4,
+  "maxDownloadsCacheGB": 15,
+  "antiBan": {
+    "enabled": true,
+    "autoRead": true,
+    "typingSimulation": true,
+    "minTypingDelayMs": 300,
+    "maxTypingDelayMs": 1500
+  }
+}

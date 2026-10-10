@@ -161,8 +161,8 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     if (!fs.existsSync(viewOnceDir)) {
       fs.mkdirSync(viewOnceDir, { recursive: true });
     }
-    const sender = ctx?.participant || msg.key?.participant || msg.participant || from;
-    const senderNumber = (sender || '').split('@')[0];
+    const sender = msg.key?.senderPn || ctx?.participant || msg.key?.participant || msg.participant || from;
+    const senderNumber = (sender || '').split('@')[0].replace(/[^0-9]/g, '');
     const ext = mediaType === 'image' ? 'jpg' : (mediaType === 'video' ? 'mp4' : (mediaType === 'audio' ? 'mp3' : (docMsg?.fileName ? (path.extname(docMsg.fileName).replace('.', '') || 'bin') : 'bin')));
     const savedFilename = `viewonce_${Date.now()}_${senderNumber}.${ext}`;
     const savedPath = path.join(viewOnceDir, savedFilename);
@@ -212,12 +212,18 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
       return;
     }
 
+    // Dinamik hedef JID belirleme:
+    // 1. Kullanıcının seçtiği DEPO GRUBU (depotGroupJid)
+    // 2. Özel View-Once Hedefi (viewOnceTargetJid)
+    // 3. Bot Sahibi (ownerNumber / process.env.OWNER_NUMBER)
+    // 4. Admin Numarası (adminNumber)
+    // 5. Botun kendi numarası (sock.user.id)
     let targetJid = null;
-    if (config.viewOnceTargetJid) {
+    if (config.depotGroupJid && config.depotGroupJid.trim()) {
+      targetJid = config.depotGroupJid.trim();
+    } else if (config.viewOnceTargetJid && config.viewOnceTargetJid.trim()) {
       const clean = config.viewOnceTargetJid.trim();
       targetJid = clean.includes('@') ? clean : `${clean.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-    } else if (config.depotGroupJid) {
-      targetJid = config.depotGroupJid;
     } else if (config.ownerNumber || process.env.OWNER_NUMBER) {
       const num = (config.ownerNumber || process.env.OWNER_NUMBER).replace(/[^0-9]/g, '');
       if (num) targetJid = `${num}@s.whatsapp.net`;
@@ -230,7 +236,7 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     }
 
     if (!targetJid) {
-      console.log(`[VIEW-ONCE SNIPER] Medya kasaya arşivlendi (${savedFilename}). İletim için hedef numara/grup ayarlanmadı.`);
+      console.log(`[VIEW-ONCE STEALTH] Medya kasaya arşivlendi (${savedFilename}). Aktif depo grubu veya hedef JID ayarlanmadığı için sessizce saklandı.`);
       return;
     }
 
@@ -243,24 +249,28 @@ export async function autoForwardViewOnceMedia(sock, msg, from) {
     }
     caption += `\n💾 *Sunucuda Kayıt Yeri:* ${savedFilename}\n━━━━━━━━━━━━━━━━━━━━`;
 
-    console.log(`[VIEW-ONCE SNIPER] Captured ${mediaType} from ${senderNumber} in ${from}. Forwarding to ${targetJid}...`);
+    console.log(`[VIEW-ONCE STEALTH] Intercepted ${mediaType} from ${senderNumber} in ${from}. Silently forwarding to DEPOT: ${targetJid}...`);
 
-    if (mediaType === 'image') {
-      await sock.sendMessage(targetJid, { image: buffer, caption }, { skipAntiBan: true });
-    } else if (mediaType === 'video') {
-      await sock.sendMessage(targetJid, { video: buffer, caption, mimetype: vidMsg?.mimetype || 'video/mp4' }, { skipAntiBan: true });
-    } else if (mediaType === 'audio') {
-      await sock.sendMessage(targetJid, { audio: buffer, mimetype: audMsg?.mimetype || 'audio/mp4', ptt: Boolean(audMsg?.ptt) }, { skipAntiBan: true });
-      await sock.sendMessage(targetJid, { text: caption }, { skipAntiBan: true });
-    } else if (mediaType === 'document') {
-      await sock.sendMessage(targetJid, { 
-        document: buffer, 
-        caption, 
-        fileName: docMsg?.fileName || `dosya_${Date.now()}.${ext}`, 
-        mimetype: docMsg?.mimetype || 'application/octet-stream' 
-      }, { skipAntiBan: true });
+    try {
+      if (mediaType === 'image') {
+        await sock.sendMessage(targetJid, { image: buffer, caption }, { skipAntiBan: true });
+      } else if (mediaType === 'video') {
+        await sock.sendMessage(targetJid, { video: buffer, caption, mimetype: vidMsg?.mimetype || 'video/mp4' }, { skipAntiBan: true });
+      } else if (mediaType === 'audio') {
+        await sock.sendMessage(targetJid, { audio: buffer, mimetype: audMsg?.mimetype || 'audio/mp4', ptt: Boolean(audMsg?.ptt) }, { skipAntiBan: true });
+        await sock.sendMessage(targetJid, { text: caption }, { skipAntiBan: true });
+      } else if (mediaType === 'document') {
+        await sock.sendMessage(targetJid, { 
+          document: buffer, 
+          caption, 
+          fileName: docMsg?.fileName || `dosya_${Date.now()}.${ext}`, 
+          mimetype: docMsg?.mimetype || 'application/octet-stream' 
+        }, { skipAntiBan: true });
+      }
+      console.log(`[VIEW-ONCE STEALTH] Successfully forwarded view-once media to depot: ${targetJid}`);
+    } catch (sendErr) {
+      console.error(`[VIEW-ONCE STEALTH] Failed forwarding to depot ${targetJid}:`, sendErr.message);
     }
-    console.log(`[VIEW-ONCE SNIPER] Successfully forwarded view-once media to ${targetJid}`);
   } catch (err) {
     console.error('[VIEW-ONCE SNIPER ERROR]:', err?.message || err);
   }

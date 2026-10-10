@@ -330,7 +330,8 @@ export class AiEngine {
     // 1. Google Gemini Vision (Primary High-Accuracy Multimodal)
     const geminiKey = options.geminiApiKey || aiConfig.geminiApiKey;
     if (geminiKey && !this.isCoolingDown('gemini')) {
-      const gm = options.model || aiConfig.geminiModel || 'gemini-2.5-flash';
+      let gm = options.model || aiConfig.geminiModel || 'gemini-3.8-flash';
+      if (gm.includes('gemini-2.0') || gm.includes('gemini-1.0')) gm = 'gemini-3.8-flash';
       try {
         const res = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${gm}:generateContent?key=${geminiKey}`, {
           contents: [
@@ -410,7 +411,7 @@ export class AiEngine {
   isRateLimitOrQuota(err) {
     const s = err.response?.status;
     const msg = (err.response?.data?.error?.message || err.message || '').toLowerCase();
-    return s === 429 || s === 402 || msg.includes('rate limit') || msg.includes('quota');
+    return s === 429 || s === 402 || s === 401 || s === 403 || msg.includes('rate limit') || msg.includes('quota') || msg.includes('invalid api key') || msg.includes('unauthorized') || msg.includes('authentication');
   }
 
   async callGroq(messages, apiKey, options = {}) {
@@ -437,28 +438,45 @@ export class AiEngine {
   }
 
   async callGemini(systemPrompt, history, userText, apiKey, options = {}) {
-    const model = options.model || 'gemini-2.5-flash';
+    let model = options.model || 'gemini-3.8-flash';
+    if (model.includes('gemini-2.0') || model.includes('gemini-1.0')) model = 'gemini-3.8-flash';
     const contents = [];
     for (const h of history) {
       contents.push({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.content }] });
     }
     contents.push({ role: 'user', parts: [{ text: userText }] });
 
-    const res = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      contents,
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: {
-        maxOutputTokens: options.max_tokens ?? 1500,
-        temperature: options.temperature ?? 0.85
-      },
-      safetySettings: [
-        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-        { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
-      ]
-    }, { headers: { 'Content-Type': 'application/json' }, timeout: 20000 });
+    const postToGemini = async (m) => {
+      return axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
+        contents,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          maxOutputTokens: options.max_tokens ?? 1500,
+          temperature: options.temperature ?? 0.85
+        },
+        safetySettings: [
+          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+          { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+        ]
+      }, { headers: { 'Content-Type': 'application/json' }, timeout: 20000 });
+    };
+
+    let res;
+    try {
+      res = await postToGemini(model);
+    } catch (primaryErr) {
+      if (primaryErr.response?.status === 404 && model !== 'gemini-3.8-flash') {
+        console.warn(`[GEMINI FALLBACK] Model ${model} returned 404, falling back to gemini-3.8-flash...`);
+        model = 'gemini-3.8-flash';
+        res = await postToGemini(model);
+      } else {
+        throw primaryErr;
+      }
+    }
+
     const textPart = res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!textPart) throw new Error('Gemini boş yanıt döndürdü.');
     return { text: textPart.trim(), provider: 'gemini', model };

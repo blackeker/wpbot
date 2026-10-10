@@ -1,0 +1,63 @@
+<section class="view-panel" id="view-group-permissions">
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <span class="card-title">👥 WhatsApp Grup İzinleri & Komut Kısıtlama</span>
+            <button class="btn btn-secondary btn-sm" onclick="fetchWhatsAppGroupsAction()">Grupları Otomatik Tara</button>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Grup JID veya Seçimi</label>
+              <input type="text" id="gp-group-jid" class="input-text" placeholder="120363xxx@g.us">
+              <select id="gp-group-select" class="input-select" style="margin-top: 8px;" onchange="onSelectWhatsAppGroup(this.value)">
+                <option value="">-- Kayıtlı / Taranan Gruplardan Seç --</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Çalışma Modu & Sessiz Yanıt</label>
+              <select id="gp-mode-select" class="input-select" onchange="toggleGpModeHelp()">
+                <option value="blacklist">Kara Liste Modu (Seçilenleri Engelle, Kalanlara İzin Ver)</option>
+                <option value="whitelist">Beyaz Liste Modu (SADECE Seçilenlere İzin Ver, Kalanları Engelle)</option>
+              </select>
+              <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--text-3); cursor: pointer;">
+                <input type="checkbox" id="gp-silent-check">
+                <span>Engellenen komutlarda 'Bu komut kapalıdır' uyarısı atma (Sessiz Mod)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Kategori / Komut Seçimleri</label>
+            <div id="gp-category-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; background: var(--bg-2); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-1);">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" onclick="saveGroupPermissionAction()">Grup Ayarlarını Kaydet</button>
+            <button class="btn btn-danger" onclick="deleteGroupPermissionAction()">Varsayılana Sıfırla</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Yapılandırılmış Gruplar Listesi</span>
+          </div>
+          <div class="table-responsive">
+            <table class="mono-table">
+              <thead>
+                <tr>
+                  <th>Grup Adı / JID</th>
+                  <th>Mod</th>
+                  <th>Kısıtlanan / İzin Verilenler</th>
+                  <th>Sessiz</th>
+                  <th>İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="gp-table-tbody">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-5);">Henüz özel kural tanımlanmış grup yok.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>

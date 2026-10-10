@@ -1,0 +1,58 @@
+<section class="view-panel" id="view-config-editor">
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="card-title">📝 Canlı config.json Editörü</span>
+              <span class="badge" id="config-file-path-badge" style="font-family: var(--font-mono); font-size: 11px;">./config.json</span>
+              <span id="config-syntax-status" style="font-size: 12px; font-weight: 600;">🟢 Kontrol ediliyor...</span>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary" onclick="formatConfigJsonUi()" title="JSON Sözdizimini Güzelce Biçimlendir">
+                🪄 Biçimlendir
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="loadConfigRawEditor()" title="Diskteki Güncel Dosyayı Yeniden Oku">
+                🔄 Yeniden Oku
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="loadConfigTemplateAction()" title="Örnek / Varsayılan Şablonu Getir">
+                📋 Varsayılan Şablon
+              </button>
+              <button type="button" class="btn btn-primary" id="config-save-btn" onclick="saveConfigRawAction()" style="background: #22c55e; border-color: #16a34a; font-weight: 700;">
+                💾 config.json Kaydet (Ctrl+S)
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Snippet Injector Chips -->
+          <div style="padding: 10px 16px; background: var(--bg-2); border-bottom: 1px solid var(--border-1); display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 12px; color: var(--text-3); font-weight: 600;">Hızlı Alan Ekle:</span>
+            <button type="button" class="badge" style="cursor: pointer; background: var(--bg-1); color: var(--text-1); border: 1px solid var(--border-1);" onclick="insertConfigSnippet('geminiApiKey', 'AQ.Ab8RN6Jv2fsDksHbCF0YZCexREmUX8mf3gxMPZ7LYDlGwYznxA')">+ Gemini API Key</button>
+            <button type="button" class="badge" style="cursor: pointer; background: var(--bg-1); color: var(--text-1); border: 1px solid var(--border-1);" onclick="insertConfigSnippet('geminiModel', 'gemini-3.8-flash')">+ Gemini Modeli</button>
+            <button type="button" class="badge" style="cursor: pointer; background: var(--bg-1); color: var(--text-1); border: 1px solid var(--border-1);" onclick="insertConfigSnippet('groqApiKey', '')">+ Groq API Key</button>
+            <button type="button" class="badge" style="cursor: pointer; background: var(--bg-1); color: var(--text-1); border: 1px solid var(--border-1);" onclick="insertConfigSnippet('openrouterApiKey', '')">+ OpenRouter Key</button>
+            <button type="button" class="badge" style="cursor: pointer; background: var(--bg-1); color: var(--text-1); border: 1px solid var(--border-1);" onclick="insertConfigSnippet('depotGroupJid', '')">+ Depo Grubu JID</button>
+            <button type="button" class="badge" style="cursor: pointer; background: var(--bg-1); color: var(--text-1); border: 1px solid var(--border-1);" onclick="insertConfigSnippet('ownerNumber', '905332624732')">+ Sahip Numarası</button>
+            <button type="button" class="badge" style="cursor: pointer; background: var(--bg-1); color: var(--text-1); border: 1px solid var(--border-1);" onclick="insertConfigSnippet('viewOnceAutoForward', true)">+ View-Once Aktif</button>
+          </div>
+
+          <!-- Code Editor Body -->
+          <div style="position: relative; padding: 0;">
+            <textarea id="config-raw-textarea" 
+              spellcheck="false" 
+              autocapitalize="off" 
+              autocomplete="off"
+              oninput="validateConfigJsonUi()"
+              onkeydown="handleConfigEditorKeyDown(event)"
+              style="width: 100%; min-height: 520px; background: #090d16; color: #e6edf3; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; padding: 18px; border: none; outline: none; resize: vertical; tab-size: 2;"
+              placeholder="config.json yükleniyor..."></textarea>
+          </div>
+
+          <div style="padding: 12px 16px; background: var(--bg-2); border-top: 1px solid var(--border-1); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <span style="font-size: 12px; color: var(--text-3);">
+              💡 <b>İpucu:</b> <kbd style="background:var(--bg-1); padding:2px 6px; border-radius:4px; font-family:var(--font-mono);">Ctrl + S</kbd> tuşuna basarak anında kaydedebilirsiniz. Girinti için <kbd style="background:var(--bg-1); padding:2px 6px; border-radius:4px; font-family:var(--font-mono);">Tab</kbd> tuşu 2 boşluk bırakır.
+            </span>
+            <span style="font-size: 12px; color: var(--text-2);">
+              Otomatik Senkronizasyon: <b>Aktif</b>
+            </span>
+          </div>
+        </div>
+      </section>

@@ -1,0 +1,19 @@
+<section class="view-panel" id="view-terminal-logs">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">💻 Canlı Terminal Log Akışı</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" onclick="clearTerminalLogs()">Temizle</button>
+              <button class="btn btn-secondary btn-sm" onclick="downloadTerminalLogs()">Logları İndir</button>
+            </div>
+          </div>
+
+          <div class="terminal-box" id="terminal-container">
+            <div class="log-line">
+              <span class="log-time">[00:00:00]</span>
+              <span class="log-module">[SYSTEM]</span>
+              <span class="log-text">Terminal log akışı başlatıldı. WebSocket bekleniyor...</span>
+            </div>
+          </div>
+        </div>
+      </section>

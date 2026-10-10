@@ -1,0 +1,47 @@
+<section class="view-panel" id="view-queue-manager">
+        <div class="card">
+          <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="card-title">İndirme Kuyruğu & Canlı Görev Monitörü</span>
+              <div style="display: flex; gap: 6px;">
+                <span class="badge" id="queue-header-active-badge">0 Aktif</span>
+                <span class="badge" id="queue-header-pending-badge">0 Bekleyen</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" id="queue-pause-btn" onclick="pauseQueueToggle()">Kuyruğu Duraklat</button>
+              <button class="btn btn-danger btn-sm" onclick="clearQueueAction()">Tümünü Sıfırla</button>
+            </div>
+          </div>
+
+          <!-- Queue Filter & Search Toolbar -->
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <div class="preset-pills" style="margin-top: 0;" id="queue-filter-pills">
+              <button class="pill active" id="q-filter-all" onclick="filterQueueList('all')">Tümü (<span id="q-cnt-all">0</span>)</button>
+              <button class="pill" id="q-filter-active" onclick="filterQueueList('active')">⚡ Aktif (<span id="q-cnt-active">0</span>)</button>
+              <button class="pill" id="q-filter-pending" onclick="filterQueueList('pending')">⏳ Bekleyen (<span id="q-cnt-pending">0</span>)</button>
+            </div>
+            <div style="flex: 1; max-width: 340px; min-width: 200px;">
+              <input type="text" id="queue-search-input" class="input-text" placeholder="🔍 Görev adı, kaynak veya alıcı ara..." oninput="onQueueSearch(this.value)" style="padding: 6px 12px; font-size: 12px;">
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="mono-table">
+              <thead>
+                <tr>
+                  <th width="70">Sıra</th>
+                  <th>Kaynak & Görev Başlığı</th>
+                  <th width="150">Hedef Alıcı</th>
+                  <th width="230">Durum & İlerleme</th>
+                  <th width="130">Süre</th>
+                  <th width="140">İşlemler</th>
+                </tr>
+              </thead>
+              <tbody id="detailed-queue-tbody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-5); padding: 24px;">Kuyrukta görev bulunmuyor.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>

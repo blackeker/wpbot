@@ -1,0 +1,130 @@
+<section class="view-panel active" id="view-overview">
+        <!-- 4 TELEMETRY METRIC CARDS -->
+        <div class="grid-4">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">İşlemci (CPU)</span>
+              <span class="badge" id="metric-cpu-cores">Cores: -</span>
+            </div>
+            <div class="card-metric-val" id="metric-cpu-val">0%</div>
+            <div class="card-metric-sub">
+              <span>Yük Ortalaması</span>
+              <span id="metric-cpu-load">0.00, 0.00</span>
+            </div>
+            <div class="progress-track"><div class="progress-bar" id="metric-cpu-bar" style="width: 0%;"></div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Bellek (RAM)</span>
+              <span class="badge" id="metric-ram-total">- GB</span>
+            </div>
+            <div class="card-metric-val" id="metric-ram-val">0%</div>
+            <div class="card-metric-sub">
+              <span>Kullanılan</span>
+              <span id="metric-ram-used">0 MB</span>
+            </div>
+            <div class="progress-track"><div class="progress-bar" id="metric-ram-bar" style="width: 0%;"></div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Medya Deposu</span>
+              <span class="badge" id="metric-disk-files">0 Dosya</span>
+            </div>
+            <div class="card-metric-val" id="metric-disk-val">0 MB</div>
+            <div class="card-metric-sub">
+              <span>İndirilenler Klasörü</span>
+              <span>/downloads</span>
+            </div>
+            <div class="progress-track"><div class="progress-bar" id="metric-disk-bar" style="width: 0%;"></div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Kuyruk Durumu</span>
+              <span class="badge" id="metric-queue-status">Hazır</span>
+            </div>
+            <div class="card-metric-val" id="metric-queue-val">0</div>
+            <div class="card-metric-sub">
+              <span>Aktif Görevler</span>
+              <span id="metric-active-count">0 İndiriliyor</span>
+            </div>
+            <div class="progress-track"><div class="progress-bar" id="metric-queue-bar" style="width: 0%;"></div></div>
+          </div>
+        </div>
+
+        <!-- QUICK DOWNLOAD & LIVE QUEUE GRID -->
+        <div class="grid-2">
+          <!-- QUICK DOWNLOAD CARD -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">⚡ Hızlı Medya İndirici</span>
+              <span class="badge">40+ Site</span>
+            </div>
+            <form id="quick-download-form" onsubmit="handleQuickDownload(event)">
+              <div class="form-group">
+                <label class="form-label">Medya / Video / Manga URL</label>
+                <input type="text" id="input-quick-url" class="input-text" placeholder="https://dizipal... / https://mangaportali... / https://instagram..." required>
+                <div class="preset-pills">
+                  <span class="pill" onclick="setQuickUrl('https://dizipal')">Dizipal</span>
+                  <span class="pill" onclick="setQuickUrl('https://hdfilmcehennemi.life')">HDFilm</span>
+                  <span class="pill" onclick="setQuickUrl('https://mangaportali.com')">MangaPortalı</span>
+                  <span class="pill" onclick="setQuickUrl('https://instagram.com')">Instagram</span>
+                  <span class="pill" onclick="setQuickUrl('https://tiktok.com')">TikTok</span>
+                  <span class="pill" onclick="setQuickUrl('https://animecix.net')">Animecix</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">WhatsApp Gönderim Hedefi (Opsiyonel)</label>
+                <input type="text" id="input-quick-phone" class="input-text" placeholder="905xxxxxxxxx veya boş (sadece sunucuya indirir)">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">İndirme Önceliği</label>
+                <select id="input-quick-mode" class="input-select">
+                  <option value="normal">Normal Kuyruk</option>
+                  <option value="high">Öncelikli (Kuyruk Başına Al)</option>
+                  <option value="now">Anında İndir & Gönder</option>
+                </select>
+              </div>
+
+              <button type="submit" id="btn-quick-submit" class="btn btn-primary btn-block">
+                <span>İndirme Görevini Başlat</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- ACTIVE DOWNLOADS & QUEUE SUMMARY -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📥 Aktif & Bekleyen Kuyruk</span>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-secondary btn-sm" onclick="pauseQueueToggle()" id="btn-pause-queue">Duraklat</button>
+                <button class="btn btn-danger btn-sm" onclick="clearQueueAction()">Temizle</button>
+              </div>
+            </div>
+
+            <div id="active-task-container" style="margin-bottom: 16px;">
+              <p style="color: var(--text-4); font-size: 13px;">Şu anda aktif indirme yok.</p>
+            </div>
+
+            <div class="form-label">Bekleme Listesi</div>
+            <div id="queue-task-list" style="max-height: 200px; overflow-y: auto;">
+              <p style="color: var(--text-5); font-size: 12px;">Kuyruk boş.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TELEMETRY CHART CARD -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📊 Gerçek Zamanlı Telemetri & Yük Grafiği</span>
+            <span class="badge" id="chart-refresh-badge">Canlı Akış</span>
+          </div>
+          <div style="height: 220px; width: 100%;">
+            <canvas id="telemetryChart"></canvas>
+          </div>
+        </div>
+      </section>

@@ -115,7 +115,7 @@ const DEFAULT_CONFIG = {
   aiBotName: process.env.BOT_NAME || "Moi",
   groqModel: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
   openrouterModel: process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free",
-  geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  geminiModel: process.env.GEMINI_MODEL || "gemini-3.8-flash",
 
   antiBan: {
     enabled: true,
@@ -242,7 +242,7 @@ export function getAiConfig() {
     botName: cfg.aiBotName || cfg.botName || process.env.BOT_NAME || 'Moi',
     groqModel: cfg.groqModel || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
     openrouterModel: cfg.openrouterModel || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free',
-    geminiModel: cfg.geminiModel || process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+    geminiModel: cfg.geminiModel || process.env.GEMINI_MODEL || 'gemini-3.8-flash'
   };
 }
 

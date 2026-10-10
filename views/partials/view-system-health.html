@@ -1,0 +1,39 @@
+<section class="view-panel" id="view-system-health">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🛠️ Sunucu Bakım & Komutlar</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <button class="btn btn-secondary btn-block" onclick="systemDiagnosticGitPull()">Git Pull (Son Kodları Çek)</button>
+              <button class="btn btn-secondary btn-block" onclick="systemDiagnosticRestartPM2()">PM2 Yeniden Başlat (Restart)</button>
+              <button class="btn btn-danger btn-block" onclick="clearHistoryLogs()">İndirme Geçmişini Temizle</button>
+              <button class="btn btn-danger btn-block" onclick="clearErrorLogs()">Hata Günlüğünü Temizle</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📋 Sistem Bilgileri</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--text-2);">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-1); padding-bottom: 6px;">
+                <span>Node.js Sürümü</span>
+                <span style="font-family: var(--font-mono); color: #fff;" id="sys-node-version">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-1); padding-bottom: 6px;">
+                <span>İşletim Sistemi</span>
+                <span style="font-family: var(--font-mono); color: #fff;" id="sys-os-platform">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-1); padding-bottom: 6px;">
+                <span>Bot Çalışma Süresi (Uptime)</span>
+                <span style="font-family: var(--font-mono); color: #fff;" id="sys-uptime-val">{{UPTIME}}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-1); padding-bottom: 6px;">
+                <span>yt-dlp Durumu</span>
+                <span style="font-family: var(--font-mono); color: #fff;" id="sys-ytdlp-version">Güncel</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>

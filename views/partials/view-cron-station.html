@@ -1,0 +1,28 @@
+<section class="view-panel" id="view-cron-station">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">⏰ Zamanlanmış Görevler (Cron Otomasyonu)</span>
+            <button class="btn btn-primary btn-sm" onclick="addNewCronRow()">+ Yeni Görev Ekle</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="mono-table">
+              <thead>
+                <tr>
+                  <th>Görev İsmi</th>
+                  <th>Cron İfadesi (Min Hour Dom Month Dow)</th>
+                  <th>Çalıştırılacak Komut</th>
+                  <th>Hedef Numara / JID</th>
+                  <th>Durum</th>
+                  <th>İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="cron-table-tbody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-5);">Cron görevleri yükleniyor...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <button class="btn btn-primary" style="margin-top: 16px;" onclick="saveCronAction()">Cron Ayarlarını Kaydet</button>
+        </div>
+      </section>

@@ -145,13 +145,23 @@ function basicAuth(req, res, next) {
   return res.status(401).send(`Hatalı kullanıcı adı veya şifre! Kalan deneme hakkınız: ${remaining}`);
 }
 
-// Secure all dashboard routes EXCEPT /watch, /downloads, and local /api
+// Secure all dashboard routes EXCEPT /watch, /downloads, static assets (/css, /js, /favicon.ico), and local /api
 app.use((req, res, next) => {
-  if (req.path.startsWith('/watch') || req.path.startsWith('/downloads') || req.path.startsWith('/api/')) {
+  if (
+    req.path.startsWith('/watch') || 
+    req.path.startsWith('/downloads') || 
+    req.path.startsWith('/api/') ||
+    req.path.startsWith('/css/') ||
+    req.path.startsWith('/js/') ||
+    req.path === '/favicon.ico'
+  ) {
     return next();
   }
   basicAuth(req, res, next);
 });
+
+// Serve static assets from public/ directory
+app.use(express.static(path.join(path.resolve(), 'public')));
 
 
 // Site-specific direct link extraction API endpoints
@@ -1117,6 +1127,160 @@ app.post('/api/settings', (req, res) => {
   }
 });
 
+// ─── Canlı config.json Dosya Editörü API'leri ───
+app.get('/api/config-raw', (req, res) => {
+  try {
+    const rootPath = path.resolve('./config.json');
+    const sessionCfgPath = path.join(sessionPath, 'config.json');
+    let rawContent = '';
+    let usedFile = './config.json';
+
+    if (fs.existsSync(rootPath)) {
+      rawContent = fs.readFileSync(rootPath, 'utf8');
+      usedFile = './config.json';
+    } else if (fs.existsSync(sessionCfgPath)) {
+      rawContent = fs.readFileSync(sessionCfgPath, 'utf8');
+      usedFile = sessionCfgPath;
+    } else {
+      const current = readConfig(true);
+      rawContent = JSON.stringify(current, null, 2);
+      usedFile = './config.json (Varsayılandan üretildi)';
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(rawContent);
+    } catch (e) {
+      parsed = readConfig(true);
+    }
+
+    res.json({
+      success: true,
+      raw: rawContent,
+      filePath: usedFile,
+      config: parsed
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/config-raw', (req, res) => {
+  try {
+    let rawInput = '';
+    if (typeof req.body?.raw === 'string') {
+      rawInput = req.body.raw;
+    } else if (typeof req.body?.configJson === 'string') {
+      rawInput = req.body.configJson;
+    } else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+      rawInput = JSON.stringify(req.body, null, 2);
+    }
+
+    rawInput = rawInput.trim();
+    if (!rawInput) {
+      return res.status(400).json({ success: false, error: 'Gönderilen config.json içeriği boş olamaz.' });
+    }
+
+    let parsedConfig;
+    try {
+      parsedConfig = JSON.parse(rawInput);
+    } catch (parseErr) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `JSON Sözdizimi Hatası (SyntaxError): ${parseErr.message}` 
+      });
+    }
+
+    if (!parsedConfig || typeof parsedConfig !== 'object' || Array.isArray(parsedConfig)) {
+      return res.status(400).json({ success: false, error: 'config.json ana kök yapısı bir JSON nesnesi (object { ... }) olmalıdır.' });
+    }
+
+    // Biçimlendirilmiş güzel JSON olarak kaydet
+    const formattedJson = JSON.stringify(parsedConfig, null, 2);
+    const rootPath = path.resolve('./config.json');
+    const sessionCfgPath = path.join(sessionPath, 'config.json');
+
+    // 1. Kök dizindeki config.json dosyasına yaz
+    fs.writeFileSync(rootPath, formattedJson, 'utf8');
+
+    // 2. Oturum dizinindeki config.json dosyasına da yaz
+    try {
+      if (!fs.existsSync(sessionPath)) fs.mkdirSync(sessionPath, { recursive: true });
+      fs.writeFileSync(sessionCfgPath, formattedJson, 'utf8');
+    } catch (e) {}
+
+    // 3. Sistem belleğini, ortam değişkenlerini ve AI konfigürasyonunu anında tazele
+    writeConfig(parsedConfig);
+    const freshConfig = readConfig(true);
+    processQueue();
+    notifyStatusUpdate();
+
+    console.log('[CONFIG EDITOR] config.json site üzerinden başarıyla güncellendi ve uygulandı.');
+    res.json({
+      success: true,
+      message: 'config.json başarıyla kaydedildi! Tüm sistem ayarları ve yapay zeka değişkenleri anında aktif edildi.',
+      raw: formattedJson,
+      config: freshConfig
+    });
+  } catch (err) {
+    console.error('[CONFIG SAVE ERROR]:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/config-raw/validate', (req, res) => {
+  try {
+    const rawInput = (req.body.raw || '').trim();
+    if (!rawInput) {
+      return res.json({ valid: false, error: 'İçerik boş.' });
+    }
+    const parsed = JSON.parse(rawInput);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return res.json({ valid: false, error: 'Kök eleman bir JSON nesnesi (object) olmalıdır.' });
+    }
+    res.json({ valid: true, keyCount: Object.keys(parsed).length });
+  } catch (err) {
+    res.json({ valid: false, error: err.message });
+  }
+});
+
+app.post('/api/config-raw/reset', (req, res) => {
+  try {
+    const defaultTemplate = {
+      whatsappPhoneNumber: process.env.WHATSAPP_PHONE_NUMBER || "",
+      port: 3000,
+      vdsIp: "111.235.150.203",
+      ownerNumber: process.env.OWNER_NUMBER || "905332624732",
+      depotGroupJid: "",
+      viewOnceAutoForward: true,
+      viewOnceTargetJid: "",
+      aiChatEnabled: true,
+      aiBotName: "Moi",
+      geminiApiKey: process.env.GEMINI_API_KEY || "",
+      geminiModel: "gemini-3.8-flash",
+      groqApiKey: process.env.GROQ_API_KEY || "",
+      groqModel: "qwen/qwen3.8-27b",
+      openrouterApiKey: process.env.OPENROUTER_API_KEY || "",
+      openrouterModel: "google/gemma-4-31b-it:free",
+      ollamaUrl: "https://ollama.com",
+      ollamaModel: "gemma4:31b",
+      ollamaApiKey: "",
+      ollamaEnabled: false,
+      concurrencyLimit: 2,
+      downloadRetentionHours: 4,
+      maxDownloadsCacheGB: 15,
+      antiBan: {
+        enabled: true,
+        autoRead: true,
+        typingSimulation: true
+      }
+    };
+    res.json({ success: true, template: defaultTemplate, raw: JSON.stringify(defaultTemplate, null, 2) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Custom Command Templates
 app.post('/api/commands', (req, res) => {
   try {
@@ -1142,6 +1306,91 @@ app.post('/api/cron', (req, res) => {
     res.json({ success: true, message: 'Zamanlanmış görevler başarıyla kaydedildi.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── Dynamic Groups & Depot Selector APIs ───
+app.get('/api/groups', async (req, res) => {
+  try {
+    const sock = botSocketRef.current;
+    const config = readConfig();
+    const currentDepot = config.depotGroupJid || '';
+
+    if (!sock) {
+      return res.json({
+        success: true,
+        connected: false,
+        depotGroupJid: currentDepot,
+        groups: [],
+        message: 'WhatsApp botu henüz bağlı değil. Grupları listelemek için botu bağlayın.'
+      });
+    }
+
+    let groups = [];
+    if (typeof sock.groupFetchAllParticipating === 'function') {
+      try {
+        const participating = await sock.groupFetchAllParticipating();
+        groups = Object.values(participating || {}).map(g => ({
+          jid: g.id,
+          name: g.subject || g.id,
+          participantsCount: g.participants?.length || g.size || 0,
+          isCurrentDepot: g.id === currentDepot
+        }));
+      } catch (err) {
+        console.warn('[GROUPS API] Fetch error:', err.message);
+      }
+    }
+
+    // Sort: current depot first, then alphabetically
+    groups.sort((a, b) => {
+      if (a.isCurrentDepot) return -1;
+      if (b.isCurrentDepot) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    res.json({
+      success: true,
+      connected: true,
+      depotGroupJid: currentDepot,
+      totalGroups: groups.length,
+      groups
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/settings/depot-group', (req, res) => {
+  const { depotGroupJid } = req.body;
+  try {
+    const cleanJid = (depotGroupJid || '').trim();
+    writeConfig({ depotGroupJid: cleanJid });
+    res.json({
+      success: true,
+      depotGroupJid: cleanJid,
+      message: cleanJid ? 'Depo grubu başarıyla kaydedildi!' : 'Depo grubu kaldırıldı.'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/settings/test-depot', async (req, res) => {
+  const sock = botSocketRef.current;
+  if (!sock) return res.status(503).json({ success: false, error: 'WhatsApp bot bağlı değil.' });
+
+  const config = readConfig();
+  const target = (req.body.depotGroupJid || config.depotGroupJid || '').trim();
+  if (!target) return res.status(400).json({ success: false, error: 'Kayıtlı veya seçilmiş bir depo grubu bulunamadı.' });
+
+  try {
+    const timeStr = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
+    await sock.sendMessage(target, {
+      text: `📦 *WPBot Depo Grubu Bağlantı Testi*\n━━━━━━━━━━━━━━━━━━━━\n✅ Bu grup, tek gönderimlik (view-once) medyalar ve bot indirmeleri için *Aktif Depo Grubu* olarak tanımlandı.\n🕒 *Zaman:* ${timeStr}`
+    });
+    res.json({ success: true, message: `"${target}" grubuna test mesajı başarıyla gönderildi!` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Mesaj gönderilemedi: ' + err.message });
   }
 });
 
@@ -1482,14 +1731,33 @@ app.post('/api/request-qr', async (req, res) => {
   }
 });
 
+// Modular Dashboard Partial Renderer
+function renderModularDashboard(viewsDir, port) {
+  const masterPath = path.join(viewsDir, 'dashboard.html');
+  let html = fs.readFileSync(masterPath, 'utf8');
+
+  // Support includes: <!-- #include "partials/..." -->
+  const includeRegex = /<!--\s*#include\s+["']([^"']+)["']\s*-->/g;
+  html = html.replace(includeRegex, (match, relPath) => {
+    const partialPath = path.join(viewsDir, relPath);
+    if (fs.existsSync(partialPath)) {
+      return fs.readFileSync(partialPath, 'utf8');
+    }
+    console.warn(`[DASHBOARD RENDER] Partial not found: ${relPath}`);
+    return `<!-- Partial: ${relPath} bulunamadı -->`;
+  });
+
+  html = html.replace(/{{PORT}}/g, port);
+  html = html.replace(/{{UPTIME}}/g, botState.uptime.toLocaleString('tr-TR'));
+  return html;
+}
+
 // HTTP Server Dashboard UI
 app.get('/', (req, res) => {
   const PORT = parseInt(process.env.PORT || '3000', 10);
   const viewsDir = path.join(path.resolve(), 'views');
   try {
-    let html = fs.readFileSync(path.join(viewsDir, 'dashboard.html'), 'utf8');
-    html = html.replace(/{{PORT}}/g, PORT);
-    html = html.replace(/{{UPTIME}}/g, botState.uptime.toLocaleString('tr-TR'));
+    const html = renderModularDashboard(viewsDir, PORT);
     res.send(html);
   } catch (err) {
     res.status(500).send("Dashboard yüklenirken hata oluştu: " + err.message);
