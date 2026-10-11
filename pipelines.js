@@ -177,8 +177,6 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           '-x',
           '--audio-format', 'mp3',
           '--no-playlist',
-          '--concurrent-fragments', '5',
-          '--buffer-size', '64K',
           '-o', mp4Path.replace('.mp4', '.mp3')
         );
       } else {
@@ -192,9 +190,6 @@ export async function executeYouTubePipeline(targetUrl, recipientJid, progressUp
           '--merge-output-format', 'mp4',
           '--postprocessor-args', 'ffmpeg:-movflags +faststart -brand mp42',
           '--no-playlist',
-          '--concurrent-fragments', '5',
-          '--buffer-size', '64K',
-          '--http-chunk-size', '10M',
           '-o', mp4Path
         );
       }

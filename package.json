@@ -12,7 +12,8 @@
     "pm2:stop": "pm2 stop wpbot",
     "pm2:restart": "pm2 restart wpbot",
     "pm2:logs": "pm2 logs wpbot",
-    "menu": "node bin/menu-cli.js"
+    "menu": "node bin/menu-cli.js",
+    "test:memory": "node tests/test_cross_session_memory.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",

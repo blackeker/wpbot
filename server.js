@@ -61,6 +61,7 @@ import {
   updateGroupConfig, 
   resetGroupConfig 
 } from './utils/permissionManager.js';
+import { userProfileManager } from './ai/userProfileManager.js';
 
 const app = express();
 app.use(express.urlencoded({ extended: true }));
@@ -1281,6 +1282,90 @@ app.post('/api/config-raw/reset', (req, res) => {
   }
 });
 
+// ─── 🧠 Yapay Zeka Kullanıcı Hafızası & Profil API'leri ───
+app.get('/api/ai/profiles', (req, res) => {
+  try {
+    const list = userProfileManager.getAllProfilesList();
+    res.json({ success: true, count: list.length, profiles: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/ai/profiles/:jid', (req, res) => {
+  try {
+    const profile = userProfileManager.getProfile(req.params.jid);
+    res.json({ success: true, profile });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/ai/profiles/:jid', (req, res) => {
+  try {
+    const { name, nickname, relationship } = req.body;
+    const prof = userProfileManager.getProfile(req.params.jid);
+    if (name !== undefined) prof.name = String(name).trim();
+    if (nickname !== undefined) prof.nickname = String(nickname).trim();
+    if (relationship !== undefined) prof.relationship = String(relationship).trim();
+    userProfileManager.scheduleSave();
+    res.json({ success: true, message: 'Profil başarıyla güncellendi.', profile: prof });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/ai/profiles/:jid/fact', (req, res) => {
+  try {
+    const { fact } = req.body;
+    if (!fact) return res.status(400).json({ success: false, error: 'Bilgi metni gerekli.' });
+    const added = userProfileManager.addFact(req.params.jid, fact);
+    res.json({ success: true, added, profile: userProfileManager.getProfile(req.params.jid) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/ai/profiles/:jid/fact', (req, res) => {
+  try {
+    const { fact } = req.body;
+    if (!fact) return res.status(400).json({ success: false, error: 'Silinecek bilgi gerekli.' });
+    const removed = userProfileManager.removeFact(req.params.jid, fact);
+    res.json({ success: true, removed, profile: userProfileManager.getProfile(req.params.jid) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/ai/profiles/:jid/note', (req, res) => {
+  try {
+    const { key, value } = req.body;
+    if (!key) return res.status(400).json({ success: false, error: 'Not anahtarı gerekli.' });
+    userProfileManager.setNote(req.params.jid, key, value);
+    res.json({ success: true, profile: userProfileManager.getProfile(req.params.jid) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/ai/profiles/:jid/note/:key', (req, res) => {
+  try {
+    userProfileManager.deleteNote(req.params.jid, req.params.key);
+    res.json({ success: true, profile: userProfileManager.getProfile(req.params.jid) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/ai/profiles/:jid', (req, res) => {
+  try {
+    userProfileManager.clearProfile(req.params.jid);
+    res.json({ success: true, message: 'Kullanıcının hafıza ve profil verileri sıfırlandı.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Custom Command Templates
 app.post('/api/commands', (req, res) => {
   try {
@@ -1479,45 +1564,6 @@ app.delete('/api/permissions/groups/:jid', (req, res) => {
     res.json({ success: true, message: 'Grup izinleri varsayılana sıfırlandı.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
-  }
-});
-
-// ─── Premium Kullanıcı Yönetimi API'leri ───
-app.get('/api/premium', async (req, res) => {
-  try {
-    const { getPremiumUsers } = await import('./utils/rateLimiter.js');
-    res.json({ success: true, premiumUsers: getPremiumUsers() });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.post('/api/premium', async (req, res) => {
-  try {
-    const { addPremiumUser } = await import('./utils/rateLimiter.js');
-    const { phone } = req.body;
-    if (!phone || typeof phone !== 'string') {
-      return res.status(400).json({ success: false, error: 'Geçersiz telefon numarası.' });
-    }
-    const cleaned = phone.trim().replace(/[^0-9]/g, '');
-    if (cleaned.length < 7) {
-      return res.status(400).json({ success: false, error: 'Telefon numarası çok kısa.' });
-    }
-    const added = addPremiumUser(cleaned);
-    res.json({ success: true, added, phone: cleaned });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
-app.delete('/api/premium/:phone', async (req, res) => {
-  try {
-    const { removePremiumUser } = await import('./utils/rateLimiter.js');
-    const phone = req.params.phone.replace(/[^0-9]/g, '');
-    const removed = removePremiumUser(phone);
-    res.json({ success: true, removed, phone });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
   }
 });
 

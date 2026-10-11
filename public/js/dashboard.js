@@ -30,11 +30,11 @@
     'media-vault': { title: 'Dosya Yöneticisi', sub: 'Sunucu Dosya Gezgini & Medya Oynatıcı' },
     'view-once-vault': { title: 'Tek Gönderimlik Kasa', sub: 'Yakalanan Tek Gönderimlik Fotoğraf, Video ve Sesler' },
     'group-permissions': { title: 'Grup İzinleri', sub: 'Grup Bazlı Komut Kısıtlama & Modlar' },
-    'premium-manager': { title: '💎 Premium Kullanıcılar', sub: 'Sınırsız Erişim İçin Premium Üye Yönetimi' },
     'whatsapp-station': { title: 'WhatsApp Bağlantısı', sub: 'QR, Eşleşme Kodu & Oturum Yedekleme' },
     'cron-station': { title: 'Zamanlanmış Görevler', sub: 'Cron Otomasyon Motoru' },
     'settings-station': { title: 'Sistem Ayarları', sub: 'Proxy, Sınırlar & Güvenlik' },
     'config-editor': { title: 'config.json Editörü', sub: 'Canlı Yapılandırma, API Anahtarları & Sistem Ayarları' },
+    'ai-profiles': { title: 'Yapay Zeka Hafızası', sub: 'Kullanıcı Profilleri, Kalıcı Bilgiler & Anılar' },
     'system-health': { title: 'Sistem Sağlığı', sub: 'Sunucu Bakım & Tanılama' },
     'terminal-logs': { title: 'Konsol & Loglar', sub: 'Gerçek Zamanlı Terminal Akışı' }
   };
@@ -99,6 +99,7 @@
     if (tabId === 'cron-station') loadCronAction();
     if (tabId === 'settings-station') loadSettingsAction();
     if (tabId === 'config-editor') loadConfigRawEditor();
+    if (tabId === 'ai-profiles') loadAiProfilesList();
     if (tabId === 'system-health') loadSystemHealth();
   }
 
@@ -2164,6 +2165,299 @@
       ta.value = ta.value.substring(0, start) + '  ' + ta.value.substring(end);
       ta.selectionStart = ta.selectionEnd = start + 2;
       validateConfigJsonUi();
+    }
+  }
+
+  /* =========================================================================
+     🧠 YAPAY ZEKA KULLANICI HAFIZASI & PROFİL İŞLEMLERİ
+     ========================================================================= */
+  let currentAiProfiles = [];
+  let selectedProfileJid = null;
+
+  async function loadAiProfilesList() {
+    const tbody = document.getElementById('ai-profiles-table-body');
+    const badge = document.getElementById('ai-profiles-count-badge');
+    if (!tbody) return;
+
+    try {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding: 24px; text-align: center; color: var(--text-3);">Profiller yükleniyor...</td></tr>';
+      const res = await fetch('/api/ai/profiles');
+      const data = await res.json();
+      if (data.success) {
+        currentAiProfiles = data.profiles || [];
+        if (badge) badge.innerText = `${currentAiProfiles.length} Kişi Kayıtlı`;
+        renderAiProfilesTable(currentAiProfiles);
+      } else {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding: 20px; text-align: center; color: #ef4444;">Hata: ${escapeHtml(data.error || 'Veri alınamadı')}</td></tr>`;
+      }
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" style="padding: 20px; text-align: center; color: #ef4444;">Bağlantı hatası: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+
+  function renderAiProfilesTable(list) {
+    const tbody = document.getElementById('ai-profiles-table-body');
+    if (!tbody) return;
+
+    if (!list || list.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="padding: 30px; text-align: center; color: var(--text-3);">
+        Henüz hafızaya kayıtlı kullanıcı bulunmuyor.<br>
+        <span style="font-size: 12px; color: var(--text-4);">Botla WhatsApp üzerinden konuştukça profiller otomatik oluşacaktır.</span>
+      </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = list.map(p => {
+      const lastSeenStr = p.lastSeen ? formatRelativeTime(new Date(p.lastSeen)) : '-';
+      return `
+        <tr style="border-bottom: 1px solid var(--border-1); transition: background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+          <td style="padding: 12px 16px;">
+            <div style="font-weight: 700; color: #fff; font-family: var(--font-mono); font-size: 13px;">${escapeHtml(p.id)}</div>
+            <div style="font-size: 11px; color: var(--text-4);">Son Görülme: ${lastSeenStr}</div>
+          </td>
+          <td style="padding: 12px 16px;">
+            <div style="font-weight: 600; color: #e2e8f0;">${escapeHtml(p.name || 'İsimsiz')}</div>
+            ${p.nickname ? `<div style="font-size: 11px; color: var(--text-3); font-style: italic;">"${escapeHtml(p.nickname)}"</div>` : ''}
+          </td>
+          <td style="padding: 12px 16px;">
+            <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-size: 11px;">
+              ${escapeHtml(p.relationship || 'Arkadaş')}
+            </span>
+          </td>
+          <td style="padding: 12px 16px;">
+            <span class="badge" style="background: var(--bg-2); color: var(--text-2); font-size: 11px;">
+              ${p.notesCount || 0} Alan
+            </span>
+          </td>
+          <td style="padding: 12px 16px;">
+            <span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 11px;">
+              🧠 ${p.factsCount || 0} Bilgi
+            </span>
+          </td>
+          <td style="padding: 12px 16px; font-family: var(--font-mono); font-size: 12px; color: var(--text-3);">
+            ${p.messageCount || 0}
+          </td>
+          <td style="padding: 12px 16px; text-align: right;">
+            <button class="btn btn-secondary btn-sm" onclick="openAiProfileDetail('${escapeHtml(p.id)}')">
+              🔍 Hafızayı Yönet
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function filterAiProfilesList() {
+    const q = (document.getElementById('ai-profile-search-input')?.value || '').toLowerCase().trim();
+    if (!q) {
+      renderAiProfilesTable(currentAiProfiles);
+      return;
+    }
+    const filtered = currentAiProfiles.filter(p => 
+      (p.id || '').toLowerCase().includes(q) ||
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.nickname || '').toLowerCase().includes(q) ||
+      (p.relationship || '').toLowerCase().includes(q)
+    );
+    renderAiProfilesTable(filtered);
+  }
+
+  async function openAiProfileDetail(jid) {
+    selectedProfileJid = jid;
+    const detailCard = document.getElementById('ai-profile-detail-card');
+    if (!detailCard) return;
+
+    try {
+      showToast('Kullanıcı hafızası yükleniyor...');
+      const res = await fetch(`/api/ai/profiles/${encodeURIComponent(jid)}`);
+      const data = await res.json();
+      if (data.success && data.profile) {
+        const p = data.profile;
+        document.getElementById('detail-profile-title').innerText = p.name || p.id;
+        document.getElementById('detail-profile-jid-badge').innerText = p.id;
+        document.getElementById('detail-name-input').value = p.name || '';
+        document.getElementById('detail-nickname-input').value = p.nickname || '';
+        document.getElementById('detail-relation-input').value = p.relationship || 'Arkadaş';
+
+        renderProfileFacts(p.facts || []);
+        renderProfileNotes(p.notes || {});
+
+        detailCard.style.display = 'block';
+        detailCard.scrollIntoView({ behavior: 'smooth' });
+      }
+    } catch (e) {
+      showToast('Profil detayı alınamadı: ' + e.message);
+    }
+  }
+
+  function closeAiProfileDetail() {
+    selectedProfileJid = null;
+    const detailCard = document.getElementById('ai-profile-detail-card');
+    if (detailCard) detailCard.style.display = 'none';
+  }
+
+  function renderProfileFacts(facts) {
+    const container = document.getElementById('detail-facts-container');
+    if (!container) return;
+    if (!facts || facts.length === 0) {
+      container.innerHTML = '<div style="padding: 12px; color: var(--text-4); font-size: 12px; font-style: italic;">Henüz kayıtlı anı veya özel bilgi yok.</div>';
+      return;
+    }
+    container.innerHTML = facts.map(f => `
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: var(--bg-2); border-radius: var(--radius-sm); border: 1px solid var(--border-1);">
+        <span style="font-size: 13px; color: #fff;">• ${escapeHtml(f)}</span>
+        <button class="btn btn-secondary btn-sm" style="color: #ef4444; padding: 2px 8px; font-size: 11px;" onclick="deleteFactAction('${escapeHtml(f).replace(/'/g, "\\'")}')">Sil</button>
+      </div>
+    `).join('');
+  }
+
+  function renderProfileNotes(notes) {
+    const container = document.getElementById('detail-notes-container');
+    if (!container) return;
+    const entries = Object.entries(notes || {});
+    if (entries.length === 0) {
+      container.innerHTML = '<div style="padding: 12px; color: var(--text-4); font-size: 12px; font-style: italic;">Henüz kayıtlı özel alan (sehir, meslek vb.) yok.</div>';
+      return;
+    }
+    container.innerHTML = entries.map(([k, v]) => `
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: var(--bg-2); border-radius: var(--radius-sm); border: 1px solid var(--border-1);">
+        <div style="font-size: 13px;">
+          <b style="color: #60a5fa;">${escapeHtml(k.toUpperCase())}:</b> <span style="color: #fff;">${escapeHtml(v)}</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" style="color: #ef4444; padding: 2px 8px; font-size: 11px;" onclick="deleteNoteAction('${escapeHtml(k).replace(/'/g, "\\'")}')">Sil</button>
+      </div>
+    `).join('');
+  }
+
+  async function saveProfileMetaAction() {
+    if (!selectedProfileJid) return;
+    const name = document.getElementById('detail-name-input')?.value.trim();
+    const nickname = document.getElementById('detail-nickname-input')?.value.trim();
+    const relationship = document.getElementById('detail-relation-input')?.value.trim();
+
+    try {
+      const res = await fetch(`/api/ai/profiles/${encodeURIComponent(selectedProfileJid)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, nickname, relationship })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Profil başarıyla güncellendi!');
+        loadAiProfilesList();
+      }
+    } catch (e) {
+      showToast('Güncelleme hatası: ' + e.message);
+    }
+  }
+
+  async function addFactAction() {
+    if (!selectedProfileJid) return;
+    const input = document.getElementById('detail-new-fact-input');
+    const fact = input?.value.trim();
+    if (!fact) return showToast('Lütfen eklenecek bilgi metnini girin.');
+
+    try {
+      const res = await fetch(`/api/ai/profiles/${encodeURIComponent(selectedProfileJid)}/fact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fact })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Yeni bilgi hafızaya kaydedildi!');
+        if (input) input.value = '';
+        renderProfileFacts(data.profile?.facts || []);
+        loadAiProfilesList();
+      }
+    } catch (e) {
+      showToast('Hata: ' + e.message);
+    }
+  }
+
+  async function deleteFactAction(fact) {
+    if (!selectedProfileJid || !fact) return;
+    if (!confirm(`"${fact}" bilgisini hafızadan silmek istediğinize emin misiniz?`)) return;
+
+    try {
+      const res = await fetch(`/api/ai/profiles/${encodeURIComponent(selectedProfileJid)}/fact`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fact })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Bilgi hafızadan silindi.');
+        renderProfileFacts(data.profile?.facts || []);
+        loadAiProfilesList();
+      }
+    } catch (e) {
+      showToast('Silme hatası: ' + e.message);
+    }
+  }
+
+  async function addNoteAction() {
+    if (!selectedProfileJid) return;
+    const keyInput = document.getElementById('detail-new-note-key');
+    const valInput = document.getElementById('detail-new-note-val');
+    const key = keyInput?.value.trim();
+    const value = valInput?.value.trim();
+    if (!key || !value) return showToast('Lütfen anahtar ve değer girin.');
+
+    try {
+      const res = await fetch(`/api/ai/profiles/${encodeURIComponent(selectedProfileJid)}/note`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Özel alan hafızaya kaydedildi!');
+        if (keyInput) keyInput.value = '';
+        if (valInput) valInput.value = '';
+        renderProfileNotes(data.profile?.notes || {});
+        loadAiProfilesList();
+      }
+    } catch (e) {
+      showToast('Hata: ' + e.message);
+    }
+  }
+
+  async function deleteNoteAction(key) {
+    if (!selectedProfileJid || !key) return;
+    if (!confirm(`"${key}" alanını silmek istediğinize emin misiniz?`)) return;
+
+    try {
+      const res = await fetch(`/api/ai/profiles/${encodeURIComponent(selectedProfileJid)}/note/${encodeURIComponent(key)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Alan silindi.');
+        renderProfileNotes(data.profile?.notes || {});
+        loadAiProfilesList();
+      }
+    } catch (e) {
+      showToast('Hata: ' + e.message);
+    }
+  }
+
+  async function clearProfileMemoryAction() {
+    if (!selectedProfileJid) return;
+    if (!confirm('DİKKAT: Bu kullanıcının tüm hafıza kayıtları ve bilgileri silinecek! Devam edilsin mi?')) return;
+
+    try {
+      const res = await fetch(`/api/ai/profiles/${encodeURIComponent(selectedProfileJid)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Kullanıcı hafızası sıfırlandı.');
+        closeAiProfileDetail();
+        loadAiProfilesList();
+      }
+    } catch (e) {
+      showToast('Hata: ' + e.message);
     }
   }
 

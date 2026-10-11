@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { pendingSelections, setPendingSelection } from '../../queue.js';
 import { readConfig } from '../../config.js';
-import { checkDailyLimit, recordUsage, isPremium } from '../../utils/rateLimiter.js';
 
 // Core 10 Styles Definition
 export const STYLE_MAP = {
@@ -258,16 +257,7 @@ export default {
 
     const sender = msg.key.participant || from;
 
-    // 2. Günlük görsel limiti kontrolü (3/gün, premium muaf)
-    const CIZ_DAILY_LIMIT = 3;
-    const limitCheck = checkDailyLimit(sender, 'ciz', CIZ_DAILY_LIMIT);
-    if (!limitCheck.allowed) {
-      await sock.sendMessage(from, {
-        text: `⛔ *Günlük görsel limitine ulaştın!*\n\nHer kullanıcı günde en fazla *${CIZ_DAILY_LIMIT} görsel* üretebilir.\n📊 Kullanım: ${limitCheck.used}/${limitCheck.limit}\n⏰ Limit her gün sıfırlanır.\n\n💎 _Premium üyelik için bot sahibiyle iletişime geç._`
-      });
-      return;
-    }
-
+    // 1. Eğer hiçbir prompt yazılmadıysa prompt girmesini iste
     if (!rawText) {
       setPendingSelection(from, {
         type: 'ciz_flow',

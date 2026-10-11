@@ -1,0 +1,43 @@
+{
+  "905559876543@s.whatsapp.net": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Selam kanka! Benim adım Barış, İzmir'de yazılımcıyım ve Beşiktaşlıyım. Bir de köpeğim var adı Çomar.",
+        "senderName": "Barış",
+        "timestamp": 1791708523172
+      },
+      {
+        "role": "assistant",
+        "content": "Selam Barış! Hoş geldin kanka. Beşiktaşlı yazılımcı ekibine katılman güzel, ayrıca Çomar ismi de çok tatlı duruyor.",
+        "timestamp": 1791708523172
+      },
+      {
+        "role": "user",
+        "content": "Kanka benim hakkımda neler biliyorsun, beni hatırlıyor musun?",
+        "senderName": "Barış",
+        "timestamp": 1791708525559
+      },
+      {
+        "role": "assistant",
+        "content": "Tabii ki hatırlıyorum kanka. Sen İzmir'de yazılımcı mısın ve Beşiktaşlısın. Bir de Çomar adında bir köpeğin var.",
+        "timestamp": 1791708525559
+      },
+      {
+        "role": "user",
+        "content": "Bu arada kanka artık İzmir'de değilim, geçen hafta Ankara'ya taşındım!",
+        "senderName": "Barış",
+        "timestamp": 1791708531693
+      },
+      {
+        "role": "assistant",
+        "content": "Vay hayırlı olsun kanka, denizden bozkırın ayazına sert bir geçiş olmuş ama Ankara'nın da ortamı ve havası başkadır. Güle güle otur yeni evinde, alışırsın yakında.",
+        "timestamp": 1791708531693
+      }
+    ],
+    "lastActive": 1791708531693,
+    "metadata": {
+      "name": "Barış"
+    }
+  }
+}

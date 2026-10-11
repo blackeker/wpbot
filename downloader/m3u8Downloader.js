@@ -71,9 +71,12 @@ export async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, 
     const args = [
       '-y',
       '-loglevel', 'error',
+      '-threads', '0',
       '-reconnect', '1',
+      '-reconnect_at_eof', '1',
       '-reconnect_streamed', '1',
-      '-reconnect_delay_max', '5'
+      '-reconnect_delay_max', '5',
+      '-rw_timeout', '15000000'
     ];
     
     if (activeProxy && shouldUseProxy(playlistUrl)) {
@@ -89,7 +92,7 @@ export async function downloadPlaylistToSingleFile(playlistUrl, outputFilePath, 
       safeOutputFilePath = safeOutputFilePath.replace(/\.[a-zA-Z0-9]+$/, '') + '.mp4';
     }
     
-    args.push('-i', playlistUrl, '-c', 'copy', '-movflags', '+faststart', safeOutputFilePath);
+    args.push('-i', playlistUrl, '-c', 'copy', '-bsf:a', 'aac_adtstoasc', '-movflags', '+faststart', safeOutputFilePath);
     
     logger.info('[HLS Downloader] Downloading using FFmpeg spawn...');
     

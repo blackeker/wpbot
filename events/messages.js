@@ -37,7 +37,6 @@ import {
   getGroupConfig
 } from '../utils/permissionManager.js';
 import { simulateIncomingRead, isSenderThrottled } from '../utils/antiBan.js';
-import { recordUsage, incrementGroupMsgCount, checkGroupCooldown, recordGroupCmdUsage, checkDailyLimit } from '../utils/rateLimiter.js';
 
 export function isViewOnceMessage(rawMsg) {
   if (!rawMsg || typeof rawMsg !== 'object') return false;
@@ -406,11 +405,6 @@ async function processSingleMessage(sock, msg) {
   const hasPrefix = Boolean(matchedPrefix);
   const isGroupChat = from.endsWith('@g.us');
 
-  // Grup mesaj sayacını artır (komut cooldown için)
-  if (isGroupChat && !msg.key.fromMe) {
-    incrementGroupMsgCount(from);
-  }
-
   if (msg.key.fromMe) {
     const isDlLink = text.startsWith('http://') || text.startsWith('https://') || text.startsWith('magnet:') || text.toLowerCase().includes('.torrent');
     if (!hasPrefix && !isDlLink) {
@@ -578,10 +572,6 @@ async function processSingleMessage(sock, msg) {
             image: result.buffer,
             caption: caption.trim()
           });
-
-          // Başarılı üretim → kullanım sayacını artır
-          recordUsage(selection.sender || from, 'ciz');
-
         } catch (err) {
           await sock.sendMessage(from, { text: `❌ Görsel oluşturulurken bir hata oluştu: ${err.message}` });
         }
@@ -1266,12 +1256,30 @@ async function processSingleMessage(sock, msg) {
 
       // 👁️ Check for image in the message or quoted message to analyze with AI Vision
       try {
-        const { extractImageBufferFromMessage, handleAiVision, handleAiChat } = await import('../ai/aiEngine.js');
+        const { extractImageBufferFromMessage, extractAudioBufferFromMessage, transcribeAudioBuffer, handleAiVision, handleAiChat } = await import('../ai/aiEngine.js');
         const imgData = await extractImageBufferFromMessage(msg);
         if (imgData && imgData.buffer) {
           const visionPrompt = prompt || imgData.caption || 'Bu görseli incele, ne olduğunu, üzerindeki detayları veya soruları açıkla.';
           await handleAiVision(sock, msg, from, imgData.buffer, imgData.mimeType, visionPrompt);
           return;
+        }
+
+        // 🎙️ Check for voice note (PTT / Audio) to transcribe with Whisper and chat
+        if (!prompt) {
+          const audioData = await extractAudioBufferFromMessage(msg);
+          if (audioData && audioData.buffer) {
+            try { await sock.sendPresenceUpdate('recording', from); } catch (e) {}
+            const transcript = await transcribeAudioBuffer(audioData.buffer, audioData.mimeType);
+            if (transcript) {
+              console.log(`[AI VOICE TRANSCRIPTION] (${from}): "${transcript}"`);
+              await handleAiChat(sock, msg, from, transcript, {
+                senderName: msg.pushName || senderNumber,
+                isGroup: isGroupChat,
+                transcribedFromVoice: true
+              });
+              return;
+            }
+          }
         }
 
         if (prompt) {

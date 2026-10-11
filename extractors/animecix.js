@@ -37,50 +37,33 @@ export async function requestAnimecixApi(pathAndQuery, preferredHost = "https://
   throw lastErr || new Error("Animecix API sunucularına erişilemedi.");
 }
 
+export
 // ==========================================
 // ANIMECIX EXTRACTOR AND RESOLVER FUNCTIONS
 // ==========================================
-export async function resolveAnimecixSlug(slug, host = "https://animecix.tv") {
-  if (!slug) throw new Error("Animecix slug boş.");
-  if (/^\d+$/.test(slug)) return slug;
-
-  // Clean slug from common video/season/episode affixes and punctuation
-  const cleanQuery = slug.toLowerCase()
-    .replace(/-(?:sezon|season|bolum|bölüm|episode)-\d+/gi, '')
-    .replace(/-(?:turkce-altyazili|altyazili|dublaj|turkce|izle|full-hd|hd|1080p|720p)/gi, '')
-    .replace(/[^a-z0-9]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const words = cleanQuery.split(' ').filter(Boolean);
+async function resolveAnimecixSlug(slug, host = "https://animecix.tv") {
+  const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9\-]/g, '');
+  const words = cleanSlug.split('-');
   let items = [];
-  
-  // Search queries from cleanQuery to sub-phrases
-  const searchQueries = [
-    cleanQuery,
-    words.slice(0, 4).join(' '),
-    words.slice(0, 2).join(' '),
-    words[0]
-  ].filter((q, idx, arr) => Boolean(q) && arr.indexOf(q) === idx);
-
-  for (const query of searchQueries) {
+  // Fallback search loop from longest to shortest query
+  for (let len = Math.min(words.length, 3); len >= 1; len--) {
+    const query = words.slice(0, len).join(' ');
     try {
       const data = await requestAnimecixApi(`/secure/titles?query=${encodeURIComponent(query)}`, host);
-      items = data?.pagination?.data || data?.data || [];
-      if (Array.isArray(items) && items.length > 0) {
+      items = data?.pagination?.data || [];
+      if (items.length > 0) {
         break;
       }
-    } catch (e) {}
+    } catch (e) {
+      // Fail silent
+    }
   }
-
-  if (!items || items.length === 0) {
+  if (items.length === 0) {
     throw new Error(`Animecix'te "${slug}" için sonuç bulunamadı.`);
   }
-
   let bestItem = null;
   let bestRatio = 0;
-  const urlWords = cleanQuery.split(' ').filter(Boolean);
-
+  const urlWords = cleanSlug.split('-');
   for (const item of items) {
     const names = [item.name, item.name_romanji, item.name_english, item.original_title].filter(Boolean);
     for (const name of names) {
@@ -94,98 +77,54 @@ export async function resolveAnimecixSlug(slug, host = "https://animecix.tv") {
       }
     }
   }
-
   if (!bestItem || bestRatio < 0.2) {
     return items[0].id;
   }
   return bestItem.id;
 }
-
-export async function parseAnimecixUrl(pageUrl, defaultHost = "https://animecix.tv") {
-  const urlObj = new URL(pageUrl);
-  const host = urlObj.origin.includes('ecchicix') ? urlObj.origin : (urlObj.origin.includes('animecix') ? urlObj.origin : defaultHost);
-  const pathname = decodeURIComponent(urlObj.pathname);
-  const parts = pathname.split('/').filter(Boolean);
-
-  let titleId = null;
-  let season = urlObj.searchParams.get('season') || urlObj.searchParams.get('s') || null;
-  let episode = urlObj.searchParams.get('episode') || urlObj.searchParams.get('e') || urlObj.searchParams.get('bolum') || null;
-
-  // 1. Direct title ID in path: /titles/123 or /title/123
-  for (let i = 0; i < parts.length; i++) {
-    const p = parts[i].toLowerCase();
-    if ((p === 'titles' || p === 'title') && parts[i + 1]) {
-      const nextP = parts[i + 1];
-      if (/^\d+$/.test(nextP)) {
-        titleId = nextP;
-      } else {
-        titleId = await resolveAnimecixSlug(nextP, host);
-      }
-      break;
-    }
-  }
-
-  // 2. Prefixes: /dizi/slug, /anime/slug, /izle/slug, /watch/slug, /seri/slug, /series/slug
-  if (!titleId) {
-    const slugMatch = pathname.match(/\/(?:dizi|anime|izle|watch|seri|series|video|detay)\/([^/]+)/i);
-    if (slugMatch) {
-      const rawSlug = slugMatch[1];
-      const inlineSeasonMatch = rawSlug.match(/-(?:sezon|season)-(\d+)/i) || rawSlug.match(/-(\d+)-sezon/i);
-      if (inlineSeasonMatch && !season) {
-        season = inlineSeasonMatch[1];
-      }
-      const inlineEpMatch = rawSlug.match(/-(?:bolum|bölüm|episode)-(\d+)/i) || rawSlug.match(/-(\d+)-bolum/i);
-      if (inlineEpMatch && !episode) {
-        episode = inlineEpMatch[1];
-      }
-      titleId = await resolveAnimecixSlug(rawSlug, host);
-    }
-  }
-
-  // 3. Fallback: single slug path e.g. https://animecix.tv/solo-leveling
-  if (!titleId && parts.length > 0) {
-    const firstPart = parts[0];
-    if (/^\d+$/.test(firstPart)) {
-      titleId = firstPart;
-    } else if (!['api', 'secure', 'search', 'register', 'login'].includes(firstPart.toLowerCase())) {
-      titleId = await resolveAnimecixSlug(firstPart, host);
-    }
-  }
-
-  // Parse season & episode from remaining path parts
-  for (let i = 0; i < parts.length; i++) {
-    const p = parts[i].toLowerCase();
-    if ((p.startsWith('season') || p.startsWith('sezon')) && !season) {
-      const m = p.match(/\d+/);
-      if (m) season = m[0];
-      else if (parts[i + 1] && /^\d+$/.test(parts[i + 1])) season = parts[i + 1];
-    }
-    if ((p.startsWith('episode') || p.startsWith('bolum') || p.startsWith('bölüm')) && !episode) {
-      const m = p.match(/\d+/);
-      if (m) episode = m[0];
-      else if (parts[i + 1] && /^\d+$/.test(parts[i + 1])) episode = parts[i + 1];
-    }
-  }
-
-  if (!titleId) {
-    throw new Error("Geçersiz Animecix URL formatı.");
-  }
-
-  return {
-    host,
-    titleId,
-    season: season || "1",
-    episode: episode || "1",
-    hasExplicitSeason: Boolean(season),
-    hasExplicitEpisode: Boolean(episode)
-  };
-}
-
 export async function extractAnimecix(pageUrl) {
   try {
-    const parsed = await parseAnimecixUrl(pageUrl);
-    const { host, titleId, season, episode } = parsed;
+    const host = new URL(pageUrl).origin;
+    const parts = pageUrl.split('/');
+    let titleId = null;
+    const titlesIdx = parts.indexOf('titles');
+    if (titlesIdx !== -1) {
+      titleId = parts[titlesIdx + 1];
+    } else {
+      const diziMatch = pageUrl.match(/\/dizi\/([^/]+)/);
+      if (diziMatch) {
+        titleId = await resolveAnimecixSlug(diziMatch[1], host);
+      }
+    }
 
+    // Parse season and episode number
+    let season = null;
+    const seasonIdx = parts.findIndex(p => p.toLowerCase().startsWith('season') || p.toLowerCase().startsWith('sezon'));
+    if (seasonIdx !== -1) {
+      const sPart = parts[seasonIdx];
+      const sMatch = sPart.match(/\d+/);
+      if (sMatch) {
+        season = sMatch[0];
+      } else if (seasonIdx + 1 < parts.length) {
+        season = parts[seasonIdx + 1];
+      }
+    }
+    let episode = null;
+    const episodeIdx = parts.findIndex(p => p.toLowerCase().startsWith('episode') || p.toLowerCase().startsWith('bolum') || p.toLowerCase().startsWith('bölüm'));
+    if (episodeIdx !== -1) {
+      const ePart = parts[episodeIdx];
+      const eMatch = ePart.match(/\d+/);
+      if (eMatch) {
+        episode = eMatch[0];
+      } else if (episodeIdx + 1 < parts.length) {
+        episode = parts[episodeIdx + 1];
+      }
+    }
+    if (!titleId) {
+      throw new Error("Geçersiz Animecix URL formatı.");
+    }
+    if (!season) season = "1";
+    if (!episode) episode = "1";
     // ── Başlığı Title Detail API'den çek (anime adı + bölüm adı) ──
     let title = `Animecix - Sezon ${season} Bölüm ${episode}`;
     try {
@@ -206,43 +145,54 @@ export async function extractAnimecix(pageUrl) {
       let providerUrl = null;
       let sourceName = '';
 
-      // Priority: Tau Video > Ok.ru > Direct Link / Generic > SibNet
-      for (const s of sources) {
-        if (!s.url) continue;
-        const u = s.url.trim();
-
-        if (u.includes('tau-video.xyz') || u.includes('tau')) {
-          providerUrl = await resolveTauVideo(u);
-          if (providerUrl) {
-            sourceName = 'Tau Video';
-            break;
-          }
-        } else if (u.includes('ok.ru') || u.includes('odnoklassniki.ru')) {
-          providerUrl = await resolveOkRu(u);
-          if (providerUrl) {
-            sourceName = 'Ok.ru';
-            break;
-          }
-        } else if (u.startsWith('http') && (u.includes('.mp4') || u.includes('.m3u8'))) {
-          providerUrl = u;
-          sourceName = s.name || 'Direkt Akış';
-          break;
-        } else if (u.includes('sibnet.ru')) {
-          providerUrl = await resolveSibNet(u);
-          if (providerUrl) {
-            sourceName = 'SibNet';
-            break;
-          }
+      // Priority: SibNet > Tau > Ok.ru > Generic
+      const sibnet = sources.find(s => s.url && s.url.includes('sibnet.ru'));
+      if (sibnet) {
+        providerUrl = await resolveSibNet(sibnet.url);
+        if (providerUrl) sourceName = 'SibNet';
+      }
+      if (!providerUrl) {
+        const tau = sources.find(s => s.url && (s.url.includes('tau-video.xyz') || s.url.includes('tau')));
+        if (tau) {
+          providerUrl = await resolveTauVideo(tau.url);
+          if (providerUrl) sourceName = 'Tau Video';
+        }
+      }
+      if (!providerUrl) {
+        const okru = sources.find(s => s.url && s.url.includes('ok.ru'));
+        if (okru) {
+          providerUrl = await resolveOkRu(okru.url);
+          if (providerUrl) sourceName = 'Ok.ru';
         }
       }
 
-      // Secondary fallback: check any remaining http links
+      // Generic fallback: check all sources for direct links or other embeds
       if (!providerUrl) {
         for (const s of sources) {
-          if (!s.url || !s.url.startsWith('http')) continue;
-          providerUrl = s.url;
-          sourceName = s.name || 'Harici Oynatıcı';
-          break;
+          if (!s.url) continue;
+          if (s.url.includes('sibnet.ru')) {
+            providerUrl = await resolveSibNet(s.url);
+            if (providerUrl) {
+              sourceName = 'SibNet';
+              break;
+            }
+          } else if (s.url.includes('tau-video.xyz') || s.url.includes('tau')) {
+            providerUrl = await resolveTauVideo(s.url);
+            if (providerUrl) {
+              sourceName = 'Tau Video';
+              break;
+            }
+          } else if (s.url.includes('ok.ru')) {
+            providerUrl = await resolveOkRu(s.url);
+            if (providerUrl) {
+              sourceName = 'Ok.ru';
+              break;
+            }
+          } else if (s.url.startsWith('http://') || s.url.startsWith('https://')) {
+            providerUrl = s.url;
+            sourceName = s.name || s.extra || 'Direkt Video';
+            break;
+          }
         }
       }
       if (providerUrl) {
@@ -369,9 +319,35 @@ export async function pickBestQuality(masterUrl) {
 }
 export async function getAnimecixSeasonEpisodes(seasonUrl) {
   try {
-    const parsed = await parseAnimecixUrl(seasonUrl);
-    const { host, titleId } = parsed;
-    const requestedSeason = parsed.hasExplicitSeason ? parsed.season : null;
+    const host = new URL(seasonUrl).origin;
+    const parts = seasonUrl.split('/');
+    let titleId = null;
+    const titlesIdx = parts.indexOf('titles');
+    if (titlesIdx !== -1) {
+      titleId = parts[titlesIdx + 1];
+    } else {
+      const diziMatch = seasonUrl.match(/\/dizi\/([^/]+)/);
+      if (diziMatch) {
+        titleId = await resolveAnimecixSlug(diziMatch[1], host);
+      }
+    }
+
+    if (!titleId) {
+      throw new Error("Geçersiz Animecix Sezon URL formatı.");
+    }
+
+    // Check if a specific season was requested in the URL
+    let requestedSeason = null;
+    const seasonIdx = parts.findIndex(p => p.toLowerCase().startsWith('season') || p.toLowerCase().startsWith('sezon'));
+    if (seasonIdx !== -1) {
+      const sPart = parts[seasonIdx];
+      const sMatch = sPart.match(/\d+/);
+      if (sMatch) {
+        requestedSeason = sMatch[0];
+      } else if (seasonIdx + 1 < parts.length) {
+        requestedSeason = parts[seasonIdx + 1];
+      }
+    }
 
     const initSeason = requestedSeason || "1";
     const response = await requestAnimecixApi(`/secure/titles/${titleId}?titleId=${titleId}&seasonNumber=${initSeason}&page=1&perPage=100`, host);
@@ -379,7 +355,6 @@ export async function getAnimecixSeasonEpisodes(seasonUrl) {
     if (!data || !data.title || !data.title.seasons) {
       throw new Error('API yanıtı geçersiz.');
     }
-
 
     const allSeasons = data.title.seasons || [];
     const targetSeasons = [];
@@ -521,7 +496,6 @@ export async function getAnimecixSeasonEpisodes(seasonUrl) {
 
     return {
       animeName: data.title.name,
-      title: data.title.name,
       isMultiSeason,
       seasons: activeSeasons,
       allEpisodes,

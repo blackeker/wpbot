@@ -1,15 +1,33 @@
 import { handleAiChat, memoryManager, aiEngine } from '../../ai/aiEngine.js';
+import { userProfileManager } from '../../ai/userProfileManager.js';
 import { getGroupConfig, updateGroupConfig, isGroupAdminOrOwner } from '../../utils/permissionManager.js';
 
 export const name = 'ai';
 export const aliases = ['sor', 'gpt', 'bot', 'sohbet', 'ask', 'gemini', 'groq', 'yapayzeka'];
-export const description = 'Yapay zeka ile kesintisiz ve doğal sohbet eder (Groq -> OpenRouter -> Gemini Fallback)';
+export const description = 'Yapay zeka ile kesintisiz ve doğal sohbet eder (Kalıcı kullanıcı hafızası destekli)';
 export const category = 'tools';
-export const usage = '!ai <mesajınız> | !ai aç | !ai kapat | !ai reset | !ai durum';
+export const usage = '!ai <mesajınız> | !ai hafıza | !ai aç | !ai kapat | !ai reset | !ai durum';
 
 export async function execute(sock, msg, from, args, context = {}) {
   const subCmd = (args[0] || '').toLowerCase().trim();
   const isGroup = from.endsWith('@g.us');
+  const userJid = msg?.key?.senderPn || msg?.key?.participant || msg?.participant || from;
+
+  // Subcommand: Kullanıcı Hafıza Kartı (Memory Profile)
+  if (subCmd === 'hafiza' || subCmd === 'hafıza' || subCmd === 'profil' || subCmd === 'memory') {
+    const memoryCard = userProfileManager.formatUserMemoryCard(userJid);
+    await sock.sendMessage(from, { text: memoryCard }, { quoted: msg });
+    return;
+  }
+
+  // Subcommand: Kullanıcı Hafızasını Sıfırlama
+  if (subCmd === 'unut' || subCmd === 'hafizasil' || subCmd === 'hafızasil' || subCmd === 'hafiza-sil' || subCmd === 'hafıza-sil') {
+    userProfileManager.clearProfile(userJid);
+    await sock.sendMessage(from, { 
+      text: '🧹 *Kalıcı Hafızan Temizlendi!*\n\nSenin hakkında öğrendiğim tüm kişisel notlar, ilgi alanları ve detaylar sıfırlandı. Yeniden tanışmış gibi konuşabiliriz!' 
+    }, { quoted: msg });
+    return;
+  }
 
   // Subcommand: Grup içi Yapay Zeka açma (Group Enable)
   if (subCmd === 'ac' || subCmd === 'aç' || subCmd === 'on' || subCmd === 'aktif' || subCmd === 'enable') {

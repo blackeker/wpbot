@@ -5,10 +5,11 @@ import { Cookie } from 'tough-cookie';
 import { fileLogger } from './utils/logger.js';
 
 export const sessionPath = process.env.SESSION_PATH || './auth_info_session';
-export const configPath = path.join(sessionPath, 'config.json');
+export const dataPath = process.env.DATA_PATH || path.resolve('./data');
+export const configPath = path.resolve('./config.json');
 export const downloadsDir = path.resolve('./downloads');
-export const historyPath = path.join(sessionPath, 'history.json');
-export const errorLogPath = path.join(sessionPath, 'errors.json');
+export const historyPath = path.join(dataPath, 'history.json');
+export const errorLogPath = path.join(dataPath, 'errors.json');
 export const sentMessageIds = new Set();
 export function addSentMessageId(id) {
   if (!id) return;
@@ -25,6 +26,9 @@ if (!fs.existsSync(downloadsDir)) {
 }
 if (!fs.existsSync(sessionPath)) {
   fs.mkdirSync(sessionPath, { recursive: true });
+}
+if (!fs.existsSync(dataPath)) {
+  fs.mkdirSync(dataPath, { recursive: true });
 }
 
 export async function cleanLeftoverCacheFiles() {

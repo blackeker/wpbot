@@ -1,4 +1,4 @@
-import { botSocketRef, sessionPath, readConfig } from './config.js';
+import { botSocketRef, sessionPath, dataPath, readConfig } from './config.js';
 import { executeDownloadPipeline } from './pipelines.js';
 import fs from 'fs';
 import path from 'path';
@@ -7,7 +7,7 @@ import { getModuleLogger } from './utils/logger.js';
 
 const logger = getModuleLogger('queue');
 
-const dbPath = path.join(sessionPath, process.env.QUEUE_DB_NAME || 'queue.db');
+const dbPath = path.join(dataPath || './data', process.env.QUEUE_DB_NAME || 'queue.db');
 const db = new Database(dbPath);
 
 // Initialize DB schema

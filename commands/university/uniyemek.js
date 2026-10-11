@@ -1,16 +1,11 @@
 import * as cheerio from 'cheerio';
 import { sendMenuResponse } from '../../utils/menuData.js';
-import { checkMenuRateLimit } from '../../utils/menuRateLimiter.js';
 
 export default {
   name: 'uniyemek',
   aliases: ['uniyemekleri', 'firatyemek', 'üniversiteyemek', 'üniversiteyemeği', 'universiteyemek', 'firatmenu', 'unimenu'],
   async execute(sock, msg, from, args, ctx) {
     try {
-      // Rate limit kontrolü (DM: günde 1, Grup: son 20 mesajda 1)
-      const allowed = await checkMenuRateLimit(sock, msg, from, 'uniyemek');
-      if (!allowed) return;
-
       const url = 'https://unievi.firat.edu.tr';
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);

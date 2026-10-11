@@ -1,0 +1,70 @@
+{
+  "905332624732": {
+    "id": "905332624732",
+    "name": "",
+    "nickname": "",
+    "relationship": "Arkadaş",
+    "custom_relationship": false,
+    "intimacy_score": 0,
+    "mood": "",
+    "personality_traits": [],
+    "facts": [
+      "Yusuf Kaymaz botun kurucusudur ve efendisidir."
+    ],
+    "notes": {
+      "unvan": "Patron"
+    },
+    "important_dates": {},
+    "preferences": {
+      "likes": [],
+      "dislikes": []
+    },
+    "message_count": 0,
+    "first_seen": 1791708170687,
+    "last_seen": 1791708170687
+  },
+  "905559876543": {
+    "id": "905559876543",
+    "name": "Barış",
+    "nickname": "",
+    "relationship": "Arkadaş",
+    "custom_relationship": false,
+    "intimacy_score": 0,
+    "mood": "",
+    "personality_traits": [],
+    "facts": [],
+    "notes": {
+      "takim": "Beşiktaş",
+      "meslek": "Yazılımcı",
+      "sehir": "Ankara"
+    },
+    "important_dates": {},
+    "preferences": {
+      "likes": [],
+      "dislikes": []
+    },
+    "message_count": 3,
+    "first_seen": 1791708522682,
+    "last_seen": 1791708527561
+  },
+  "905553334455": {
+    "id": "905553334455",
+    "name": "Deniz",
+    "nickname": "",
+    "relationship": "Arkadaş",
+    "custom_relationship": false,
+    "intimacy_score": 5,
+    "mood": "",
+    "personality_traits": [],
+    "facts": [],
+    "notes": {},
+    "important_dates": {},
+    "preferences": {
+      "likes": [],
+      "dislikes": []
+    },
+    "message_count": 17,
+    "first_seen": 1791708661939,
+    "last_seen": 1791709333964
+  }
+}

@@ -256,42 +256,9 @@ export function getAndUnpack(script) {
   return p.replace(/\b[0-9a-zA-Z_]+\b/g, w => d[w] || w);
 }
 
-export async function extractYtDlpUrl(targetUrl) {
-  const { getYtDlpCommand, getProxyUrl } = await import('./config.js');
-  const { exec } = await import('child_process');
-  const path = (await import('path')).default;
-  const ytDlpCmd = getYtDlpCommand();
-  const activeProxy = getProxyUrl();
-  const proxyArg = activeProxy ? ` --proxy "${activeProxy}"` : '';
-  const env = { ...process.env };
-  const ytDlpDir = path.dirname(ytDlpCmd);
-  const separator = process.platform === 'win32' ? ';' : ':';
-  env.PATH = `${ytDlpDir}${separator}/usr/local/bin${separator}/usr/bin${separator}/bin${separator}${env.PATH || ''}`;
-
-  return new Promise((resolve, reject) => {
-    exec(`"${ytDlpCmd}" --dump-single-json --no-playlist${proxyArg} "${targetUrl}"`, { env, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) {
-        return reject(new Error(stderr || err.message));
-      }
-      try {
-        const info = JSON.parse(stdout);
-        const title = info.title || 'Video';
-        const url = info.url || targetUrl;
-        const extractor = info.extractor || 'Web Video';
-        resolve({
-          title,
-          source: extractor,
-          url,
-          directUrl: url,
-          referer: targetUrl
-        });
-      } catch (parseErr) {
-        reject(new Error(`JSON ayrıştırma hatası: ${parseErr.message}`));
-      }
-    });
-  });
-}
-
+// ==========================================
+// HENTAIZM DECRYPTER AND RESOLVER FUNCTIONS
+// ==========================================
 // Main extract function
 export async function extractVideoUrl(pageUrl, fromJid = null, selectedAudio = null) {
   let targetUrl = pageUrl;
@@ -321,12 +288,6 @@ export async function extractVideoUrl(pageUrl, fromJid = null, selectedAudio = n
       url: targetUrl,
       referer: targetUrl
     };
-  }
-  if (/youtube\.com|youtu\.be/i.test(targetUrl)) {
-    return extractYtDlpUrl(targetUrl);
-  }
-  if (/twitter\.com|x\.com|vimeo\.com|dailymotion\.com|facebook\.com|fb\.watch|reddit\.com|twitch\.tv|soundcloud\.com|pinterest\.com/i.test(targetUrl)) {
-    return extractYtDlpUrl(targetUrl);
   }
   if (targetUrl.includes('animecix.') || targetUrl.includes('ecchicix.')) {
     return extractAnimecix(targetUrl);

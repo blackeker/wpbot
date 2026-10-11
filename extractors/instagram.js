@@ -55,22 +55,5 @@ export async function extractInstagram(pageUrl) {
     }
   }
 
-  // 3. Fallback: yt-dlp
-  try {
-    const { extractYtDlpUrl } = await import('../extractor.js');
-    const ytResult = await extractYtDlpUrl(pageUrl);
-    if (ytResult && ytResult.url) {
-      return {
-        title: ytResult.title || 'Instagram_Video.mp4',
-        url: ytResult.url,
-        referer: 'https://www.instagram.com/',
-        source: 'Instagram'
-      };
-    }
-  } catch (ytErr) {
-    console.warn(`[Instagram Extractor] yt-dlp fallback error: ${ytErr.message}`);
-  }
-
   throw new Error('İndirme bağlantısı alınamadı. Tüm Instagram indirme servisleri yanıt vermiyor.');
 }
-
