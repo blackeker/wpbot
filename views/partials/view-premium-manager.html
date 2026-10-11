@@ -1,0 +1,145 @@
+<section id="view-premium-manager" class="view-panel">
+  <div class="section-header">
+    <h2>💎 Premium Kullanıcı Yönetimi</h2>
+    <p class="section-desc">Premium kullanıcılar günlük resim limiti (3/gün) ve yemek komut kısıtlamalarından muaftır.</p>
+  </div>
+
+  <div class="card" style="max-width: 600px;">
+    <div class="card-header">
+      <h3>➕ Premium Kullanıcı Ekle</h3>
+    </div>
+    <div class="card-body">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input type="text" id="premium-phone-input" placeholder="Telefon numarası (ör: 905332624732)"
+          style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid #333; background:#1a1a2e; color:#fff; font-size:14px;" />
+        <button onclick="addPremiumUser()" class="btn btn-primary" style="white-space:nowrap;">
+          ✅ Ekle
+        </button>
+      </div>
+      <p style="font-size:12px; color:#888; margin-top:8px;">
+        📌 Başında + veya boşluk olmadan sadece rakam girin (örn: 905332624732)
+      </p>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:600px; margin-top:16px;">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+      <h3>⭐ Premium Kullanıcı Listesi</h3>
+      <button onclick="loadPremiumUsers()" class="btn btn-sm btn-secondary">🔄 Yenile</button>
+    </div>
+    <div class="card-body">
+      <div id="premium-list-container">
+        <p style="color:#888; text-align:center;">Yükleniyor...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:600px; margin-top:16px; background:#1a1a2e; border:1px solid #333;">
+    <div class="card-body" style="padding:16px;">
+      <h4 style="color:#a78bfa; margin-bottom:12px;">ℹ️ Limit Bilgileri</h4>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid #333;">
+            <th style="padding:8px; text-align:left; color:#888;">Özellik</th>
+            <th style="padding:8px; text-align:center; color:#888;">Normal Kullanıcı</th>
+            <th style="padding:8px; text-align:center; color:#a78bfa;">💎 Premium</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #222;">
+            <td style="padding:8px;">🎨 Günlük AI Resim (!ciz)</td>
+            <td style="padding:8px; text-align:center; color:#f87171;">3 / gün</td>
+            <td style="padding:8px; text-align:center; color:#34d399;">♾️ Sınırsız</td>
+          </tr>
+          <tr style="border-bottom:1px solid #222;">
+            <td style="padding:8px;">🍽️ Yemek Komutları (DM)</td>
+            <td style="padding:8px; text-align:center; color:#f87171;">1 / gün</td>
+            <td style="padding:8px; text-align:center; color:#34d399;">♾️ Sınırsız</td>
+          </tr>
+          <tr>
+            <td style="padding:8px;">👥 Yemek Komutları (Grup)</td>
+            <td style="padding:8px; text-align:center; color:#f87171;">Her 20 mesajda 1</td>
+            <td style="padding:8px; text-align:center; color:#34d399;">♾️ Sınırsız</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<script>
+// Premium Kullanıcı Yönetimi
+async function loadPremiumUsers() {
+  const container = document.getElementById('premium-list-container');
+  container.innerHTML = '<p style="color:#888;text-align:center;">Yükleniyor...</p>';
+  try {
+    const res = await fetch('/api/premium');
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    const users = data.premiumUsers || [];
+    if (users.length === 0) {
+      container.innerHTML = '<p style="color:#888;text-align:center;">📭 Henüz premium kullanıcı yok.</p>';
+      return;
+    }
+    container.innerHTML = users.map(phone => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:8px; background:#12122a; margin-bottom:8px; border:1px solid #2d2d4a;">
+        <div>
+          <span style="font-size:18px;">💎</span>
+          <span style="margin-left:10px; font-size:14px; color:#e2e8f0; font-family:monospace;">+${phone}</span>
+        </div>
+        <button onclick="removePremiumUser('${phone}')" class="btn btn-sm" style="background:#7f1d1d; color:#fca5a5; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">
+          🗑️ Kaldır
+        </button>
+      </div>
+    `).join('');
+  } catch (e) {
+    container.innerHTML = `<p style="color:#f87171;">❌ Hata: ${e.message}</p>`;
+  }
+}
+
+async function addPremiumUser() {
+  const input = document.getElementById('premium-phone-input');
+  const phone = (input.value || '').trim().replace(/[^0-9]/g, '');
+  if (!phone || phone.length < 7) {
+    alert('Geçerli bir telefon numarası girin!');
+    return;
+  }
+  try {
+    const res = await fetch('/api/premium', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    if (!data.added) {
+      alert(`⚠️ +${phone} zaten premium listesinde!`);
+    } else {
+      input.value = '';
+      await loadPremiumUsers();
+    }
+  } catch (e) {
+    alert(`❌ Hata: ${e.message}`);
+  }
+}
+
+async function removePremiumUser(phone) {
+  if (!confirm(`+${phone} numarasını premium listesinden çıkarmak istiyor musunuz?`)) return;
+  try {
+    const res = await fetch(`/api/premium/${phone}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    await loadPremiumUsers();
+  } catch (e) {
+    alert(`❌ Hata: ${e.message}`);
+  }
+}
+
+// Enter key desteği
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('premium-phone-input');
+  if (input) {
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') addPremiumUser(); });
+  }
+});
+</script>

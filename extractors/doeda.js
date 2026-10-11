@@ -73,6 +73,21 @@ export async function extractDoeda(pageUrl) {
         referer: new URL(pageUrl).origin + '/'
       };
     }
+
+    // ── yt-dlp Fallback ──
+    try {
+      const { extractYtDlpUrl } = await import('../extractor.js');
+      const ytResult = await extractYtDlpUrl(pageUrl);
+      if (ytResult && ytResult.url) {
+        return {
+          title: title || ytResult.title,
+          source: 'Doeda (yt-dlp)',
+          url: ytResult.url,
+          referer: new URL(pageUrl).origin + '/'
+        };
+      }
+    } catch (ytErr) {}
+
     throw new Error("JetPlayer veya PlayerJS sunucusundan video dosyası çözümlenemedi.");
   } catch (err) {
     throw new Error(`Doeda ayıklama hatası: ${err.message}`);

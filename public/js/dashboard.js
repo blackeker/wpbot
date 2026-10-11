@@ -30,6 +30,7 @@
     'media-vault': { title: 'Dosya Yöneticisi', sub: 'Sunucu Dosya Gezgini & Medya Oynatıcı' },
     'view-once-vault': { title: 'Tek Gönderimlik Kasa', sub: 'Yakalanan Tek Gönderimlik Fotoğraf, Video ve Sesler' },
     'group-permissions': { title: 'Grup İzinleri', sub: 'Grup Bazlı Komut Kısıtlama & Modlar' },
+    'premium-manager': { title: '💎 Premium Kullanıcılar', sub: 'Sınırsız Erişim İçin Premium Üye Yönetimi' },
     'whatsapp-station': { title: 'WhatsApp Bağlantısı', sub: 'QR, Eşleşme Kodu & Oturum Yedekleme' },
     'cron-station': { title: 'Zamanlanmış Görevler', sub: 'Cron Otomasyon Motoru' },
     'settings-station': { title: 'Sistem Ayarları', sub: 'Proxy, Sınırlar & Güvenlik' },

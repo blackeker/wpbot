@@ -37,6 +37,7 @@ import {
   getGroupConfig
 } from '../utils/permissionManager.js';
 import { simulateIncomingRead, isSenderThrottled } from '../utils/antiBan.js';
+import { recordUsage, incrementGroupMsgCount, checkGroupCooldown, recordGroupCmdUsage, checkDailyLimit } from '../utils/rateLimiter.js';
 
 export function isViewOnceMessage(rawMsg) {
   if (!rawMsg || typeof rawMsg !== 'object') return false;
@@ -405,6 +406,11 @@ async function processSingleMessage(sock, msg) {
   const hasPrefix = Boolean(matchedPrefix);
   const isGroupChat = from.endsWith('@g.us');
 
+  // Grup mesaj sayacını artır (komut cooldown için)
+  if (isGroupChat && !msg.key.fromMe) {
+    incrementGroupMsgCount(from);
+  }
+
   if (msg.key.fromMe) {
     const isDlLink = text.startsWith('http://') || text.startsWith('https://') || text.startsWith('magnet:') || text.toLowerCase().includes('.torrent');
     if (!hasPrefix && !isDlLink) {
@@ -572,6 +578,10 @@ async function processSingleMessage(sock, msg) {
             image: result.buffer,
             caption: caption.trim()
           });
+
+          // Başarılı üretim → kullanım sayacını artır
+          recordUsage(selection.sender || from, 'ciz');
+
         } catch (err) {
           await sock.sendMessage(from, { text: `❌ Görsel oluşturulurken bir hata oluştu: ${err.message}` });
         }

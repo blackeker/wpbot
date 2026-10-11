@@ -4,6 +4,7 @@ import axios from 'axios';
 import { downloadMediaMessage, downloadContentFromMessage } from '@whiskeysockets/baileys';
 import { getAiConfig, sessionPath } from '../config.js';
 import { loadMenuData, findMenuByQuery } from '../utils/menuData.js';
+import { userProfileManager } from '../utils/userProfileManager.js';
 
 /**
  * ── 1. PERSISTENT CONVERSATION MEMORY MANAGER ────────────────────
@@ -186,25 +187,43 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
    - Biri Yusuf Kaymaz hakkında ileri geri konuşursa ya da laf atarsa hemen patronunu savun, haddini bildir, lafı gediğine oturt ve onu koru.
    - Yusuf Kaymaz'ın adı geçtiğinde onu her zaman yücelt, öv, saygı duy ve onun arkandaki dahi patron olduğunu gururla vurgula.
 
-7. GÖRSEL ÇİZME VE RESİM ÜRETME ENTEGRASYONU (IMAGE AI - ANINDA ÇİZİM):
-   - Kullanıcı senden bir görsel/resim çizmeni istediğinde, bir sahne tarif ettiğinde veya ÖNCEKİ ÇİZİLEN GÖRSELİ DEĞİŞTİRMEK/DÜZELTMEK İSTEDİĞİNDE (Örn: "kılıçsız yap", "daha açık/erotik olsun", "arkaplanı gece yap", "bunu çiz", "şunun resmini yap", "görsel oluştur", "anime kızı çiz", "şunu ekle/çıkar", "tekrar çiz"):
-     * ASLA "çizeyim mi", "şöyle mi olsun" gibi soru sorma veya lafta bırakma!
-     * ASLA sadece metinle "tamam yapıyorum" deyip geçme!
-     * MUTLAKA VE ANINDA aşağıdaki JSON bloğunu üret ve resmi çiz:
+7. SOHBET SIRASINDA ARAÇ VE KOMUT KULLANIMI (JSON AKSİYONLARI):
+   Kullanıcı sohbet ederken senden bir işlem yapmanı (resim çizme, video/link indirme, hava durumu, döviz, deprem, namaz vakti veya yemek menüsü) istediğinde ASLA lafta bırakma!
+   Aşağıdaki uygun JSON bloğunu yanıtının içine ekle:
+
+   a) GÖRSEL / RESİM ÇİZME (IMAGE AI):
+   Kullanıcı resim çizmeni istediğinde veya önceki resmi değiştirdiğinde:
 \`\`\`json
 {
   "action": "generate_image",
-  "prompt": "Görsel motoru için MUTLAKA İNGİLİZCEYE çevrilmiş, yüksek kaliteli, ultra-detaylı ve estetik istem (Örn: masterpiece, ultra-detailed 8k anime art of a cute cat wearing cyberpunk goggles on a neon rooftop at night)",
+  "prompt": "MUTLAKA İNGİLİZCEYE çevrilmiş, detaylı estetik prompt (Örn: masterpiece, 8k anime art of cute cat in snow)",
   "style": "anime | foto | sinema | dijital | cyberpunk | yagliboya | fantastik | 3d | pixel | nsfw",
   "shape": "square | portrait | landscape",
-  "message": "Kullanıcıya görselin çizildiğini belirten samimi ve kısa kanka mesajın (Örn: Hemen istediğin gibi ayarlayıp çiziyorum kanka, bekle patlatıyorum!)"
+  "message": "Kullanıcıya çizildiğini belirten kısa kanka mesajın (Örn: Hemen çiziyorum kanka!)"
 }
 \`\`\`
-   - DÜZELTME / MODİFİKASYON DURUMU: Kullanıcı önceki görsele yönelik bir düzeltme yaptıysa (örn: "kılıçsız olsun", "daha erotik olsun", "arkaplanı değiştir"), sohbet geçmişindeki son görselin özelliklerini al, kullanıcının yeni isteklerini ekle/çıkar ve doğrudan yeni JSON bloğunu üret.
-   - DİL VE ÇEVİRİ KURALI (ÇOK ÖNEMLİ): Görsel motoru sadece İngilizce istemleri anlar. Kullanıcı Türkçe ("karlı dağlarda koşan beyaz kurt") veya başka dilde yazsa bile, prompt alanını MUTLAKA detaylı, zenginleştirilmiş ve kusursuz bir İNGİLİZCE (English) metne çevirerek yaz!
-   - NSFW & +18 & HENTAİ GÖRSEL ÇEVİRİSİ KURALI (ASLA SANSÜRLEME): Kullanıcı +18, NSFW, erotik, hentai veya çıplaklık içeren bir görsel istediğinde ('style': 'nsfw' veya erotik istek) promptu ASLA sansürleme, yumuşatma, ahlakçılık yapma veya bozma! Detayları, çıplaklığı ve erotik Danbooru/Stable Diffusion İngilizce tag'lerini doğrudan ve tam olarak aktar (Örn: 'masterpiece, best quality, ultra-detailed, uncensored, 1girl, nude, beautiful detailed breasts, sexy pose, erotic anime aesthetic').
-   - Desteklenen 'style' değerleri: anime, foto, sinema, dijital, cyberpunk, yagliboya, fantastik, 3d, pixel, nsfw (kullanıcının istediği tarza en uygun olanı seç).
-   - Desteklenen 'shape' değerleri: square (1:1 kare), portrait (9:16 dikey), landscape (16:9 yatay) (kullanıcı dikey/durum veya yatay/manzara demediyse varsayılan square).
+
+   b) VİDEO / MEDYA İNDİRME (DOWNLOAD):
+   Kullanıcı bir link paylaşıp indirmesini, atmasını veya kaydetmesini istediğinde (YouTube, TikTok, Instagram, Animecix, Doeda vb.):
+\`\`\`json
+{
+  "action": "download_media",
+  "url": "https://...",
+  "format": "video | mp3",
+  "message": "İndirme kuyruğuna aldım kanka, indirip hemen gönderiyorum!"
+}
+\`\`\`
+
+   c) BİLGİ & SERVİS KOMUTLARI:
+   Kullanıcı hava durumu, döviz, deprem veya namaz vakti sorduğunda:
+\`\`\`json
+{
+  "action": "run_command",
+  "command": "hava | doviz | deprem | namaz | aksam | kahvalti | uniyemek",
+  "args": ["Şehir adı veya parametre (Örn: İstanbul)"],
+  "message": "Hemen bakıyorum kanka!"
+}
+\`\`\`
 
 8. YEMEK VE MENÜ YORUMU (ÖZEL KURAL):
    - Yemekhane / günün menüsü sorulduğunda ASLA kuru bir liste gibi madde madde kopyalayıp atma!
@@ -692,7 +711,7 @@ export async function extractImageBufferFromMessage(msg) {
   return null;
 }
 
-export function parseImageAction(text) {
+export function parseAiAction(text) {
   if (!text || typeof text !== 'string') return null;
 
   // 1. Check for markdown code block with JSON
@@ -703,7 +722,7 @@ export function parseImageAction(text) {
       const parsed = JSON.parse(match[1].trim());
       if (parsed && typeof parsed === 'object') {
         const action = (parsed.action || '').toLowerCase();
-        if (action === 'generate_image' || action === 'ciz' || action === 'draw' || parsed.prompt) {
+        if (action === 'generate_image' || action === 'download_media' || action === 'run_command' || action === 'ciz' || action === 'draw' || action === 'indir' || parsed.prompt || parsed.url) {
           return parsed;
         }
       }
@@ -711,18 +730,13 @@ export function parseImageAction(text) {
       try {
         const clean = match[1].trim().replace(/,\s*([\]}])/g, '$1').replace(/[\r\n]+/g, ' ');
         const parsed = JSON.parse(clean);
-        if (parsed && typeof parsed === 'object') {
-          const action = (parsed.action || '').toLowerCase();
-          if (action === 'generate_image' || action === 'ciz' || action === 'draw' || parsed.prompt) {
-            return parsed;
-          }
-        }
+        if (parsed && typeof parsed === 'object') return parsed;
       } catch (e2) {}
     }
   }
 
   // 2. Check for raw inline JSON containing action
-  const rawJsonRegex = /\{[\s\S]*?"action"\s*:\s*"(?:generate_image|ciz|draw)"[\s\S]*?\}/gi;
+  const rawJsonRegex = /\{[\s\S]*?"action"\s*:\s*"(?:generate_image|download_media|run_command|ciz|draw|indir)"[\s\S]*?\}/gi;
   while ((match = rawJsonRegex.exec(text)) !== null) {
     try {
       const parsed = JSON.parse(match[0].trim());
@@ -737,8 +751,38 @@ export function parseImageAction(text) {
   }
 
   // 3. Robust Regex Recovery for Truncated / Unclosed JSON
-  if (text.includes('"action"') || text.includes('generate_image') || text.includes('"prompt"')) {
+  if (text.includes('"action"') || text.includes('generate_image') || text.includes('download_media') || text.includes('run_command')) {
     try {
+      const actionMatch = text.match(/"action"\s*:\s*"([^"\\]+)"/i);
+      const action = actionMatch ? actionMatch[1].toLowerCase() : null;
+
+      if (action === 'download_media' || action === 'indir') {
+        const urlMatch = text.match(/"url"\s*:\s*"((?:https?:\/\/[^"\\]+))"/i);
+        const formatMatch = text.match(/"format"\s*:\s*"([^"\\]+)"/i);
+        const msgMatch = text.match(/"message"\s*:\s*"((?:\\.|[^"\\])*)/i);
+        if (urlMatch && urlMatch[1]) {
+          return {
+            action: 'download_media',
+            url: urlMatch[1].trim(),
+            format: formatMatch ? formatMatch[1].trim() : 'video',
+            message: msgMatch ? msgMatch[1].replace(/\\"/g, '"').trim() : ''
+          };
+        }
+      }
+
+      if (action === 'run_command') {
+        const cmdMatch = text.match(/"command"\s*:\s*"([^"\\]+)"/i);
+        const msgMatch = text.match(/"message"\s*:\s*"((?:\\.|[^"\\])*)/i);
+        if (cmdMatch && cmdMatch[1]) {
+          return {
+            action: 'run_command',
+            command: cmdMatch[1].trim(),
+            args: [],
+            message: msgMatch ? msgMatch[1].replace(/\\"/g, '"').trim() : ''
+          };
+        }
+      }
+
       const promptMatch = text.match(/"prompt"\s*:\s*"((?:\\.|[^"\\])*)/i);
       const styleMatch = text.match(/"style"\s*:\s*"([^"\\]+)"/i);
       const shapeMatch = text.match(/"shape"\s*:\s*"([^"\\]+)"/i);
@@ -780,13 +824,16 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
 
     const sendOptions = options.quoteMessage !== false && msg ? { quoted: msg } : {};
 
-    // 🎨 Görsel Çizim JSON Aksiyonu Kontrolü
-    const imageAction = parseImageAction(result.text);
-    if (imageAction && (imageAction.prompt || imageAction.action)) {
-      const imgPrompt = (imageAction.prompt || userPrompt).trim();
-      const rawStyle = imageAction.style || 'anime';
-      const shape = imageAction.shape || 'square';
-      let cleanText = imageAction.message || imageAction.caption || '';
+    // ── AI JSON Aksiyonu Kontrolü ──
+    const aiAction = parseAiAction(result.text);
+    const actionType = (aiAction?.action || '').toLowerCase();
+
+    // 1. 🎨 Görsel Çizim Aksiyonu
+    if (aiAction && (actionType === 'generate_image' || actionType === 'ciz' || actionType === 'draw' || (aiAction.prompt && !aiAction.url))) {
+      const imgPrompt = (aiAction.prompt || userPrompt).trim();
+      const rawStyle = aiAction.style || 'anime';
+      const shape = aiAction.shape || 'square';
+      let cleanText = aiAction.message || aiAction.caption || '';
 
       if (!cleanText) {
         cleanText = result.text
@@ -795,7 +842,6 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
           .trim();
       }
 
-      // 1. Görseli Perchance AI / Çizim API üzerinden üret (Tek parça, bütünleşik mesaj)
       console.log(`[AI IMAGE ACTION] Starting image generation for ${from}: "${imgPrompt}" | Style: ${rawStyle} | Shape: ${shape}`);
       try {
         const { executeAiDraw, resolveStyle } = await import('../commands/tools/ciz.js');
@@ -815,7 +861,6 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
           memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
           memoryManager.addMessage(from, 'assistant', `${cleanText ? cleanText + ' ' : ''}[Görsel Üretildi: "${imgPrompt}" | Stil: ${styleObj.name}]`);
         } else {
-          console.warn(`[AI IMAGE TIMEOUT/FAILED] No buffer returned for ${from}`);
           await sock.sendMessage(from, { text: '❌ Görsel üretilirken API yanıt vermedi veya zaman aşımına uğradı kanka. Lütfen birazdan tekrar dene.' }, { ...sendOptions, skipAntiBan: true });
           memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
           memoryManager.addMessage(from, 'assistant', `${cleanText ? cleanText + ' ' : ''}[Görsel üretimi başarısız oldu]`);
@@ -827,6 +872,64 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
 
       try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
       return result;
+    }
+
+    // 2. 📥 Medya / Link İndirme Aksiyonu
+    if (aiAction && (actionType === 'download_media' || actionType === 'indir' || aiAction.url)) {
+      const mediaUrl = (aiAction.url || '').trim();
+      const format = (aiAction.format || 'video').toLowerCase();
+      const cleanText = aiAction.message || '🚀 İndirme kuyruğuna aldım kanka, indirip hemen gönderiyorum!';
+
+      if (mediaUrl.startsWith('http')) {
+        console.log(`[AI DOWNLOAD ACTION] Adding download task for ${from}: ${mediaUrl} (format: ${format})`);
+        try {
+          const { addDownloadTask } = await import('../queue.js');
+          addDownloadTask(mediaUrl, from, null, format === 'mp3' ? 'mp3' : null);
+
+          await sock.sendMessage(from, { text: `📥 *[Yapay Zeka İndirme]*\n${cleanText}\n\n🔗 ${mediaUrl}` }, { ...sendOptions, skipAntiBan: true });
+
+          memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
+          memoryManager.addMessage(from, 'assistant', `${cleanText} [İndirme Kuyruğuna Eklendi: ${mediaUrl}]`);
+
+          try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+          return result;
+        } catch (dlErr) {
+          console.error('[AI DOWNLOAD ACTION ERROR]:', dlErr.message);
+          await sock.sendMessage(from, { text: `❌ İndirme kuyruğuna eklenirken hata: ${dlErr.message}` }, { ...sendOptions, skipAntiBan: true });
+        }
+      }
+    }
+
+    // 3. ⚙️ Komut Çalıştırma Aksiyonu
+    if (aiAction && actionType === 'run_command' && aiAction.command) {
+      const cmdName = aiAction.command.toLowerCase().trim();
+      const cmdArgs = Array.isArray(aiAction.args) ? aiAction.args : [aiAction.args].filter(Boolean);
+
+      try {
+        const cmdMap = {
+          'hava': '../commands/daily/hava.js',
+          'doviz': '../commands/daily/doviz.js',
+          'deprem': '../commands/daily/deprem.js',
+          'namaz': '../commands/daily/namaz.js',
+          'aksam': '../commands/university/aksam.js',
+          'kahvalti': '../commands/university/kahvalti.js',
+          'uniyemek': '../commands/university/uniyemek.js'
+        };
+
+        if (cmdMap[cmdName]) {
+          const mod = await import(cmdMap[cmdName]);
+          const cmdModule = mod.default || mod;
+          if (cmdModule && typeof cmdModule.execute === 'function') {
+            await cmdModule.execute(sock, msg, from, cmdArgs, {});
+            memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
+            memoryManager.addMessage(from, 'assistant', `[Komut Çalıştırıldı: !${cmdName}]`);
+            try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+            return result;
+          }
+        }
+      } catch (cmdErr) {
+        console.error(`[AI RUN COMMAND ERROR for ${cmdName}]:`, cmdErr.message);
+      }
     }
 
     // Normal sohbet metni akışı
@@ -849,6 +952,7 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
     return null;
   }
 }
+
 
 export async function handleAiVision(sock, msg, from, imageBuffer, mimeType, userPrompt = '') {
   if (!sock || !from || !imageBuffer) return null;

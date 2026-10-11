@@ -1,6 +1,7 @@
 import { getYemekMessage, sendMenuResponse, loadMenuData, findMenuByQuery } from '../../utils/menuData.js';
 import { aiEngine } from '../../ai/aiEngine.js';
 import { getAiConfig } from '../../config.js';
+import { checkMenuRateLimit } from '../../utils/menuRateLimiter.js';
 
 export default {
   name: 'yemek',
@@ -8,6 +9,10 @@ export default {
   description: 'Günlük yemek menüsünü ve yapay zeka gurme yorumunu gösterir',
   async execute(sock, msg, from, args, ctx) {
     try {
+      // Rate limit kontrolü (DM: günde 1, Grup: son 20 mesajda 1)
+      const allowed = await checkMenuRateLimit(sock, msg, from, 'yemek');
+      if (!allowed) return;
+
       const query = args && args.length > 0 ? args.join(' ').trim() : '';
       const menuText = getYemekMessage(query);
 

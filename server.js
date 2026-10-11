@@ -1482,6 +1482,45 @@ app.delete('/api/permissions/groups/:jid', (req, res) => {
   }
 });
 
+// ─── Premium Kullanıcı Yönetimi API'leri ───
+app.get('/api/premium', async (req, res) => {
+  try {
+    const { getPremiumUsers } = await import('./utils/rateLimiter.js');
+    res.json({ success: true, premiumUsers: getPremiumUsers() });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.post('/api/premium', async (req, res) => {
+  try {
+    const { addPremiumUser } = await import('./utils/rateLimiter.js');
+    const { phone } = req.body;
+    if (!phone || typeof phone !== 'string') {
+      return res.status(400).json({ success: false, error: 'Geçersiz telefon numarası.' });
+    }
+    const cleaned = phone.trim().replace(/[^0-9]/g, '');
+    if (cleaned.length < 7) {
+      return res.status(400).json({ success: false, error: 'Telefon numarası çok kısa.' });
+    }
+    const added = addPremiumUser(cleaned);
+    res.json({ success: true, added, phone: cleaned });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.delete('/api/premium/:phone', async (req, res) => {
+  try {
+    const { removePremiumUser } = await import('./utils/rateLimiter.js');
+    const phone = req.params.phone.replace(/[^0-9]/g, '');
+    const removed = removePremiumUser(phone);
+    res.json({ success: true, removed, phone });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // History & Errors Logger Analytics APIs
 app.get('/api/history', (req, res) => {
   res.json({ success: true, history: readHistory() });
