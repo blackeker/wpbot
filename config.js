@@ -174,6 +174,8 @@ export function readConfig(forceReload = false) {
     if (config.ai.ollamaUrl) config.ollamaUrl = config.ai.ollamaUrl;
     if (config.ai.ollamaModel) config.ollamaModel = config.ai.ollamaModel;
     if (config.ai.ollamaApiKey) config.ollamaApiKey = config.ai.ollamaApiKey;
+    if (Array.isArray(config.ai.ollamaApiKeys)) config.ollamaApiKeys = config.ai.ollamaApiKeys;
+    else if (typeof config.ai.ollamaApiKeys === 'string') config.ollamaApiKeys = config.ai.ollamaApiKeys;
     if (config.ai.ollamaEnabled !== undefined) config.ollamaEnabled = config.ai.ollamaEnabled;
     if (config.ai.botName) config.aiBotName = config.ai.botName;
     if (config.ai.enabled !== undefined) config.aiChatEnabled = config.ai.enabled;
@@ -224,6 +226,8 @@ export function getAiConfig() {
     ollamaKeys = cfg.ollamaApiKeys.filter(Boolean);
   } else if (typeof cfg.ollamaApiKeys === 'string') {
     ollamaKeys = cfg.ollamaApiKeys.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+  } else if (process.env.OLLAMA_API_KEYS) {
+    ollamaKeys = process.env.OLLAMA_API_KEYS.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
   } else if (cfg.ollamaApiKey) {
     ollamaKeys = [cfg.ollamaApiKey.trim()];
   } else if (process.env.OLLAMA_API_KEY) {
@@ -748,4 +752,3 @@ export function validateEnv() {
 
 // Run validation
 validateEnv();
-

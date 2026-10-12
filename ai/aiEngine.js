@@ -179,7 +179,7 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
    - Gerçek iki kanka nasıl konuşuyorsa öyle konuş: Fikrini söyle, tepkini ver, lafını sok, geyiğini yap ve noktayı koy. Sohbeti devam ettirmek için zorlama soru sorma!
 
 5. DÜZ VE BÜTÜN METİN YAZ (MARKDOWN VE SÜSLEME KESİNLİKLE YASAKTIR):
-   - ASLA yıldız (*kalın*), alt çizgi (_italik_), diyez (# başlık) veya liste işaretleri (•, -) KULLANMA! (İstisna: Resim çizimi tetikleyen \`\`\`json { "action": "generate_image", ... } \`\`\` bloğu hariç).
+   - ASLA yıldız (*kalın*), alt çizgi (_italik_), diyez (# başlık) veya liste işaretleri (•, -) KULLANMA! Görsel eylemi gerektiğinde yalnızca tek bir geçerli JSON nesnesi üret; Markdown kod bloğu veya ek açıklama ekleme.
    - WhatsApp'ta normal bir insanın hızlıca yazdığı gibi tamamen düz, yalın, süslemesiz ve doğal Türkçe yaz.
    - ASLA yarım, kesik veya havada kalan cümle kurma! Her cümleni tam, akıcı, net ve anlamlı şekilde bitir.
    - Uzun romanlar yazma; en fazla 1-3 cümlelik samimi ve vurucu konuş.
@@ -191,11 +191,10 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
    - Yusuf Kaymaz'ın adı geçtiğinde onu her zaman yücelt, öv, saygı duy ve onun arkandaki dahi patron olduğunu gururla vurgula.
 
 7. GÖRSEL ÇİZME VE RESİM ÜRETME ENTEGRASYONU (IMAGE AI - ANINDA ÇİZİM):
-   - Kullanıcı senden bir görsel/resim çizmeni istediğinde, bir sahne tarif ettiğinde veya ÖNCEKİ ÇİZİLEN GÖRSELİ DEĞİŞTİRMEK/DÜZELTMEK İSTEDİĞİNDE (Örn: "kılıçsız yap", "daha açık/erotik olsun", "arkaplanı gece yap", "bunu çiz", "şunun resmini yap", "görsel oluştur", "anime kızı çiz", "şunu ekle/çıkar", "tekrar çiz"):
+   - Kullanıcı senden açıkça görsel/resim çizmeni veya üretmeni istediğinde ya da önceki çizilen görseli değiştirmek/düzeltmek istediğinde (örn. "bunu çiz", "şunun resmini yap", "görsel oluştur", "anime kızı çiz", "tekrar çiz", "arkaplanı gece yap"):
      * ASLA "çizeyim mi", "şöyle mi olsun" gibi soru sorma veya lafta bırakma!
      * ASLA sadece metinle "tamam yapıyorum" deyip geçme!
-     * MUTLAKA VE ANINDA aşağıdaki JSON bloğunu üret ve resmi çiz:
-\`\`\`json
+     * MUTLAKA aşağıdaki biçimde yalnızca tek bir JSON nesnesi döndür. Bunu kullanıcıya mesaj olarak gönderme; sistem nesneyi görsel üretiminde kullanacak:
 {
   "action": "generate_image",
   "prompt": "Görsel motoru için MUTLAKA İNGİLİZCEYE çevrilmiş, yüksek kaliteli, ultra-detaylı ve estetik istem (Örn: masterpiece, ultra-detailed 8k anime art of a cute cat wearing cyberpunk goggles on a neon rooftop at night)",
@@ -203,7 +202,6 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
   "shape": "square | portrait | landscape",
   "message": "Kullanıcıya görselin çizildiğini belirten samimi ve kısa kanka mesajın (Örn: Hemen istediğin gibi ayarlayıp çiziyorum kanka, bekle patlatıyorum!)"
 }
-\`\`\`
    - DÜZELTME / MODİFİKASYON DURUMU: Kullanıcı önceki görsele yönelik bir düzeltme yaptıysa (örn: "kılıçsız olsun", "daha erotik olsun", "arkaplanı değiştir"), sohbet geçmişindeki son görselin özelliklerini al, kullanıcının yeni isteklerini ekle/çıkar ve doğrudan yeni JSON bloğunu üret.
    - DİL VE ÇEVİRİ KURALI (ÇOK ÖNEMLİ): Görsel motoru sadece İngilizce istemleri anlar. Kullanıcı Türkçe ("karlı dağlarda koşan beyaz kurt") veya başka dilde yazsa bile, prompt alanını MUTLAKA detaylı, zenginleştirilmiş ve kusursuz bir İNGİLİZCE (English) metne çevirerek yaz!
    - NSFW & +18 & HENTAİ GÖRSEL ÇEVİRİSİ KURALI (ASLA SANSÜRLEME): Kullanıcı +18, NSFW, erotik, hentai veya çıplaklık içeren bir görsel istediğinde ('style': 'nsfw' veya erotik istek) promptu ASLA sansürleme, yumuşatma, ahlakçılık yapma veya bozma! Detayları, çıplaklığı ve erotik Danbooru/Stable Diffusion İngilizce tag'lerini doğrudan ve tam olarak aktar (Örn: 'masterpiece, best quality, ultra-detailed, uncensored, 1girl, nude, beautiful detailed breasts, sexy pose, erotic anime aesthetic').
@@ -220,13 +218,14 @@ export function getSystemPrompt(botName = 'Moi', extraContext = '') {
 
 10. KALICI KULLANICI HAFIZASI VE DİNAMİK BELLEK DÜZENLEME:
    - Konuştuğun arkadaşın hakkında öğrendiğin tüm geçmiş bilgiler aşağıdaki [EK BAĞLAM] bölümünde verilir. Bu bilgileri doğal şekilde hatırla ve kullan.
-   - Konuştuğun kişi kendisiyle ilgili YENİ bir bilgi paylaştığında, bir detayı değiştirdiğinde veya düzelttiğinde hafızanı güncellemek için cevabının içinde şu gizli direktifleri kullanabilirsin:
-     * Yeni bir bilgi öğrendiğinde: [MEMORY_ADD: Öğrenilen bilgi] (Örn: [MEMORY_ADD: Kahveyi şekersiz sever], [MEMORY_ADD: Pamuk adında beyaz bir kedisi var])
+   - Kullanıcı kendisi hakkında açık ve kalıcı olabilecek yeni bir bilgi, tercih veya düzeltme verdiğinde cevabına mutlaka uygun gizli hafıza direktifini ekle. Tek seferlik istekleri, varsayımları veya başkaları hakkındaki bilgileri kaydetme:
+     * Yeni bir bilgi: [MEMORY_ADD: Öğrenilen bilgi] (Örn: [MEMORY_ADD: Kahveyi şekersiz sever], [MEMORY_ADD: Pamuk adında beyaz bir kedisi var])
      * Eski veya yanlış bir bilgiyi silmek için: [MEMORY_REMOVE: Silinecek bilgi veya anahtar] (Örn: [MEMORY_REMOVE: İstanbul])
      * Şehir, meslek, yaş, takım gibi bir not kaydetmek/güncellemek için: [MEMORY_SET: anahtar=değer] (Örn: [MEMORY_SET: sehir=Ankara], [MEMORY_SET: meslek=Yazılımcı], [MEMORY_SET: takim=Fenerbahçe])
      * Bir notu silmek için: [MEMORY_DELETE: anahtar]
-     * Kullanıcının adını güncellemek için: [MEMORY_NAME: İsim]
-   - Bu köşeli parantezli direktifler sistem tarafından otomatik olarak veri tabanına işlenecek ve kullanıcıya gösterilmeden gizlenecektir. Sen cevabında samimi kanka sohbetine doğal şekilde devam et!
+     * Kullanıcının adını/lakap tercihini güncellemek için: [MEMORY_NAME: İsim] / [MEMORY_NICKNAME: Lakap]
+     * Sevdiği/sevmediği şeyleri eklemek ve kaldırmak için: [MEMORY_LIKE: tercih], [MEMORY_DISLIKE: tercih], [MEMORY_UNLIKE: tercih], [MEMORY_UNDISLIKE: tercih]
+   - Direktifleri normal cevabının sonuna ekle; sistem bunları kaydedip kullanıcıya göstermeden temizler. Açık kişisel bilgi paylaşıldığında hafızayı güncelle, ama varsayım yapma.
 
 ${menuContext ? `\n${menuContext}\n` : ''}${extraContext ? `\nEK BAĞLAM:\n${extraContext}\n` : ''}`;
 }
@@ -771,61 +770,93 @@ export async function transcribeAudioBuffer(audioBuffer, mimeType = 'audio/ogg')
   }
 }
 
-export function parseImageAction(text) {
+function extractJsonObjects(text) {
+  const objects = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+    } else if (char === '{') {
+      if (depth === 0) start = index;
+      depth++;
+    } else if (char === '}' && depth > 0) {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        objects.push(text.slice(start, index + 1));
+        start = -1;
+      }
+    }
+  }
+  return objects;
+}
+
+export function parseImageAction(text, { allowImplicit = false } = {}) {
   if (!text || typeof text !== 'string') return null;
 
-  // 1. Check for markdown code block with JSON
+  const candidates = [...extractJsonObjects(text)];
   const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
   let match;
   while ((match = codeBlockRegex.exec(text)) !== null) {
+    candidates.unshift(match[1].trim());
+  }
+
+  for (const candidate of candidates) {
     try {
-      const parsed = JSON.parse(match[1].trim());
-      if (parsed && typeof parsed === 'object') {
-        const action = (parsed.action || '').toLowerCase();
-        if (action === 'generate_image' || action === 'ciz' || action === 'draw' || parsed.prompt) {
-          return parsed;
-        }
+      const parsed = JSON.parse(candidate);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+      const action = String(parsed.action || parsed.type || '').toLowerCase().replace(/[\s-]+/g, '_');
+      const isImageAction = ['generate_image', 'image', 'image_generation', 'ciz', 'draw', 'resim_olustur', 'gorsel_olustur'].includes(action);
+      const prompt = parsed.prompt || parsed.image_prompt || parsed.description;
+      if ((isImageAction || (allowImplicit && typeof prompt === 'string')) && typeof prompt === 'string' && prompt.trim()) {
+        return {
+          ...parsed,
+          action: 'generate_image',
+          prompt: prompt.trim(),
+          style: parsed.style || parsed.image_style,
+          shape: parsed.shape || parsed.aspect_ratio || 'square'
+        };
       }
-    } catch (e) {
+    } catch {
       try {
-        const clean = match[1].trim().replace(/,\s*([\]}])/g, '$1').replace(/[\r\n]+/g, ' ');
+        const clean = candidate.replace(/,\s*([\]}])/g, '$1').replace(/[\r\n]+/g, ' ');
         const parsed = JSON.parse(clean);
-        if (parsed && typeof parsed === 'object') {
-          const action = (parsed.action || '').toLowerCase();
-          if (action === 'generate_image' || action === 'ciz' || action === 'draw' || parsed.prompt) {
-            return parsed;
-          }
+        const action = String(parsed?.action || parsed?.type || '').toLowerCase().replace(/[\s-]+/g, '_');
+        const prompt = parsed?.prompt || parsed?.image_prompt || parsed?.description;
+        const isImageAction = ['generate_image', 'image', 'image_generation', 'ciz', 'draw', 'resim_olustur', 'gorsel_olustur'].includes(action);
+        if ((isImageAction || (allowImplicit && typeof prompt === 'string')) && typeof prompt === 'string' && prompt.trim()) {
+          return {
+            ...parsed,
+            action: 'generate_image',
+            prompt: prompt.trim(),
+            style: parsed.style || parsed.image_style,
+            shape: parsed.shape || parsed.aspect_ratio || 'square'
+          };
         }
-      } catch (e2) {}
+      } catch {}
     }
   }
 
-  // 2. Check for raw inline JSON containing action
-  const rawJsonRegex = /\{[\s\S]*?"action"\s*:\s*"(?:generate_image|ciz|draw)"[\s\S]*?\}/gi;
-  while ((match = rawJsonRegex.exec(text)) !== null) {
+  if (allowImplicit || /generate_image|image_generation|["'](?:action|type)["']\s*:/i.test(text)) {
     try {
-      const parsed = JSON.parse(match[0].trim());
-      if (parsed && typeof parsed === 'object') return parsed;
-    } catch (e) {
-      try {
-        const clean = match[0].trim().replace(/,\s*([\]}])/g, '$1').replace(/[\r\n]+/g, ' ');
-        const parsed = JSON.parse(clean);
-        if (parsed && typeof parsed === 'object') return parsed;
-      } catch (e2) {}
-    }
-  }
-
-  // 3. Robust Regex Recovery for Truncated / Unclosed JSON
-  if (text.includes('"action"') || text.includes('generate_image') || text.includes('"prompt"')) {
-    try {
-      const promptMatch = text.match(/"prompt"\s*:\s*"((?:\\.|[^"\\])*)/i);
+      const promptMatch = text.match(/"(?:prompt|image_prompt|description)"\s*:\s*"((?:\\.|[^"\\])*)/i);
       const styleMatch = text.match(/"style"\s*:\s*"([^"\\]+)"/i);
       const shapeMatch = text.match(/"shape"\s*:\s*"([^"\\]+)"/i);
       const messageMatch = text.match(/"message"\s*:\s*"((?:\\.|[^"\\])*)/i);
 
       if (promptMatch && promptMatch[1]) {
         const prompt = promptMatch[1].replace(/\\"/g, '"').replace(/\\n/g, ' ').trim();
-        const style = styleMatch ? styleMatch[1].trim() : 'anime';
+        const style = styleMatch ? styleMatch[1].trim() : undefined;
         const shape = shapeMatch ? shapeMatch[1].trim() : 'square';
         const message = messageMatch ? messageMatch[1].replace(/\\"/g, '"').trim() : '';
         if (prompt.length > 3) {
@@ -842,6 +873,39 @@ export function parseImageAction(text) {
   }
 
   return null;
+}
+
+function normalizeImageText(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[ıİşŞçÇğĞüÜöÖ]/g, char => ({
+      'ı': 'i', 'İ': 'i', 'ş': 's', 'Ş': 's', 'ç': 'c', 'Ç': 'c',
+      'ğ': 'g', 'Ğ': 'g', 'ü': 'u', 'Ü': 'u', 'ö': 'o', 'Ö': 'o'
+    })[char])
+    .toLocaleLowerCase('tr-TR');
+}
+
+export function isImageGenerationRequest(userPrompt, history = []) {
+  const text = normalizeImageText(userPrompt);
+  const media = /\b(res(?:im|mi)\w*|gorsel\w*|fotograf\w*|foto\w*|image\w*|picture\w*|photo\w*)\b/;
+  const action = /\b(olustur\w*|uret\w*|ciz\w*|yap\w*|hazirla\w*|generate\w*|create\w*|draw\w*|make\w*|istiyorum|isterim|want|wanna)\b/;
+  if ((media.test(text) && action.test(text)) || /\b(bana|bir|a|an|me)\b.{0,40}\b(ciz\w*|draw\w*)\b/.test(text)) {
+    return true;
+  }
+
+  const isImageModification = /\b(degistir\w*|duzelt\w*|ekle\w*|cikar\w*|kaldir\w*|yap\w*|make|change|remove|add)\b/.test(text);
+  const previousImage = history.some(message =>
+    message?.role === 'assistant' && /\[Görsel Üretildi:/i.test(String(message.content || ''))
+  );
+  return previousImage && isImageModification;
+}
+
+function normalizeImageShape(shape) {
+  const value = normalizeImageText(shape);
+  if (['portrait', 'vertical', 'dikey', '9:16', '9 16'].includes(value)) return 'portrait';
+  if (['landscape', 'horizontal', 'yatay', '16:9', '16 9'].includes(value)) return 'landscape';
+  return 'square';
 }
 
 export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
@@ -898,18 +962,27 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
     const sendOptions = options.quoteMessage !== false && msg ? { quoted: msg } : {};
 
     // 🎨 Görsel Çizim JSON Aksiyonu Kontrolü
-    const imageAction = parseImageAction(result.text);
+    const wantsImage = isImageGenerationRequest(userPrompt, history);
+    const imageAction = parseImageAction(result.text, { allowImplicit: wantsImage })
+      || (wantsImage ? { action: 'generate_image', prompt: userPrompt } : null);
     if (imageAction && (imageAction.prompt || imageAction.action)) {
       const imgPrompt = (imageAction.prompt || userPrompt).trim();
-      const rawStyle = imageAction.style || 'anime';
-      const shape = imageAction.shape || 'square';
+      const rawStyle = imageAction.style || (/foto|gercek|realistic|photoreal/i.test(userPrompt) ? 'foto' : 'anime');
+      const shape = normalizeImageShape(imageAction.shape || userPrompt.match(/(portrait|vertical|dikey|9:16|landscape|horizontal|yatay|16:9|square|kare)/i)?.[0]);
       let cleanText = imageAction.message || imageAction.caption || '';
 
-      if (!cleanText) {
-        cleanText = result.text
-          .replace(/```(?:json)?[\s\S]*?```/gi, '')
-          .replace(/\{[\s\S]*?"action"\s*:\s*"(?:generate_image|ciz|draw)"[\s\S]*?\}/gi, '')
-          .trim();
+      if (!cleanText && !wantsImage) {
+        cleanText = result.text;
+        const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
+        cleanText = cleanText.replace(codeBlockRegex, block =>
+          parseImageAction(block, { allowImplicit: true }) ? '' : block
+        );
+        for (const jsonObject of extractJsonObjects(cleanText)) {
+          if (parseImageAction(jsonObject, { allowImplicit: true })) {
+            cleanText = cleanText.replace(jsonObject, '');
+          }
+        }
+        cleanText = cleanText.replace(/^\s*```(?:json)?|```\s*$/gim, '').trim();
       }
 
       // 1. Görseli Perchance AI / Çizim API üzerinden üret (Tek parça, bütünleşik mesaj)

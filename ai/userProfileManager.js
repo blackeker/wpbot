@@ -2,6 +2,18 @@ import fs from 'fs';
 import path from 'path';
 import { sessionPath, dataPath } from '../config.js';
 
+function normalizeMemoryValue(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[ıİşŞçÇğĞüÜöÖ]/g, char => ({
+      'ı': 'i', 'İ': 'i', 'ş': 's', 'Ş': 's', 'ç': 'c', 'Ç': 'c',
+      'ğ': 'g', 'Ğ': 'g', 'ü': 'u', 'Ü': 'u', 'ö': 'o', 'Ö': 'o'
+    })[char])
+    .toLocaleLowerCase('tr-TR')
+    .trim();
+}
+
 /**
  * 🧠 USER PROFILE & PERSISTENT MEMORY MANAGER
  * 
@@ -156,7 +168,8 @@ export class UserProfileManager {
 
     const prof = this.getProfile(rawJid);
     // Benzer veya birebir aynısı varsa ekleme
-    const exists = prof.facts.some(f => f.toLowerCase() === cleanFact.toLowerCase() || f.includes(cleanFact));
+    const normalizedFact = normalizeMemoryValue(cleanFact);
+    const exists = prof.facts.some(f => normalizeMemoryValue(f) === normalizedFact);
     if (!exists) {
       prof.facts.unshift(cleanFact);
       if (prof.facts.length > this.maxFactsPerUser) {
@@ -174,11 +187,12 @@ export class UserProfileManager {
    */
   removeFact(rawJid, keywordOrText) {
     if (!keywordOrText || typeof keywordOrText !== 'string') return false;
-    const q = keywordOrText.trim().toLowerCase();
+    const q = normalizeMemoryValue(keywordOrText);
+    if (!q) return false;
     const prof = this.getProfile(rawJid);
     const initialLen = prof.facts.length;
 
-    prof.facts = prof.facts.filter(f => !f.toLowerCase().includes(q));
+    prof.facts = prof.facts.filter(f => !normalizeMemoryValue(f).includes(q));
     if (prof.facts.length !== initialLen) {
       this.scheduleSave();
       console.log(`[USER MEMORY] - Bilgi Silindi (${prof.id}): "${keywordOrText}"`);
@@ -192,11 +206,14 @@ export class UserProfileManager {
    */
   setNote(rawJid, key, value) {
     if (!key) return false;
-    const cleanKey = String(key).trim().toLowerCase();
+    const cleanKey = normalizeMemoryValue(key).replace(/\s+/g, '_');
+    if (!cleanKey) return false;
     const cleanVal = String(value || '').trim();
     const prof = this.getProfile(rawJid);
 
+    if (cleanVal && prof.notes[cleanKey] === cleanVal) return false;
     if (!cleanVal) {
+      if (prof.notes[cleanKey] === undefined) return false;
       delete prof.notes[cleanKey];
     } else {
       prof.notes[cleanKey] = cleanVal;
@@ -206,12 +223,37 @@ export class UserProfileManager {
     return true;
   }
 
+  setPreference(rawJid, kind, value, enabled = true) {
+    const cleanValue = String(value || '').trim();
+    if (normalizeMemoryValue(cleanValue).length < 2 || !['likes', 'dislikes'].includes(kind)) return false;
+    const prof = this.getProfile(rawJid);
+    const target = prof.preferences[kind];
+    const opposite = prof.preferences[kind === 'likes' ? 'dislikes' : 'likes'];
+    const normalized = normalizeMemoryValue(cleanValue);
+    const before = target.length + opposite.length;
+    const matches = item => {
+      const normalizedItem = normalizeMemoryValue(item);
+      return normalizedItem === normalized || (!enabled && normalizedItem.includes(normalized));
+    };
+    prof.preferences[kind] = target.filter(item => !matches(item));
+    if (enabled) {
+      prof.preferences[kind === 'likes' ? 'dislikes' : 'likes'] = opposite.filter(item => !matches(item));
+      prof.preferences[kind].unshift(cleanValue);
+      prof.preferences[kind] = prof.preferences[kind].slice(0, 20);
+    }
+    const changed = before !== prof.preferences.likes.length + prof.preferences.dislikes.length
+      || (enabled && !target.some(item => normalizeMemoryValue(item) === normalized));
+    if (changed) this.scheduleSave();
+    return changed;
+  }
+
   /**
    * Notu siler
    */
   deleteNote(rawJid, key) {
     if (!key) return false;
-    const cleanKey = String(key).trim().toLowerCase();
+    const cleanKey = normalizeMemoryValue(key).replace(/\s+/g, '_');
+    if (!cleanKey) return false;
     const prof = this.getProfile(rawJid);
     if (prof.notes[cleanKey] !== undefined) {
       delete prof.notes[cleanKey];
@@ -350,6 +392,33 @@ export class UserProfileManager {
     }
     cleanText = cleanText.replace(relRegex, '');
 
+    const nicknameRegex = /\[MEMORY_NICKNAME:\s*([^\]]+)\]/gi;
+    while ((match = nicknameRegex.exec(aiReplyText)) !== null) {
+      const nickname = match[1].trim();
+      if (nickname) {
+        this.setNickname(rawJid, nickname);
+        actionsApplied.push({ action: 'set_nickname', value: nickname });
+      }
+    }
+    cleanText = cleanText.replace(nicknameRegex, '');
+
+    const preferenceDirectives = [
+      { regex: /\[MEMORY_LIKE:\s*([^\]]+)\]/gi, kind: 'likes', enabled: true, action: 'add_like' },
+      { regex: /\[MEMORY_DISLIKE:\s*([^\]]+)\]/gi, kind: 'dislikes', enabled: true, action: 'add_dislike' },
+      { regex: /\[MEMORY_UNLIKE:\s*([^\]]+)\]/gi, kind: 'likes', enabled: false, action: 'remove_like' },
+      { regex: /\[MEMORY_UNDISLIKE:\s*([^\]]+)\]/gi, kind: 'dislikes', enabled: false, action: 'remove_dislike' }
+    ];
+    for (const directive of preferenceDirectives) {
+      while ((match = directive.regex.exec(aiReplyText)) !== null) {
+        const value = match[1].trim();
+        if (value) {
+          this.setPreference(rawJid, directive.kind, value, directive.enabled);
+          actionsApplied.push({ action: directive.action, value });
+        }
+      }
+      cleanText = cleanText.replace(directive.regex, '');
+    }
+
     // Boşlukları ve gereksiz satır başlarını düzelt
     cleanText = cleanText.replace(/^\s+/, '').replace(/\s{2,}/g, ' ').trim();
 
@@ -380,14 +449,15 @@ export class UserProfileManager {
     const isQuestionAboutCity = lower.includes('hangi') || lower.includes('nerede') || lower.includes('?') || lower.includes('miyim') || lower.includes('muyum');
     if (!isQuestionAboutCity) {
       const nonCities = ['şehir', 'sehir', 'nerede', 'neresi', 'burası', 'orası', 'hangi', 'ev', 'iş', 'ofis', 'yol', 'otobüs', 'araba', 'tren', 'uçak', 'tatil', 'otel', 'köy', 'oda'];
-      const cityMatch = text.match(/([A-ZÇĞİÖŞÜa-zçğıöşü]{3,15})('da|'de|'ta|'te|da|de|ta|te)\s+(?:yaşıyorum|ikamet|oturuyorum|bulunuyorum|çalışıyorum|mimarlık|yazılımcı|okuyorum)/i);
-      if (cityMatch && cityMatch[1]) {
-        const c = cityMatch[1].trim();
-        if (!nonCities.includes(c.toLowerCase())) {
-          this.setNote(rawJid, 'sehir', c);
-        }
-      } else {
-        const cityShortMatch = text.match(/([A-ZÇĞİÖŞÜa-zçğıöşü]{3,15})('da|'de|'ta|'te|da|de|ta|te)yim/i);
+        const cityMatches = [...text.matchAll(/([A-ZÇĞİÖŞÜa-zçğıöşü]{3,20})(?:['’]?(?:da|de|ta|te|a|e))\s*(?:yaşıyorum|ikamet\s+ediyorum|oturuyorum|bulunuyorum|çalışıyorum|okuyorum|taşındım|yerleştim)/gi)];
+        const cityMatch = cityMatches.at(-1);
+        if (cityMatch && cityMatch[1]) {
+          const c = cityMatch[1].trim();
+          if (!nonCities.includes(c.toLowerCase())) {
+            this.setNote(rawJid, 'sehir', c);
+          }
+        } else {
+          const cityShortMatch = text.match(/([A-ZÇĞİÖŞÜa-zçğıöşü]{3,20})(?:['’]?(?:da|de|ta|te|dayım|deyim|tayım|teyim))/i);
         if (cityShortMatch && cityShortMatch[1]) {
           const c = cityShortMatch[1].trim();
           if (!nonCities.includes(c.toLowerCase())) {
@@ -421,34 +491,30 @@ export class UserProfileManager {
     if (petMatch) {
       const petName = petMatch[1].trim();
       const petType = petMatch[2].trim();
+      prof.facts = prof.facts.filter(f => !/adında\s+.*(?:köpe|kedi|kuş|tavşan|balık)/i.test(f));
       this.addFact(rawJid, `${petName} adında ${petType} var.`);
     }
 
     // Enstrüman yakalama: "gitar çalıyorum", "piyano çalıyorum", "bateri çalıyorum"
     const instrumentMatch = lower.match(/(klasik gitar|gitar|piyano|bateri|keman|bağlama|flüt)\s+çalıyorum/);
     if (instrumentMatch) {
+      prof.facts = prof.facts.filter(f => !/(gitar|piyano|bateri|keman|bağlama|flüt)\s+çal/i.test(f));
       this.addFact(rawJid, `${instrumentMatch[1]} çalıyor.`);
     }
 
-    // Beğeni ve Zevkler Yakalama ("anime çok severim", "rock müzik bayılırım")
-    const likeMatch = text.match(/([a-zA-Z0-9\sğüşıöçĞÜŞİÖÇ]{2,20})\s+(?:çok\s+)?(?:severim|bayılırım|seviyorum)/i);
-    if (likeMatch && likeMatch[1]) {
-      const item = likeMatch[1].trim();
-      const forbidden = ['ben', 'sen', 'onu', 'bunu', 'şunu', 'kanka', 'evet', 'hayır'];
-      if (!forbidden.includes(item.toLowerCase()) && !prof.preferences.likes.includes(item)) {
-        prof.preferences.likes.push(item);
-        if (prof.preferences.likes.length > 10) prof.preferences.likes.shift();
+    // Tercih ifadelerini ayrı cümle/bağlaç bölümlerinde işle; önceki metni tercih sanma.
+    const preferenceClauses = text.split(/[,;.!?]|\bve\b|\bama\b|\bfakat\b/i);
+    for (const clause of preferenceClauses) {
+      const likeMatch = clause.match(/(?:ben\s+)?(.{2,40}?)\s+(?:çok\s+)?(?:severim|bayılırım|seviyorum|hoşlanıyorum)/i);
+      if (likeMatch && likeMatch[1]) {
+        const item = likeMatch[1].replace(/^(?:ben\s+|artık\s+|ayrıca\s+)+/i, '').trim();
+        if (item) this.setPreference(rawJid, 'likes', item, true);
       }
-    }
 
-    // Hoşlanılmayan Şeyler Yakalama ("sütlü tatlıları hiç sevmem", "yalandan nefret ederim")
-    const dislikeMatch = text.match(/([a-zA-Z0-9\sğüşıöçĞÜŞİÖÇ]{2,20})\s+(?:hiç\s+)?(?:sevmem|nefret ederim|sevmiyorum)/i);
-    if (dislikeMatch && dislikeMatch[1]) {
-      const item = dislikeMatch[1].trim();
-      const forbidden = ['ben', 'sen', 'onu', 'bunu', 'şunu', 'kanka'];
-      if (!forbidden.includes(item.toLowerCase()) && !prof.preferences.dislikes.includes(item)) {
-        prof.preferences.dislikes.push(item);
-        if (prof.preferences.dislikes.length > 10) prof.preferences.dislikes.shift();
+      const dislikeMatch = clause.match(/(?:ben\s+)?(.{2,40}?)\s+(?:hiç\s+)?(?:sevmem|nefret ederim|sevmiyorum|hoşlanmıyorum)/i);
+      if (dislikeMatch && dislikeMatch[1]) {
+        const item = dislikeMatch[1].replace(/^(?:ben\s+|artık\s+|ayrıca\s+)+/i, '').trim();
+        if (item) this.setPreference(rawJid, 'dislikes', item, true);
       }
     }
 
@@ -512,11 +578,12 @@ export class UserProfileManager {
     }
 
     out += `\n💡 HAFIZA KULLANIM VE GÜNCELLEME TALİMATI:
-1. Bu bilgileri konuşurken DOĞAL ŞEKİLDE hatırla ve gerektiğinde laf arasına kat.
-2. Kullanıcı sana kendisi hakkında YENİ BİR BİLGİ söylediğinde, bunu kalıcı hafızana eklemek için cevabının içinde şu gizli etiketi kullan: [MEMORY_ADD: öğrendiğin bilgi]
-3. Bir bilginin değiştiğini, yanlış olduğunu veya eskidiğini söylediğinde: [MEMORY_REMOVE: silinecek kelime veya bilgi]
-4. Şehir, meslek, yaş, takım gibi net bir not ayarlamak için: [MEMORY_SET: sehir=İzmir] veya [MEMORY_SET: meslek=Avukat]
-(Bu etiketler otomatik olarak ayrıştırılıp veri tabanına işlenecek ve kullanıcıya gönderilmeden gizlenecektir, doğal konuşmanı sürdür!)\n`;
+1. Bu bilgileri konuşurken doğal şekilde hatırla.
+2. Kullanıcı kendisi hakkında açık ve kalıcı olabilecek yeni bir bilgi, tercih veya düzeltme verdiğinde cevabına mutlaka uygun gizli direktifi ekle. Tek seferlik istekleri, varsayımları veya başkaları hakkındaki bilgileri kaydetme.
+3. Yeni bir bilgi: [MEMORY_ADD: öğrenilen bilgi]. Bir bilgi yanlışlandıysa/eskiyse: [MEMORY_REMOVE: eski bilgi veya ayırt edici kelime].
+4. Şehir, meslek, yaş, takım gibi alan eklemek veya güncellemek için [MEMORY_SET: anahtar=değer] kullan; aynı anahtardaki eski değer yenisiyle değiştirilir. Alanı silmek için [MEMORY_DELETE: anahtar] kullan.
+5. İsim/lakap değişikliği için [MEMORY_NAME: isim] / [MEMORY_NICKNAME: lakap]; beğeni ekleme/kaldırma için [MEMORY_LIKE: tercih], [MEMORY_DISLIKE: tercih], [MEMORY_UNLIKE: tercih], [MEMORY_UNDISLIKE: tercih] kullan.
+6. Direktifleri normal cevabının sonuna ekle. Sistem kaydedip kullanıcıya göstermeden temizler. Açık kişisel bilgi paylaşıldığında hafızayı güncelle; emin değilsen kaydetme.\n`;
 
     return out;
   }
