@@ -1,5 +1,6 @@
 import { gotScraping, getAndUnpack } from '../extractor.js';
 import * as cheerio from 'cheerio';
+import vm from 'node:vm';
 
 function rot13(str) {
   return (str + '').replace(/[a-z]/gi, (c) =>
@@ -241,6 +242,9 @@ export async function extractFullHDFilmIzlesene(pageUrl, selectedAudio = null) {
 
     throw new Error('FullHDFilmIzlesene video kaynağı bulunamadı.');
   } catch (err) {
+    if (err.message.includes('FullHDFilmIzlesene')) {
+      throw err;
+    }
     throw new Error(`FullHDFilmIzlesene extraction error: ${err.message}`);
   }
 }

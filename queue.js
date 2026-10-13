@@ -474,7 +474,10 @@ export async function processQueue() {
             if (error.message === 'İndirme iptal edildi.') {
               text = `⚠️ *İndirme İptal Edildi:* ${task.title}`;
             } else if (isNoSource) {
-              text = `⏩ *Atlandı:* ${task.title}\n└ Bu bölüm henüz platforma yüklenmemiş, sonraki bölüme geçiliyor...`;
+              const isBatchEpisode = !!(task.episodeBatch || task.seriesPack);
+              text = isBatchEpisode
+                ? `⏩ *Atlandı:* ${task.title}\n└ Bu bölüm henüz platforma yüklenmemiş, sonraki bölüme geçiliyor...`
+                : `❌ *Hata (${task.title}):* Çözümlenebilir video kaynağı bulunamadı.`;
             } else {
               text = `❌ *Hata (${task.title}):* ${error.message}`;
             }
