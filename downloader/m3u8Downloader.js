@@ -13,7 +13,8 @@ const logger = getModuleLogger('downloader-m3u8');
 
 let ffmpegPath = ffmpegStaticPath;
 try {
-  const sysFfmpeg = execSync('which ffmpeg 2>/dev/null || true').toString().trim();
+  const checkCmd = process.platform === 'win32' ? 'where ffmpeg' : 'which ffmpeg 2>/dev/null';
+  const sysFfmpeg = execSync(checkCmd, { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim().split(/[\r\n]+/)[0];
   if (sysFfmpeg && fs.existsSync(sysFfmpeg)) {
     ffmpegPath = sysFfmpeg;
   }

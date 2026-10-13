@@ -395,7 +395,7 @@ export async function extractVideoUrl(pageUrl, fromJid = null, selectedAudio = n
     return extractDizipal(targetUrl);
   }
   if (targetUrl.includes('fullhdfilmizlesene')) {
-    return extractFullHDFilmIzlesene(targetUrl);
+    return extractFullHDFilmIzlesene(targetUrl, fromJid, selectedAudio);
   }
   if (targetUrl.includes('filmmodu')) {
     return extractFilmModu(targetUrl);
