@@ -1,6 +1,6 @@
 import { downloadQueue, activeTask, activeTasksList, clearQueue, queueState, getEstimatedWaitTime } from '../../queue.js';
-import { readConfig } from '../../config.js';
-import { getProgressBar } from '../../utils/progressBar.js'; // Added progress bar helper
+import { readConfig, getProgressBar } from '../../config.js';
+
 
 export default {
   name: 'kuyruk',

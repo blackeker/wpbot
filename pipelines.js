@@ -16,7 +16,7 @@ class WebTorrent {
 import { getCachedResult, saveToCache, deleteFromCache } from './cache.js';
 import { getModuleLogger } from './utils/logger.js';
 import { ffmpegPath, replaceTurkishChars, getMediaStreamInfo, convertVttToSrt, withRetry } from './pipelines/helpers.js';
-import { updateUserProgress } from './queue.js'; // Added import
+
 
 export { convertVttToSrt };
 // ... (rest of the file)
