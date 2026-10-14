@@ -33,7 +33,7 @@ function matchCron(cronExpr, date = new Date()) {
 
 export function startCronScheduler() {
   logger.info('[CRON] Zamanlanmış otomasyon motoru başlatıldı.');
-  setInterval(() => {
+  setInterval(async () => {
     try {
       const config = readConfig();
       const schedules = config.cronSchedules || [];
