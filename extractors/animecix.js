@@ -452,41 +452,13 @@ export async function getAnimecixSeasonEpisodes(seasonUrl) {
       const candidates = rawEps.filter(ep => {
         if (ep.release_date) {
           const relDate = new Date(ep.release_date);
-          if (relDate > new Date()) return false;
+          if (Number.isFinite(relDate.getTime()) && relDate > new Date()) return false;
         }
         return true;
       });
+      totalSkipped += rawEps.length - candidates.length;
 
-      // Filter episodes that have video sources (in chunks of 15 with retry)
-      const episodesWithSources = [];
-      const CHUNK_SIZE = 15;
-      for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
-        const chunk = candidates.slice(i, i + CHUNK_SIZE);
-        const results = await Promise.allSettled(chunk.map(async ep => {
-          let sources = [];
-          for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-              const r = await requestAnimecixApi(`/secure/episode-videos?titleId=${titleId}&season=${sNum}&episode=${ep.episode_number}`, host);
-              sources = r?.data || r || [];
-              if (Array.isArray(sources) && sources.length > 0) break;
-            } catch (e) {
-              if (attempt === 0) await sleep(250);
-            }
-          }
-          return { ep, sources };
-        }));
-
-        for (const result of results) {
-          if (result.status === 'fulfilled' && result.value.sources && result.value.sources.length > 0) {
-            episodesWithSources.push(result.value.ep);
-          } else {
-            totalSkipped++;
-            console.log(`[Season Filter] Sezon ${sNum} Bölüm ${result.value?.ep?.episode_number ?? '?'} atlandı - video kaynağı yok`);
-          }
-        }
-      }
-
-      const episodes = episodesWithSources.map(ep => {
+      const episodes = candidates.map(ep => {
         const epNum = ep.episode_number;
         return {
           season: String(sNum),
@@ -517,6 +489,13 @@ export async function getAnimecixSeasonEpisodes(seasonUrl) {
       skippedCount: totalSkipped
     };
   } catch (err) {
-    throw new Error(`Bölümler alınamadı: ${err.message}`);
+    const detail = typeof err?.message === 'string' && err.message.trim()
+      ? err.message.trim()
+      : err?.response?.status
+        ? `Animecix API HTTP ${err.response.status} yanıtı verdi.`
+        : err?.code
+          ? `Animecix API isteği başarısız oldu (${err.code}).`
+          : 'Animecix API isteği başarısız oldu; hata ayrıntısı alınamadı.';
+    throw new Error(`Bölümler alınamadı: ${detail}`, { cause: err });
   }
 }

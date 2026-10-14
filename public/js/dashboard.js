@@ -1975,7 +1975,7 @@
     const line = document.createElement('div');
     line.className = 'log-line';
 
-    const timeStr = log.time ? new Date(log.time).toLocaleTimeString('tr-TR', { hour12: false }) : new Date().toLocaleTimeString('tr-TR', { hour12: false });
+    const timeStr = log.time || new Date().toLocaleTimeString('tr-TR', { hour12: false });
     const moduleStr = log.module ? `[${log.module.toUpperCase()}]` : '[BOT]';
     const msgStr = typeof log.msg === 'object' ? JSON.stringify(log.msg) : (log.msg || log.text || String(log));
 
