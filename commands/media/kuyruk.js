@@ -1,5 +1,6 @@
 import { downloadQueue, activeTask, activeTasksList, clearQueue, queueState, getEstimatedWaitTime } from '../../queue.js';
 import { readConfig } from '../../config.js';
+import { getProgressBar } from '../../utils/progressBar.js'; // Added progress bar helper
 
 export default {
   name: 'kuyruk',
@@ -15,18 +16,27 @@ export default {
     const config = readConfig();
     const limit = Math.max(1, Number(config.concurrencyLimit) || 1);
 
-    let responseText = `📋 *İNDİRME KUYRUĞU VE CANLI DURUM* (Paralel Limit: ${limit})\n`;
+    let responseText = `📋 *SİSTEM DURUMU VE İNDİRME KUYRUĞU*\n`;
+    responseText += `⚙️ *Paralel Limit:* ${limit} Görev\n`;
     if (queueState.isPaused) responseText += `\n⏸️ *Kuyruk duraklatıldı.* Devam ettirmek için *devam* yaz.\n`;
     responseText += '\n';
 
     if (activeTasksList.length > 0) {
-      responseText += `🚀 *Şu An İndirilenler (${activeTasksList.length}/${limit}):*\n`;
+      responseText += `🚀 *Şu An Aktif Olanlar (${activeTasksList.length}/${limit}):*\n`;
       activeTasksList.forEach((task, idx) => {
         const elapsedMs = task.startTime ? Date.now() - task.startTime : 0;
         const elapsedStr = elapsedMs > 60000 ? `${Math.floor(elapsedMs/60000)}dk ${Math.floor((elapsedMs%60000)/1000)}sn` : `${Math.floor(elapsedMs/1000)}sn`;
-        responseText += `${idx + 1}. 🎬 *${task.title}*\n   ├ 📊 *Durum:* ${task.status || 'İşleniyor...'}\n`;
-        if (task.speed) responseText += `   ├ ⚡ *Hız:* ~${task.speed} MB/s\n`;
-        responseText += `   └ ⏱️ *Süre:* ${elapsedStr} geçti\n`;
+
+        // Extract percent from status (e.g., "45% [████░░] - ...")
+        const percentMatch = task.status?.match(/(\d+)%/);
+        const percent = percentMatch ? parseInt(percentMatch[1], 10) : 0;
+        const bar = getProgressBar(percent);
+
+        responseText += `${idx + 1}. 🎬 *${task.title}*\n`;
+        responseText += `   └ 📊 *İlerleme:* %${percent} \`${bar}\`\n`;
+        responseText += `   └ ⚙️ *Durum:* ${task.status || 'İşleniyor...'}\n`;
+        if (task.speed) responseText += `   └ ⚡ *Hız:* ~${task.speed} MB/s\n`;
+        responseText += `   └ ⏱️ *Geçen Süre:* ${elapsedStr}\n`;
       });
       responseText += '\n';
     } else {
@@ -34,15 +44,20 @@ export default {
     }
 
     if (downloadQueue.length > 0) {
-      responseText += `⏳ *Bekleyen Görevler (${downloadQueue.length} adet):*\n`;
+      responseText += `⏳ *Sıradakiler (${downloadQueue.length} adet):*\n`;
       downloadQueue.forEach((t, i) => {
         const waitEst = getEstimatedWaitTime(i);
         const priorityTag = t.priority ? '🔴 [ÖNCELİKLİ] ' : '';
-        responseText += `${i + 1}. ${priorityTag}*${t.title}*\n   └ Tahmini Bekleme: ${waitEst}\n`;
+        responseText += `${i + 1}. ${priorityTag}*${t.title}*\n   └ 🕒 Tahmini Başlangıç: ${waitEst}\n`;
       });
     } else {
       responseText += `✨ *Kuyrukta bekleyen görev yok.*`;
     }
+
+    responseText += `\n\n💡 *Hızlı Komutlar:*\n`;
+    responseText += `• \`!onceliklendir <id>\` ➔ Görevi başa al\n`;
+    responseText += `• \`!iptal <id>\` ➔ Görevi sil\n`;
+    responseText += `• \`!kuyruk temizle\` ➔ Her şeyi sıfırla`;
 
     await sock.sendMessage(from, { text: responseText });
   }

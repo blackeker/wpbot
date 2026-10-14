@@ -4,7 +4,7 @@ import path from 'path';
 import { exec, execSync } from 'child_process';
 import { extractVideoUrl, gotScraping } from './extractor.js';
 import { downloadM3u8 } from './downloader.js';
-import { notifyQueueUpdate } from './queue.js';
+import { notifyQueueUpdate, updateUserProgress } from './queue.js';
 import { botSocketRef, downloadsDir, getProgressBar, formatBytes, addHistory, addErrorLog, botState, readConfig, getProxyUrl } from './config.js';
 // WebTorrent native addon stub (node-datachannel native binary is unsupported in cloud container)
 class WebTorrent {
@@ -12,11 +12,14 @@ class WebTorrent {
     throw new Error('Torrent indirmeleri bu bulut sunucu ortamında desteklenmemektedir.');
   }
 }
+// ... (imports remain the same)
 import { getCachedResult, saveToCache, deleteFromCache } from './cache.js';
 import { getModuleLogger } from './utils/logger.js';
 import { ffmpegPath, replaceTurkishChars, getMediaStreamInfo, convertVttToSrt, withRetry } from './pipelines/helpers.js';
+import { updateUserProgress } from './queue.js'; // Added import
 
 export { convertVttToSrt };
+// ... (rest of the file)
 
 const logger = getModuleLogger('pipelines');
 

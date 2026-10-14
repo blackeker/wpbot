@@ -17,7 +17,7 @@ export function getAnimecixHeaders(host = "https://animecix.tv") {
 }
 
 export async function requestAnimecixApi(pathAndQuery, preferredHost = "https://animecix.tv") {
-  const candidateHosts = [preferredHost, "https://ecchicix.com", "https://animecix.tv"].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
+  const candidateHosts = [preferredHost, "https://ecchicix.com", "https://animecix.tv", "https://animecix.me", "https://animecix.net"].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
   let lastErr = null;
   for (const host of candidateHosts) {
     try {
@@ -28,13 +28,17 @@ export async function requestAnimecixApi(pathAndQuery, preferredHost = "https://
         timeout: 12000
       });
       if (res.data && typeof res.data === 'object') {
+        // If it's an array and it's empty, we don't treat it as a success
+        if (Array.isArray(res.data) && res.data.length === 0) {
+          continue;
+        }
         return res.data;
       }
     } catch (err) {
       lastErr = err;
     }
   }
-  throw lastErr || new Error("Animecix API sunucularına erişilemedi.");
+  throw lastErr || new Error("Animecix API sunucularına erişilemedi veya kaynak bulunamadı.");
 }
 
 export
@@ -139,8 +143,13 @@ export async function extractAnimecix(pageUrl) {
     }
 
     // ── Video kaynaklarını çek ──
-    const epRes = await requestAnimecixApi(`/secure/episode-videos?titleId=${titleId}&season=${season}&episode=${episode}`, host);
-    const sources = epRes?.data || epRes;
+    let sources = null;
+    try {
+      sources = await requestAnimecixApi(`/secure/episode-videos?titleId=${titleId}&season=${season}&episode=${episode}`, host);
+    } catch (e) {
+      console.error(`[Animecix] Ana API hatası: ${e.message}`);
+    }
+
     if (Array.isArray(sources) && sources.length > 0) {
       let providerUrl = null;
       let sourceName = '';
@@ -207,7 +216,7 @@ export async function extractAnimecix(pageUrl) {
         };
       }
     }
-    throw new Error("Çözümlenebilir video kaynağı bulunamadı.");
+    throw new Error("Çözümlenebilir video kaynağı bulunamadı. (API boş döndü veya linkler geçersiz)");
   } catch (err) {
     throw new Error(`Animecix çözme hatası: ${err.message}`);
   }
@@ -226,8 +235,13 @@ export async function resolveTauVideo(embedUrl) {
       timeout: 15000
     });
     if (response.data && response.data.urls && response.data.urls.length > 0) {
-      const best = response.data.urls.sort((a, b) => (parseInt(b.label) || 0) - (parseInt(a.label) || 0))[0];
-      return best.url;
+      // Sort urls by label (quality) in descending order to get the highest quality
+      const sortedUrls = response.data.urls.sort((a, b) => {
+        const labelA = parseInt(a.label) || 0;
+        const labelB = parseInt(b.label) || 0;
+        return labelB - labelA;
+      });
+      return sortedUrls[0].url;
     }
   } catch (e) {}
   return null;

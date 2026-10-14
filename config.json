@@ -10,7 +10,7 @@
   "aiBotName": "Moi",
   "geminiApiKey": "AQ.Ab8RN6IrQSzRs5oPoxW4cTm9jXnSRaT07Uy1gtkPR2oqnGx10g",
   "geminiModel": "gemini-3.8-flash",
-  "groqApiKey": "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",
+  "groqApiKey": "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",
   "groqModel": "qwen/qwen3.8-27b",
   "openrouterApiKey": "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",
   "openrouterModel": "google/gemma-4-31b-it:free",
@@ -33,5 +33,19 @@
     "typingSimulation": true,
     "minTypingDelayMs": 300,
     "maxTypingDelayMs": 1500
-  }
+  },
+  "cronSchedules": [
+    {
+      "name": "Cleanup Old Downloads",
+      "cron": "0 3 * * *",
+      "action": "cleanup",
+      "active": true
+    },
+    {
+      "name": "Refresh Uni House Menu",
+      "cron": "*/20 * * * *",
+      "action": "checkUniHouseMenu",
+      "active": true
+    }
+  ]
 }

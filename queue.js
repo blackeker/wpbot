@@ -25,7 +25,7 @@ db.exec(`
     seriesPack TEXT,
     audioTrack TEXT
   );
-  
+
   CREATE TABLE IF NOT EXISTS active_tasks (
     id TEXT PRIMARY KEY,
     url TEXT,
@@ -39,6 +39,16 @@ db.exec(`
     seriesPack TEXT,
     audioTrack TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS user_progress (
+    userId TEXT,
+    seriesId TEXT,
+    lastEpisode INTEGER,
+    lastSeason INTEGER,
+    updatedAt TEXT,
+    status TEXT,
+    PRIMARY KEY (userId, seriesId)
+  );
 `);
 
 try { db.exec("ALTER TABLE tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
@@ -50,6 +60,33 @@ try { db.exec("ALTER TABLE active_tasks ADD COLUMN audioTrack TEXT"); } catch (e
 
 export let downloadQueue = [];
 export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...], timer } }
+
+export function updateUserProgress(userId, seriesId, episode, season) {
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO user_progress (userId, seriesId, lastEpisode, lastSeason, updatedAt, status)
+      VALUES (?, ?, ?, ?, ?, 'watching')
+      ON CONFLICT(userId, seriesId) DO UPDATE SET
+        lastEpisode = excluded.lastEpisode,
+        lastSeason = excluded.lastSeason,
+        updatedAt = excluded.updatedAt,
+        status = 'watching'
+    `);
+    stmt.run(userId, seriesId, episode, season, new Date().toISOString());
+    logger.info(`[PROGRESS] Updated ${userId} progress for ${seriesId}: S${season} E${episode}`);
+  } catch (err) {
+    logger.error({ err: err.message }, `[PROGRESS] Failed to update progress for ${userId}`);
+  }
+}
+
+export function getUserProgress(userId, seriesId) {
+  try {
+    return db.prepare('SELECT * FROM user_progress WHERE userId = ? AND seriesId = ?').get(userId, seriesId);
+  } catch (err) {
+    logger.error({ err: err.message }, `[PROGRESS] Failed to get progress for ${userId}`);
+    return null;
+  }
+}
 
 export function setPendingSelection(from, selectionData) {
   if (pendingSelections[from]?.timer) {
