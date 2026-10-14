@@ -2,119 +2,116 @@ import { gotScraping, getAndUnpack } from '../extractor.js';
 import * as cheerio from 'cheerio';
 import vm from 'node:vm';
 
-function decodeFullHDToken(token) {
-  if (!token) return '';
-  const rot13 = String(token).replace(/[a-z]/gi, (c) =>
+function rot13(str) {
+  return (str + '').replace(/[a-z]/gi, (c) =>
     String.fromCharCode(c.charCodeAt(0) + (c.toLowerCase() < 'n' ? 13 : -13))
   );
+}
+
+function decodeScxItem(enc) {
   try {
-    return Buffer.from(rot13, 'base64').toString('utf-8');
+    const r = rot13(enc);
+    return Buffer.from(r, 'base64').toString('utf8');
   } catch (e) {
-    return '';
+    return null;
   }
 }
 
-function decodeRapidvidP8(p8) {
-  const rev = Buffer.from(String(p8 || '').split('').reverse().join(''), 'base64').toString('binary');
+function decodeP8(t) {
+  let e = Buffer.from(String(t || '').split('').reverse().join(''), 'base64').toString('binary');
   let n = '';
-  for (let i = 0; i < rev.length; i++) {
-    const a = 'K9L'[i % 3];
-    const code = rev.charCodeAt(i) - (a.charCodeAt(0) % 5 + 1);
-    n += String.fromCharCode(code);
+  for (let i = 0; i < e.length; i++) {
+    let a = 'K9L'[i % 3];
+    let diff = e.charCodeAt(i) - (a.charCodeAt(0) % 5 + 1);
+    n += String.fromCharCode(diff);
   }
-  return JSON.parse(Buffer.from(n, 'base64').toString('utf-8'));
+  return Buffer.from(n, 'base64').toString('utf8');
 }
 
 async function resolvePlayerUrl(playerUrl, pageUrl) {
-  if (!playerUrl) return null;
   if (playerUrl.startsWith('//')) playerUrl = 'https:' + playerUrl;
 
-  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-  // Direct stream
-  if (playerUrl.includes('.m3u8')) {
-    return {
-      url: playerUrl,
-      isHls: true,
-      headers: { 'Referer': pageUrl }
-    };
-  }
-
-  // Rapidvid / Vidcloud / Rapid
-  if (playerUrl.includes('rapidvid') || playerUrl.includes('rapid') || playerUrl.includes('cdnimg')) {
+  // 1. Rapidvid Player (window._p8 obfuscation)
+  if (playerUrl.includes('rapidvid')) {
     try {
-      const res = await gotScraping({
+      const pRes = await gotScraping({
         url: playerUrl,
         headers: {
-          'Referer': pageUrl,
-          'User-Agent': userAgent
-        }
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Referer': pageUrl
+        },
+        timeout: { request: 15000 }
       });
-      const p8Match = res.body.match(/window\._p8\s*=\s*['"]([^'"]+)['"]/);
+
+      const p8Match = pRes.body.match(/window\._p8\s*=\s*['"]([^'"]+)['"]/);
       if (p8Match) {
-        const p8Data = decodeRapidvidP8(p8Match[1]);
-        const streamUrl = p8Data.cm || p8Data.tm;
+        const decoded = decodeP8(p8Match[1]);
+        const data = JSON.parse(decoded);
+        const streamUrl = data.cm || data.tm;
         if (streamUrl) {
+          const subtitles = (data.ct || []).map(c => ({
+            url: c.file,
+            language: c.label && c.label.toLowerCase().includes('türk') ? 'tur' : 'eng',
+            label: c.label ? c.label.trim() : 'Altyazı'
+          }));
           return {
-            url: streamUrl,
-            isHls: true,
-            subtitles: p8Data.ct || null,
-            headers: {
-              'Referer': 'https://rapidvid.org/',
-              'Origin': 'https://rapidvid.org',
-              'User-Agent': userAgent
-            }
+            streamUrl,
+            referer: playerUrl,
+            subtitles,
+            isHls: true
           };
         }
       }
 
-      const m3u8Match = res.body.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/);
+      const m3u8Match = pRes.body.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/);
       if (m3u8Match) {
         return {
-          url: m3u8Match[0],
-          isHls: true,
-          headers: { 'Referer': playerUrl }
+          streamUrl: m3u8Match[0],
+          referer: playerUrl,
+          isHls: true
         };
       }
     } catch (e) {
-      console.error('[FullHDFilmIzlesene] Rapidvid resolution error:', e.message);
+      console.error(`[FullHDFilmIzlesene] Rapidvid resolution error: ${e.message}`);
     }
   }
 
-  // Vidmoly
+  // 2. Vidmoly
   if (playerUrl.includes('vidmoly')) {
     try {
-      const res = await gotScraping({
+      const pRes = await gotScraping({
         url: playerUrl,
         headers: {
-          'Referer': pageUrl,
-          'User-Agent': userAgent
-        }
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Referer': pageUrl
+        },
+        timeout: { request: 15000 }
       });
-      const m3u8Match = res.body.match(/file\s*:\s*["']([^"']+\.m3u8[^"']*)["']/) || res.body.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/);
+      const m3u8Match = pRes.body.match(/file\s*:\s*"([^"]+\.m3u8[^"]*)"/) || pRes.body.match(/"file"\s*:\s*"([^"]+\.m3u8[^"]*)"/);
       if (m3u8Match) {
         return {
-          url: m3u8Match[1] || m3u8Match[0],
-          isHls: true,
-          headers: { 'Referer': 'https://vidmoly.me/' }
+          streamUrl: m3u8Match[1],
+          referer: playerUrl,
+          isHls: true
         };
       }
     } catch (e) {
-      console.error('[FullHDFilmIzlesene] Vidmoly resolution error:', e.message);
+      console.error(`[FullHDFilmIzlesene] Vidmoly resolution error: ${e.message}`);
     }
   }
 
-  // Filemoon
+  // 3. Filemoon
   if (playerUrl.includes('filemoon')) {
     try {
-      const res = await gotScraping({
+      const pRes = await gotScraping({
         url: playerUrl,
         headers: {
-          'Referer': pageUrl,
-          'User-Agent': userAgent
-        }
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Referer': pageUrl
+        },
+        timeout: { request: 15000 }
       });
-      const $ = cheerio.load(res.body);
+      const $ = cheerio.load(pRes.body);
       let packedScript = '';
       $('script').each((_, el) => {
         const text = $(el).html() || '';
@@ -122,37 +119,46 @@ async function resolvePlayerUrl(playerUrl, pageUrl) {
           packedScript = text;
         }
       });
-      if (packedScript && typeof getAndUnpack === 'function') {
+      if (packedScript) {
         const unpacked = getAndUnpack(packedScript);
-        const m3u8Match = unpacked.match(/file\s*:\s*["']([^"']+\.m3u8[^"']*)["']/) || unpacked.match(/file\s*:\s*'([^']+\.m3u8[^']*)'/);
+        const m3u8Match = unpacked.match(/file\s*:\s*"([^"]+\.m3u8[^"]*)"/) || unpacked.match(/file\s*:\s*'([^']+\.m3u8[^']*)'/) || unpacked.match(/src\s*:\s*"([^"]+\.m3u8[^"]*)"/);
         if (m3u8Match) {
           return {
-            url: m3u8Match[1],
-            isHls: true,
-            headers: { 'Referer': 'https://filemoon.sx/' }
+            streamUrl: m3u8Match[1],
+            referer: playerUrl,
+            isHls: true
           };
         }
       }
     } catch (e) {
-      console.error('[FullHDFilmIzlesene] Filemoon resolution error:', e.message);
+      console.error(`[FullHDFilmIzlesene] Filemoon resolution error: ${e.message}`);
     }
   }
 
-  // Generic fallback
+  // 4. Generic fallback (HLS or direct video)
   try {
-    const res = await gotScraping({
+    const pRes = await gotScraping({
       url: playerUrl,
       headers: {
-        'Referer': pageUrl,
-        'User-Agent': userAgent
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': pageUrl
+      },
+      timeout: { request: 15000 }
     });
-    const m3u8Match = res.body.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/);
+    const m3u8Match = pRes.body.match(/https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/);
     if (m3u8Match) {
       return {
-        url: m3u8Match[0],
-        isHls: true,
-        headers: { 'Referer': playerUrl }
+        streamUrl: m3u8Match[0],
+        referer: playerUrl,
+        isHls: true
+      };
+    }
+    const mp4Match = pRes.body.match(/https?:\/\/[^"'\s]+\.mp4[^"'\s]*/);
+    if (mp4Match) {
+      return {
+        streamUrl: mp4Match[0],
+        referer: playerUrl,
+        isHls: false
       };
     }
   } catch (e) {}
@@ -160,106 +166,76 @@ async function resolvePlayerUrl(playerUrl, pageUrl) {
   return null;
 }
 
-export async function extractFullHDFilmIzlesene(pageUrl, recipientJid = null, selectedAudio = null) {
+export async function extractFullHDFilmIzlesene(pageUrl, selectedAudio = null) {
   try {
     const response = await gotScraping({
       url: pageUrl,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': 'https://www.fullhdfilmizlesene.now/'
+      },
+      timeout: { request: 15000 }
     });
 
     const $ = cheerio.load(response.body);
-    const title = $('h1').text().trim() || $('title').text().replace(/Film izle.*/i, '').trim() || 'FullHDFilmIzlesene_Movie';
+    let title = $('meta[property="og:title"]').attr('content') ||
+      $('h1').first().text().trim() ||
+      $('title').text().replace(/izle.*$/i, '').trim() ||
+      'FullHDFilmIzlesene_Movie';
 
-    const candidateUrls = [];
+    title = title.replace(/\s+/g, ' ').trim();
 
-    // 1. Check scx in scripts
-    const scxMatch = response.body.match(/var\s+scx\s*=\s*(\{[\s\S]*?\});/);
+    const candidates = [];
+
+    // Parse scx JS variable
+    const scxMatch = response.body.match(/var\s+scx\s*=\s*({[\s\S]*?});/);
     if (scxMatch) {
       try {
-        let scxObj = null;
-        try {
-          scxObj = JSON.parse(scxMatch[1]);
-        } catch (e) {
-          const script = new vm.Script('(' + scxMatch[1] + ')');
-          scxObj = script.runInNewContext({});
-        }
-
-        if (scxObj && typeof scxObj === 'object') {
-          for (const [sourceKey, sourceVal] of Object.entries(scxObj)) {
-            if (!sourceVal || !sourceVal.sx) continue;
-            const isTurbo = sourceVal.tt && Buffer.from(sourceVal.tt, 'base64').toString().toLowerCase().includes('turbo');
-
-            const tokens = [];
-
-            // Audio track preference
-            if (sourceVal.sx.t && typeof sourceVal.sx.t === 'object') {
-              if (selectedAudio === 'tr' && sourceVal.sx.t.tr) {
-                tokens.push(sourceVal.sx.t.tr);
-              } else if ((selectedAudio === 'en' || selectedAudio === 'altyazi') && sourceVal.sx.t.en) {
-                tokens.push(sourceVal.sx.t.en);
-              } else {
-                tokens.push(...Object.values(sourceVal.sx.t));
+        const scx = JSON.parse(scxMatch[1]);
+        for (const [key, val] of Object.entries(scx)) {
+          let sourceName = key;
+          if (val && val.tt) {
+            try { sourceName = Buffer.from(val.tt, 'base64').toString('utf8'); } catch (e) {}
+          }
+          const links = [...(val.sx?.t || []), ...(val.sx?.p || [])];
+          for (const enc of links) {
+            let u = decodeScxItem(enc);
+            if (u) {
+              if (sourceName.toLowerCase().includes('turbo') && (u.includes('movie') || u.includes('watch'))) {
+                const a = u.split(/(movie|watch)/).pop().split('/')[1];
+                if (a) u = 'https://turbo.imgz.me/play/' + a;
               }
-            }
-
-            if (sourceVal.sx.p && typeof sourceVal.sx.p === 'object') {
-              tokens.push(...Object.values(sourceVal.sx.p));
-            }
-
-            for (const token of tokens) {
-              if (!token) continue;
-              let decoded = decodeFullHDToken(token);
-              if (!decoded) continue;
-
-              if (decoded.includes('<iframe')) {
-                const srcMatch = decoded.match(/src\s*=\s*["']([^"']+)["']/i);
-                if (srcMatch) decoded = srcMatch[1];
-              }
-
-              if (isTurbo && (decoded.includes('/movie/') || decoded.includes('/watch/'))) {
-                const id = decoded.split(/(movie|watch)/).pop().split('/')[1];
-                decoded = `https://turbo.imgz.me/play/${id}`;
-              }
-
-              if (decoded.startsWith('//')) decoded = 'https:' + decoded;
-              if (decoded.startsWith('/')) decoded = new URL(pageUrl).origin + decoded;
-
-              if (!candidateUrls.includes(decoded)) {
-                candidateUrls.push(decoded);
-              }
+              candidates.push({ name: sourceName, url: u });
             }
           }
         }
       } catch (e) {
-        console.error('[FullHDFilmIzlesene] Error parsing scx:', e.message);
+        console.error('[FullHDFilmIzlesene] scx parse error:', e.message);
       }
     }
 
-    // 2. Check iframes in HTML as fallback
+    // Fallback: check iframes in DOM
     $('iframe').each((_, el) => {
-      let src = $(el).attr('src') || $(el).attr('data-src');
-      if (src) {
-        if (src.startsWith('//')) src = 'https:' + src;
-        if (src.startsWith('/')) src = new URL(pageUrl).origin + src;
-        if (!candidateUrls.includes(src)) candidateUrls.push(src);
+      const src = $(el).attr('src') || $(el).attr('data-src');
+      if (src && !src.includes('google') && !src.includes('facebook') && !src.includes('yandex')) {
+        candidates.push({ name: 'Iframe', url: src });
       }
     });
 
-    console.log(`[FullHDFilmIzlesene] Candidate player URLs count: ${candidateUrls.length}`);
-
-    for (const playerUrl of candidateUrls) {
-      const resolved = await resolvePlayerUrl(playerUrl, pageUrl);
-      if (resolved && resolved.url) {
+    for (const cand of candidates) {
+      const resolved = await resolvePlayerUrl(cand.url, pageUrl);
+      if (resolved && resolved.streamUrl) {
         return {
           title,
-          source: 'fullhdfilmizlesene',
-          url: resolved.url,
-          directUrl: resolved.url,
-          isHls: resolved.isHls !== undefined ? resolved.isHls : resolved.url.includes('.m3u8'),
-          headers: resolved.headers || { 'Referer': playerUrl },
-          referer: resolved.headers?.Referer || playerUrl
+          source: `fullhdfilmizlesene (${cand.name})`,
+          url: resolved.streamUrl,
+          directUrl: resolved.streamUrl,
+          referer: resolved.referer || pageUrl,
+          headers: {
+            'Referer': resolved.referer || pageUrl
+          },
+          subtitles: resolved.subtitles || [],
+          isHls: resolved.isHls ?? resolved.streamUrl.includes('.m3u8')
         };
       }
     }

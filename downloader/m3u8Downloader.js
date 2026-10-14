@@ -332,6 +332,8 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
 
     let targetPlaylistUrl = m3u8Url;
     let audioPlaylistUrl = audioPlaylistUrlOverride || null;
+    let dualTracks = null;
+    let muxMode = 'dual';
 
     if (content.includes('#EXT-X-STREAM-INF')) {
       const lines = content.split('\n');
@@ -376,8 +378,14 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
         }
       }
 
-      let muxMode = 'dual';
-      if (selectedAudioTrack === 'tr') {
+      if (selectedAudioTrack === 'dual' && audioTracks.length >= 2) {
+        const trTrack = audioTracks.find(t => t.lang.startsWith('tr') || t.name.toLowerCase().includes('türk') || t.name.toLowerCase().includes('turk')) || audioTracks[0];
+        const secondTrack = audioTracks.find(t => t !== trTrack) || audioTracks[1];
+        if (trTrack && secondTrack) {
+          dualTracks = [trTrack, secondTrack];
+          muxMode = 'dual';
+        }
+      } else if (selectedAudioTrack === 'tr') {
         const trTrack = audioTracks.find(t => t.lang.startsWith('tr') || t.name.toLowerCase().includes('türk') || t.name.toLowerCase().includes('turk'));
         if (trTrack) {
           audioPlaylistUrl = trTrack.uri;
@@ -389,6 +397,13 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
           audioPlaylistUrl = enTrack.uri;
           muxMode = 'replace_audio';
         }
+      } else if (!audioPlaylistUrl && audioTracks.length > 0) {
+        // Varsayılan: Ses tercihi belirtilmemişse Türkçe (varsa) veya ilk ses parçasını dahil et
+        const defTrack = audioTracks.find(t => t.lang.startsWith('tr') || t.name.toLowerCase().includes('türk') || t.name.toLowerCase().includes('turk')) || audioTracks[0];
+        if (defTrack) {
+          audioPlaylistUrl = defTrack.uri;
+          muxMode = 'replace_audio';
+        }
       }
 
       if (bestStreamUrl) {
@@ -396,7 +411,47 @@ export async function downloadM3u8(m3u8Url, outputPath, arg3, arg4, arg5, arg6, 
       }
     }
 
-    if (audioPlaylistUrl) {
+    if (dualTracks && dualTracks.length === 2) {
+      logger.info(`Performing audio/video dual stream download (2 audio tracks)...`);
+      const tempVideoFile = outputPath.replace(/\.[a-zA-Z0-9]+$/, '_video.ts');
+      const tempAudioFile1 = outputPath.replace(/\.[a-zA-Z0-9]+$/, '_audio1.ts');
+      const tempAudioFile2 = outputPath.replace(/\.[a-zA-Z0-9]+$/, '_audio2.ts');
+
+      await downloadPlaylistToSingleFile(targetPlaylistUrl, tempVideoFile, 'video', signal, headers, (completed, total) => {
+        if (progressCallback) {
+          progressCallback(Math.round((completed / total) * 40), 100);
+        }
+      }, cookieJar);
+
+      await downloadPlaylistToSingleFile(dualTracks[0].uri, tempAudioFile1, 'audio', signal, headers, (completed, total) => {
+        if (progressCallback) {
+          progressCallback(40 + Math.round((completed / total) * 30), 100);
+        }
+      }, cookieJar);
+
+      await downloadPlaylistToSingleFile(dualTracks[1].uri, tempAudioFile2, 'audio', signal, headers, (completed, total) => {
+        if (progressCallback) {
+          progressCallback(70 + Math.round((completed / total) * 30), 100);
+        }
+      }, cookieJar);
+
+      logger.info(`Merging dual audio and video via FFmpeg...`);
+      await new Promise((resolve) => {
+        exec(`"${ffmpegPath}" -y -i "${tempVideoFile}" -i "${tempAudioFile1}" -i "${tempAudioFile2}" -map 0:v -map 1:a -map 2:a -c:v copy -c:a copy -bsf:a aac_adtstoasc -movflags +faststart -brand mp42 "${outputPath}"`, (err, stdout, stderr) => {
+          try {
+            if (fs.existsSync(tempVideoFile)) fs.unlinkSync(tempVideoFile);
+            if (fs.existsSync(tempAudioFile1)) fs.unlinkSync(tempAudioFile1);
+            if (fs.existsSync(tempAudioFile2)) fs.unlinkSync(tempAudioFile2);
+          } catch (cleanupErr) {}
+          if (err) {
+            logger.error({ err: err.message }, "FFmpeg dual audio merge failed.");
+          } else {
+            logger.info("FFmpeg dual audio merge completed successfully!");
+          }
+          resolve();
+        });
+      });
+    } else if (audioPlaylistUrl) {
       logger.info(`Performing audio/video dual stream download...`);
       const tempVideoFile = outputPath.replace(/\.[a-zA-Z0-9]+$/, '_video.ts');
       const tempAudioFile = outputPath.replace(/\.[a-zA-Z0-9]+$/, '_audio.ts');

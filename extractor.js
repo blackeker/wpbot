@@ -395,7 +395,7 @@ export async function extractVideoUrl(pageUrl, fromJid = null, selectedAudio = n
     return extractDizipal(targetUrl);
   }
   if (targetUrl.includes('fullhdfilmizlesene')) {
-    return extractFullHDFilmIzlesene(targetUrl, fromJid, selectedAudio);
+    return extractFullHDFilmIzlesene(targetUrl, selectedAudio);
   }
   if (targetUrl.includes('filmmodu')) {
     return extractFilmModu(targetUrl);
@@ -953,7 +953,7 @@ export async function probeMediaAudioOptions(pageUrl) {
       } else {
         try {
           const extracted = await extractVideoUrl(pageUrl);
-          if (extracted && extracted.url && extracted.url.includes('.m3u8')) {
+          if (extracted && extracted.url && (extracted.url.includes('.m3u8') || extracted.isHls)) {
             targetM3u8 = extracted.url;
             title = extracted.title || title;
             headers = extracted.headers || (extracted.referer ? { Referer: extracted.referer } : {});
