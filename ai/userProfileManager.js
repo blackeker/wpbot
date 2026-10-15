@@ -323,6 +323,7 @@ export class UserProfileManager {
 
     let cleanText = aiReplyText;
     const actionsApplied = [];
+     console.log(`[USER PROFILE] Processing memory directives for rawJid: ${rawJid}`);
 
     // 1. [MEMORY_ADD: ...]
     const addRegex = /\[MEMORY_ADD:\s*([^\]]+)\]/gi;
@@ -422,6 +423,7 @@ export class UserProfileManager {
     // Boşlukları ve gereksiz satır başlarını düzelt
     cleanText = cleanText.replace(/^\s+/, '').replace(/\s{2,}/g, ' ').trim();
 
+     console.log('[USER PROFILE] Memory directives applied: %d actions', actionsApplied.length);
     return { cleanText, actionsApplied };
   }
 

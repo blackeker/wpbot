@@ -944,6 +944,7 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
     let promptWithContext = userPrompt;
     if (quotedText) promptWithContext = `[Alıntılanan / Yanıtlanan Mesaj: "${quotedText}"]\n\n${userPrompt}`;
 
+     console.log('[AI CHAT] Starting generateReply for ${userJid}...');
     const history = memoryManager.getHistory(from);
     const result = await aiEngine.generateReply(promptWithContext, history, { 
       ...options, 
@@ -951,7 +952,9 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
       userJid,
       extraContext: extraContextWithProfile
     });
+     console.log(`[AI CHAT] Received reply from AI provider: ${result.provider} (${result.model})`);
 
+     console.log('[AI CHAT] Processing memory directives from AI reply...');
     // 🧠 4. Yapay Zekanın Yanıtındaki Hafıza Direktiflerini Çözümle ve Veritabanına İşle
     const { cleanText: textAfterMemoryDirectives, actionsApplied } = userProfileManager.processAiMemoryDirectives(userJid, result.text);
     result.text = textAfterMemoryDirectives;
