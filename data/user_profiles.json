@@ -1,27 +1,28 @@
 {
   "905332624732": {
     "id": "905332624732",
-    "name": "",
+    "name": "Yûsuf Kaymaz",
     "nickname": "",
-    "relationship": "Arkadaş",
+    "relationship": "Kanka",
     "custom_relationship": false,
-    "intimacy_score": 0,
+    "intimacy_score": 38,
     "mood": "",
     "personality_traits": [],
     "facts": [
       "Yusuf Kaymaz botun kurucusudur ve efendisidir."
     ],
     "notes": {
-      "unvan": "Patron"
+      "unvan": "Patron",
+      "sehir": "karak"
     },
     "important_dates": {},
     "preferences": {
       "likes": [],
       "dislikes": []
     },
-    "message_count": 0,
+    "message_count": 38,
     "first_seen": 1791708170687,
-    "last_seen": 1791708170687
+    "last_seen": 1792063985827
   },
   "905559876543": {
     "id": "905559876543",

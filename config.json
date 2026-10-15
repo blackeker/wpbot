@@ -24,7 +24,24 @@
   "depotGroupJid": "120363427767241966@g.us",
   "groupJid": "",
   "hentaiGroupJid": "",
-  "groupPermissions": {},
+  "groupPermissions": {
+    "120363427767241966@g.us": {
+      "mode": "blacklist",
+      "disabledCategories": [
+        "hentai"
+      ],
+      "disabledCommands": [
+        "medya"
+      ],
+      "allowedCategories": [],
+      "allowedCommands": [],
+      "allowLinks": true,
+      "allowAdultLinks": false,
+      "allowAi": false,
+      "silent": false,
+      "updatedAt": "2026-10-14T08:59:09.906Z"
+    }
+  },
   "groqApiKey": "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",
   "openrouterApiKey": "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",
   "geminiApiKey": "AQ.Ab8RN6IrQSzRs5oPoxW4cTm9jXnSRaT07Uy1gtkPR2oqnGx10g",
