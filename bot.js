@@ -273,6 +273,11 @@ async function startBot() {
   });
 
   sock.ev.on('messages.upsert', async (m) => {
+    console.log('[DEBUG UPSERT ARRIVED]', {
+      type: m.type,
+      count: m.messages ? m.messages.length : 0,
+      keys: m.messages?.map(x => ({ id: x.key?.id, from: x.key?.remoteJid, fromMe: x.key?.fromMe, hasMessage: Boolean(x.message) }))
+    });
     for (const msg of m.messages || []) {
       if (msg?.key && msg?.message) {
         storeMessage(msg.key, msg.message);
