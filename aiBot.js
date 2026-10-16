@@ -20,13 +20,14 @@ import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeInMemoryStore
+  makeInMemoryStore,
+  downloadMediaMessage
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import path from 'path';
 import fs from 'fs';
-import { handleAiChat, memoryManager, aiEngine } from './ai/aiEngine.js';
+import { handleAiChat, memoryManager, aiEngine, isVariationRequest } from './ai/aiEngine.js';
 import { getAiConfig, readConfig } from './config.js';
 
 // Configuration
@@ -230,6 +231,130 @@ async function processIncomingMessage(sock, msg) {
   }
 
   if (!shouldReply || !userPrompt) return;
+
+  // ── 2.5. VARYASYON İSTEK KONTROLÜ ────────────────────────
+  if (isVariationRequest(userPrompt)) {
+    // Check if this is a reply to a message with media
+    let quotedMedia = null;
+    let quotedMediaType = null;
+    let quotedContextInfo = null;
+    
+    // Check if the message has contextInfo (indicating it's a reply)
+    // This can be on any message type: conversation, extendedTextMessage, imageMessage, etc.
+    if (content.contextInfo?.quotedMessage) {
+      quotedContextInfo = content.contextInfo;
+    } else if (content.extendedTextMessage?.contextInfo?.quotedMessage) {
+      quotedContextInfo = content.extendedTextMessage.contextInfo;
+    } else if (content.imageMessage?.contextInfo?.quotedMessage) {
+      quotedContextInfo = content.imageMessage.contextInfo;
+    } else if (content.videoMessage?.contextInfo?.quotedMessage) {
+      quotedContextInfo = content.videoMessage.contextInfo;
+    } else if (content.documentMessage?.contextInfo?.quotedMessage) {
+      quotedContextInfo = content.documentMessage.contextInfo;
+    }
+    
+    // If we found contextInfo with a quoted message, check if the quoted message has media
+    if (quotedContextInfo && quotedContextInfo.quotedMessage) {
+      const quotedMsg = quotedContextInfo.quotedMessage;
+      // Check for image
+      if (quotedMsg.imageMessage) {
+        quotedMedia = quotedMsg;
+        quotedMediaType = 'image';
+      }
+      // Check for video
+      else if (quotedMsg.videoMessage) {
+        quotedMedia = quotedMsg;
+        quotedMediaType = 'video';
+      }
+      // Check for document
+      else if (quotedMsg.documentMessage) {
+        quotedMedia = quotedMsg;
+        quotedMediaType = 'document';
+      }
+      // Check for viewOnce messages (disappearing media)
+      else if (quotedMsg.viewOnceMessage?.message?.imageMessage) {
+        quotedMedia = quotedMsg.viewOnceMessage.message;
+        quotedMediaType = 'image';
+      }
+      else if (quotedMsg.viewOnceMessageV2?.message?.imageMessage) {
+        quotedMedia = quotedMsg.viewOnceMessageV2.message;
+        quotedMediaType = 'image';
+      }
+      else if (quotedMsg.viewOnceMessageV2Extension?.message?.imageMessage) {
+        quotedMedia = quotedMsg.viewOnceMessageV2Extension.message;
+        quotedMediaType = 'image';
+      }
+      else if (quotedMsg.viewOnceMessage?.message?.videoMessage) {
+        quotedMedia = quotedMsg.viewOnceMessage.message;
+        quotedMediaType = 'video';
+      }
+      else if (quotedMsg.viewOnceMessageV2?.message?.videoMessage) {
+        quotedMedia = quotedMsg.viewOnceMessageV2.message;
+        quotedMediaType = 'video';
+      }
+      else if (quotedMsg.viewOnceMessageV2Extension?.message?.videoMessage) {
+        quotedMedia = quotedMsg.viewOnceMessageV2Extension.message;
+        quotedMediaType = 'video';
+      }
+    }
+    
+    // If we found quoted media, try to download it and generate variations
+    if (quotedMedia && quotedContextInfo) {
+      try {
+        // Create a proper message object for downloadMediaMessage
+        const quotedObj = {
+          key: {
+            remoteJid: from,
+            id: quotedContextInfo.stanzaId || '',
+            participant: quotedContextInfo.participant || undefined
+          },
+          message: quotedMedia
+        };
+        
+        // Download the media buffer
+        const buffer = await downloadMediaMessage(quotedObj, 'buffer', {}, { 
+          reuploadRequest: () => Promise.resolve() 
+        });
+        
+        // Generate variations (default to 4 variations)
+        const variations = await aiEngine.executeAiVariations(buffer, '', 'square', 4);
+        
+        // Send each variation as a separate message
+        for (let i = 0; i < variations.length; i++) {
+          await sock.sendMessage(from, { 
+            image: variations[i], 
+            caption: `🎨 Varyasyon ${i + 1}/${variations.length}` 
+          }, { quoted: msg });
+          
+          // Small delay between sends to avoid rate limiting
+          if (i < variations.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        // Log success to memory
+        memoryManager.addMessage(from, {
+          role: 'assistant',
+          content: `[Varyasyon Üretildi: ${variations.length} adet varyasyon oluşturuldu]`,
+          senderName: BOT_NAME
+        });
+        
+        return; // Skip normal AI processing since we handled the variation request
+      } catch (error) {
+        console.error('[VARYASYON HATASI]:', error);
+        await sock.sendMessage(from, { 
+          text: `❌ Varyasyon oluşturulurken bir hata oluştu: ${error.message}` 
+        }, { quoted: msg });
+        return;
+      }
+    }
+    
+    // If we got here, it was a variation request but no quoted media was found
+    await sock.sendMessage(from, { 
+      text: '🎨 Varyasyon oluşturmak için lütfen bir görsele yanıt olarak bu komutu gönderin. Örn: Bir görsele yanıt olarak "varyasyon yap" yazın.' 
+    }, { quoted: msg });
+    return;
+  }
 
   console.log(`[MESAJ ALINDI] Chat: ${from} | Prompt: "${userPrompt}"`);
 

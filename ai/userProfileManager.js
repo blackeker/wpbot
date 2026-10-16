@@ -450,7 +450,7 @@ export class UserProfileManager {
     // Soru cümlelerinde (örn: "hangi şehirdeyim?", "neredeyim?") veya genel kelimelerde atama yapılmaz
     const isQuestionAboutCity = lower.includes('hangi') || lower.includes('nerede') || lower.includes('?') || lower.includes('miyim') || lower.includes('muyum');
     if (!isQuestionAboutCity) {
-      const nonCities = ['şehir', 'sehir', 'nerede', 'neresi', 'burası', 'orası', 'hangi', 'ev', 'iş', 'ofis', 'yol', 'otobüs', 'araba', 'tren', 'uçak', 'tatil', 'otel', 'köy', 'oda'];
+      const nonCities = ['şehir', 'sehir', 'nerede', 'neresi', 'burası', 'orası', 'hangi', 'ev', 'iş', 'ofis', 'yol', 'otobüs', 'araba', 'tren', 'uçak', 'tatil', 'otel', 'köy', 'oda', 'hakkım', 'veri', 'şey', 'bu', 'şu', 'o', 'ben', 'sen', 'biz', 'onlar', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on', 'var', 'yok'];
         const cityMatches = [...text.matchAll(/([A-ZÇĞİÖŞÜa-zçğıöşü]{3,20})(?:['’]?(?:da|de|ta|te|a|e))\s*(?:yaşıyorum|ikamet\s+ediyorum|oturuyorum|bulunuyorum|çalışıyorum|okuyorum|taşındım|yerleştim)/gi)];
         const cityMatch = cityMatches.at(-1);
         if (cityMatch && cityMatch[1]) {

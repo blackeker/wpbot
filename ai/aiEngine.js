@@ -6,6 +6,7 @@ import { getAiConfig, sessionPath, dataPath } from '../config.js';
 import { loadMenuData, findMenuByQuery } from '../utils/menuData.js';
 import { userProfileManager } from './userProfileManager.js';
 import { resolveLiveGroundingContext } from './liveGrounding.js';
+import { executeAiVariations } from '../commands/tools/ciz.js';
 
 export { userProfileManager, resolveLiveGroundingContext };
 
@@ -536,6 +537,10 @@ export class AiEngine {
     throw lastErr || new Error('Tüm Ollama anahtarları yanıt veremedi.');
   }
 
+  async executeAiVariations(imageBuffer, styleInput, shape = 'square', variationCount = 1) {
+    return executeAiVariations(imageBuffer, styleInput, shape, variationCount);
+  }
+
   getStatus() {
     const c = getAiConfig();
     return {
@@ -890,10 +895,44 @@ export function isImageGenerationRequest(userPrompt, history = []) {
   const text = normalizeImageText(userPrompt);
   const media = /\b(res(?:im|mi)\w*|gorsel\w*|fotograf\w*|foto\w*|image\w*|picture\w*|photo\w*)\b/;
   const action = /\b(olustur\w*|uret\w*|ciz\w*|yap\w*|hazirla\w*|generate\w*|create\w*|draw\w*|make\w*|istiyorum|isterim|want|wanna)\b/;
-  if ((media.test(text) && action.test(text)) || /\b(bana|bir|a|an|me)\b.{0,40}\b(ciz\w*|draw\w*)\b/.test(text)) {
+  if (media.test(text) && action.test(text)) {
     return true;
   }
 
+  const drawAction = /\b(ciz(?:sene|er|sin|in|mek|me|elim|iyorum|iyor|ebilir|dir|di|dim)?|resmet\w*|draw|paint)\b/;
+  if (drawAction.test(text) && text.replace(drawAction, ' ').trim()) {
+    return true;
+  }
+
+  return isImageModificationRequest(text, history);
+}
+
+export function isVariationRequest(userPrompt) {
+  const text = userPrompt.toLocaleLowerCase('tr-TR');
+  const variationKeywords = /\b(varyasyon\w*|variation\w*|varyant\w*|alternatif\w*|benzer\w*|similar\w*|benzeri\w*|benzerleri\w*|kopya\w*|clone\w*|türü\w*|type\w*)\b/;
+  const requestPatterns = /\b(yap\w*|et\w*| üret\w*|ciz\w*|olustur\w*|hazirla\w*|make\w*|create\w*|generate\w*|draw\w*|istiyorum|isterim|want|wanna)\b/;
+  
+  // Check for direct variation requests
+  if (variationKeywords.test(text) && requestPatterns.test(text)) {
+    return true;
+  }
+  
+  // Check for short Turkish variation requests like "varyasyon yap"
+  const shortVariation = /\b(varyasyon|variation)\s*(yap|et|et)\b/.test(text);
+  if (shortVariation) {
+    return true;
+  }
+  
+  // Check for English variation requests
+  const englishVariation = /\b(variation|variations)\s*(make|create|do|generate|draw)\b/.test(text);
+  if (englishVariation) {
+    return true;
+  }
+  
+  return false;
+}
+
+function isImageModificationRequest(text, history) {
   const isImageModification = /\b(degistir\w*|duzelt\w*|ekle\w*|cikar\w*|kaldir\w*|yap\w*|make|change|remove|add)\b/.test(text);
   const previousImage = history.some(message =>
     message?.role === 'assistant' && /\[Görsel Üretildi:/i.test(String(message.content || ''))
@@ -901,11 +940,47 @@ export function isImageGenerationRequest(userPrompt, history = []) {
   return previousImage && isImageModification;
 }
 
+function getPreviousImageDetails(history) {
+  for (let index = history.length - 1; index >= 0; index--) {
+    const content = String(history[index]?.content || '');
+    const match = content.match(/\[Görsel Üretildi: "([\s\S]*?)" \| Stil: ([^\]]+)\]/);
+    if (match) return { prompt: match[1], style: match[2].trim() };
+  }
+  return null;
+}
+
 function normalizeImageShape(shape) {
   const value = normalizeImageText(shape);
   if (['portrait', 'vertical', 'dikey', '9:16', '9 16'].includes(value)) return 'portrait';
   if (['landscape', 'horizontal', 'yatay', '16:9', '16 9'].includes(value)) return 'landscape';
   return 'square';
+}
+
+async function generateAndSendImage(sock, from, prompt, styleInput, shape, sendOptions, promptWithContext, senderName) {
+  try {
+    const { executeAiDraw, resolveStyle } = await import('../commands/tools/ciz.js');
+    const styleObj = resolveStyle(styleInput || prompt);
+    const drawResult = await executeAiDraw(prompt, styleObj, shape);
+    if (!drawResult?.buffer?.length) {
+      throw new Error('Çizim API geçerli bir görsel döndürmedi.');
+    }
+
+    let caption = `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${drawResult.shapeLabel || shape}\n⏱️ (${drawResult.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
+    await sock.sendMessage(from, { image: drawResult.buffer, caption }, { ...sendOptions, skipAntiBan: true });
+
+    memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
+    memoryManager.addMessage(from, 'assistant', `[Görsel Üretildi: "${prompt}" | Stil: ${styleObj.name}]`);
+    console.log(`[AI IMAGE SUCCESS] Image generated (${drawResult.elapsed}s, ${drawResult.buffer.length} bytes). Sent to ${from}.`);
+    return { text: caption, provider: 'image-generation', model: drawResult.engine || 'Perchance AI' };
+  } catch (err) {
+    console.error(`[AI IMAGE DRAW ERROR] ${from}:`, err.message);
+    memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
+    memoryManager.addMessage(from, 'assistant', '[Görsel üretimi başarısız oldu]');
+    await sock.sendMessage(from, {
+      text: '❌ Görseli şu an oluşturup gönderemedim kanka. Çizim servisi yanıt vermedi; birazdan tekrar dene.'
+    }, { ...sendOptions, skipAntiBan: true });
+    return { text: 'Görsel üretimi başarısız oldu.', provider: 'image-generation', model: 'Perchance AI', error: err.message };
+  }
 }
 
 export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
@@ -944,8 +1019,20 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
     let promptWithContext = userPrompt;
     if (quotedText) promptWithContext = `[Alıntılanan / Yanıtlanan Mesaj: "${quotedText}"]\n\n${userPrompt}`;
 
-     console.log('[AI CHAT] Starting generateReply for ${userJid}...');
     const history = memoryManager.getHistory(from);
+    const wantsImage = isImageGenerationRequest(userPrompt, history);
+    const isImageModification = isImageModificationRequest(normalizeImageText(userPrompt), history);
+    const sendOptions = options.quoteMessage !== false && msg ? { quoted: msg } : {};
+    if (wantsImage) {
+      const previousImage = isImageModification ? getPreviousImageDetails(history) : null;
+      const imagePrompt = previousImage ? `${previousImage.prompt}, ${userPrompt}` : userPrompt;
+      const shape = normalizeImageShape(userPrompt.match(/(portrait|vertical|dikey|9:16|landscape|horizontal|yatay|16:9|square|kare)/i)?.[0]);
+      const imageResult = await generateAndSendImage(sock, from, imagePrompt, previousImage?.style, shape, sendOptions, promptWithContext, senderName);
+      try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
+      return imageResult;
+    }
+
+     console.log('[AI CHAT] Starting generateReply for ${userJid}...');
     const result = await aiEngine.generateReply(promptWithContext, history, { 
       ...options, 
       senderName, 
@@ -962,64 +1049,15 @@ export async function handleAiChat(sock, msg, from, userPrompt, options = {}) {
       console.log(`[USER MEMORY UPDATED] ${userJid}: ${JSON.stringify(actionsApplied)}`);
     }
 
-    const sendOptions = options.quoteMessage !== false && msg ? { quoted: msg } : {};
-
     // 🎨 Görsel Çizim JSON Aksiyonu Kontrolü
-    const wantsImage = isImageGenerationRequest(userPrompt, history);
-    const imageAction = parseImageAction(result.text, { allowImplicit: wantsImage })
-      || (wantsImage ? { action: 'generate_image', prompt: userPrompt } : null);
+    const imageAction = parseImageAction(result.text);
     if (imageAction && (imageAction.prompt || imageAction.action)) {
       const imgPrompt = (imageAction.prompt || userPrompt).trim();
-      const rawStyle = imageAction.style || (/foto|gercek|realistic|photoreal/i.test(userPrompt) ? 'foto' : 'anime');
+      const rawStyle = imageAction.style || userPrompt;
       const shape = normalizeImageShape(imageAction.shape || userPrompt.match(/(portrait|vertical|dikey|9:16|landscape|horizontal|yatay|16:9|square|kare)/i)?.[0]);
-      let cleanText = imageAction.message || imageAction.caption || '';
-
-      if (!cleanText && !wantsImage) {
-        cleanText = result.text;
-        const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/gi;
-        cleanText = cleanText.replace(codeBlockRegex, block =>
-          parseImageAction(block, { allowImplicit: true }) ? '' : block
-        );
-        for (const jsonObject of extractJsonObjects(cleanText)) {
-          if (parseImageAction(jsonObject, { allowImplicit: true })) {
-            cleanText = cleanText.replace(jsonObject, '');
-          }
-        }
-        cleanText = cleanText.replace(/^\s*```(?:json)?|```\s*$/gim, '').trim();
-      }
-
-      // 1. Görseli Perchance AI / Çizim API üzerinden üret (Tek parça, bütünleşik mesaj)
-      console.log(`[AI IMAGE ACTION] Starting image generation for ${from}: "${imgPrompt}" | Style: ${rawStyle} | Shape: ${shape}`);
-      try {
-        const { executeAiDraw, resolveStyle } = await import('../commands/tools/ciz.js');
-        const styleObj = resolveStyle(rawStyle);
-        const drawResult = await executeAiDraw(imgPrompt, styleObj, shape);
-
-        if (drawResult && drawResult.buffer) {
-          console.log(`[AI IMAGE SUCCESS] Image generated (${drawResult.elapsed}s, ${drawResult.buffer.length} bytes). Sending to ${from}...`);
-          let caption = '';
-          if (cleanText) {
-            caption += `${cleanText}\n\n`;
-          }
-          caption += `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${imgPrompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${drawResult.shapeLabel || shape}\n⏱️ (${drawResult.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
-          
-          await sock.sendMessage(from, { image: drawResult.buffer, caption: caption.trim() }, { ...sendOptions, skipAntiBan: true });
-
-          memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
-          memoryManager.addMessage(from, 'assistant', `${cleanText ? cleanText + ' ' : ''}[Görsel Üretildi: "${imgPrompt}" | Stil: ${styleObj.name}]`);
-        } else {
-          console.warn(`[AI IMAGE TIMEOUT/FAILED] No buffer returned for ${from}`);
-          await sock.sendMessage(from, { text: '❌ Görsel üretilirken API yanıt vermedi veya zaman aşımına uğradı kanka. Lütfen birazdan tekrar dene.' }, { ...sendOptions, skipAntiBan: true });
-          memoryManager.addMessage(from, 'user', promptWithContext, { senderName });
-          memoryManager.addMessage(from, 'assistant', `${cleanText ? cleanText + ' ' : ''}[Görsel üretimi başarısız oldu]`);
-        }
-      } catch (drawErr) {
-        console.error('[AI IMAGE DRAW ERROR]:', drawErr.message);
-        await sock.sendMessage(from, { text: `❌ Görsel oluşturulurken bir hata oluştu: ${drawErr.message}` }, { ...sendOptions, skipAntiBan: true });
-      }
-
+      const imageResult = await generateAndSendImage(sock, from, imgPrompt, rawStyle, shape, sendOptions, promptWithContext, senderName);
       try { await sock.sendPresenceUpdate('paused', from); } catch (e) {}
-      return result;
+      return imageResult;
     }
 
     // Normal sohbet metni akışı

@@ -477,19 +477,102 @@
     document.getElementById('task-modal-id-badge').innerText = `#${task.id}`;
     const modalContent = document.getElementById('task-modal-content');
     
+    // Format file size if available
+    const formatFileSize = (bytes) => {
+      if (!bytes || bytes === 0) return '-';
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+    };
+
+    // Format progress percentage
+    const formatProgress = (progress) => {
+      if (progress === undefined || progress === null) return '-';
+      return `${progress}%`;
+    };
+
+    // Get status badge class and text
+    const getStatusBadge = (isActive, statusText) => {
+      if (isActive) {
+        return '<span class="badge badge-white" style="font-size: 10px;">⚡ Aktif</span>';
+      } else {
+        return '<span class="badge" style="font-size: 10px;">⏳ Bekliyor</span>';
+      }
+    };
+
     modalContent.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 2px;">
-        <div class="meta-kv"><span class="meta-k">Başlık</span><span class="meta-v" style="font-family: inherit;">${escapeHtml(task.title || '-')}</span></div>
-        <div class="meta-kv"><span class="meta-k">Kaynak Platform</span><span class="meta-v">${escapeHtml(task.source || 'Web')}</span></div>
-        <div class="meta-kv"><span class="meta-k">Hedef WhatsApp</span><span class="meta-v">${escapeHtml(task.recipientFormatted || task.recipientJid || '-')}</span></div>
-        <div class="meta-kv"><span class="meta-k">Durum</span><span class="meta-v">${task.isActive ? '⚡ Aktif İndiriliyor' : '⏳ Kuyrukta Bekliyor'}</span></div>
-        <div class="meta-kv"><span class="meta-k">Canlı Mesaj</span><span class="meta-v" style="font-family: inherit;">${escapeHtml(task.statusText || task.status || '-')}</span></div>
-        <div class="meta-kv"><span class="meta-k">Hız</span><span class="meta-v">${task.speed ? task.speed + ' MB/s' : '-'}</span></div>
-        <div class="meta-kv"><span class="meta-k">Format / Kalite</span><span class="meta-v">${escapeHtml(task.format || 'Otomatik / En Yüksek')}</span></div>
-        <div class="meta-kv"><span class="meta-k">Eklenme Saati</span><span class="meta-v">${task.addedTime ? new Date(task.addedTime).toLocaleString('tr-TR') : '-'}</span></div>
-        <div class="meta-kv"><span class="meta-k">Başlama Saati</span><span class="meta-v">${task.startTime ? new Date(task.startTime).toLocaleString('tr-TR') : '-'}</span></div>
-        <div class="meta-kv"><span class="meta-k">Öncelik</span><span class="meta-v">${task.priority ? '★ Yüksek Öncelik' : 'Normal'}</span></div>
-        <div class="meta-kv"><span class="meta-k">URL Linki</span><span class="meta-v" style="font-size: 11px;"><a href="${escapeHtml(task.url || '')}" target="_blank" rel="noopener" style="color: #fff; text-decoration: underline;">${escapeHtml(task.url || '')}</a></span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <!-- Başlık ve Kaynak -->
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1; min-width: 200px;">
+            <div class="meta-kv"><span class="meta-k">Görev Başlığı</span><span class="meta-v" style="font-family: inherit; font-weight: 600;">${escapeHtml(task.title || '-')}</span></div>
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <div class="meta-kv"><span class="meta-k">Kaynak</span><span class="meta-v">${escapeHtml(task.source || 'Web')}</span></div>
+          </div>
+        </div>
+        
+        <!-- Hedef ve Durum -->
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1; min-width: 200px;">
+            <div class="meta-kv"><span class="meta-k">Hedef Alıcı</span><span class="meta-v">${escapeHtml(task.recipientFormatted || task.recipientJid || '-')}</span></div>
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <div class="meta-kv"><span class="meta-k">Durum</span>${getStatusBadge(task.isActive, task.statusText)}</div>
+          </div>
+        </div>
+        
+        <!-- İlerleme ve Hız -->
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1; min-width: 200px;">
+            <div class="meta-kv"><span class="meta-k">İlerleme</span><span class="meta-v">${formatProgress(task.progress || 0)}</span></div>
+            ${task.progress !== undefined && task.progress !== null ? `
+            <div style="background: var(--bg-2); height: 6px; border-radius: 3px; overflow: hidden; margin-top: 2px;">
+              <div style="background: var(--primary-color); height: 100%; width: ${task.progress}%; transition: width 0.3s ease;"></div>
+            </div>` : ''}
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <div class="meta-kv"><span class="meta-k">İndirme Hızı</span><span class="meta-v">${task.speed ? task.speed.toFixed(2) + ' MB/s' : '-'}</span></div>
+          </div>
+        </div>
+        
+        <!-- Boyut ve Format -->
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1; min-width: 200px;">
+            <div class="meta-kv"><span class="meta-k">Dosya Boyutu</span><span class="meta-v">${formatFileSize(task.sizeBytes || 0)}</span></div>
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <div class="meta-kv"><span class="meta-k">Format / Kalite</span><span class="meta-v">${escapeHtml(task.format || 'Otomatik / En Yüksek')}</span></div>
+          </div>
+        </div>
+        
+        <!-- Zaman Bilgileri -->
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1; min-width: 200px;">
+            <div class="meta-kv"><span class="meta-k">Eklenme Saati</span><span class="meta-v">${task.addedTime ? new Date(task.addedTime).toLocaleString('tr-TR') : '-'}</span></div>
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <div class="meta-kv"><span class="meta-k">Başlama Saati</span><span class="meta-v">${task.startTime ? new Date(task.startTime).toLocaleString('tr-TR') : '-'}</span></div>
+          </div>
+        </div>
+        
+        <!-- Öncelik ve URL -->
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <div style="flex: 1; min-width: 200px;">
+            <div class="meta-kv"><span class="meta-k">Öncelik</span><span class="meta-v">${task.priority ? '★ Yüksek Öncelik' : 'Normal'}</span></div>
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <div class="meta-kv"><span class="meta-k">Kaynak URL</span><span class="meta-v" style="font-size: 11px;"><a href="${escapeHtml(task.url || '#')}" target="_blank" rel="noopener" style="color: #fff; text-decoration: underline; ${!task.url ? 'pointer-events: none; opacity: 0.5;' : ''}">${task.url ? escapeHtml(task.url) : '-'}</a></span></div>
+          </div>
+        </div>
+        
+        <!-- Ek Bilgiler (varsa) -->
+        ${task.extraInfo ? `
+        <div style="background: var(--bg-2); border-radius: var-radius-md; padding: 12px; margin-top: 8px;">
+          <div style="font-size: 12px; color: var(--text-3); font-weight: 600; margin-bottom: 6px;">Ek Bilgiler</div>
+          <div style="font-size: 11px; color: var(--text-2); line-height: 1.4;">${escapeHtml(task.extraInfo)}</div>
+        </div>` : ''}
       </div>
     `;
 
@@ -1403,9 +1486,74 @@
     }
   }
 
-  /* =========================================================================
-     VIEW-ONCE VAULT (TEK GÖNDERİMLİK MEDYA KASASI) & DEPOT GROUP SELECTOR
-     ========================================================================= */
+    async function editGroupPermission(jid) {
+      if (!jid) return showToast('Geçersiz Grup JID');
+
+      try {
+        // Switch to group permissions tab if not already there
+        if (activeTab !== 'group-permissions') {
+          switchNavTab('group-permissions');
+        }
+
+        // Load the group permission details
+        const res = await fetch(`/api/permissions/groups/${encodeURIComponent(jid)}`);
+        const data = await res.json();
+      
+        if (!data.success || !data.group) {
+          return showToast('Grup izinleri alınamadı');
+        }
+
+        const group = data.group;
+      
+        // Populate the form fields
+        document.getElementById('gp-group-jid').value = group.jid;
+        document.getElementById('gp-mode-select').value = group.mode || 'blacklist';
+        document.getElementById('gp-silent-check').checked = group.silent || false;
+      
+        // Check category checkboxes
+        document.querySelectorAll('.gp-cat-check').forEach(cb => {
+          cb.checked = group.categories && group.categories.includes(cb.value);
+        });
+      
+        // Call toggleGpModeHelp to update any help text based on mode
+        toggleGpModeHelp();
+      
+        showToast('Grup izinleri düzenleme modu yüklendi');
+      } catch (e) {
+        console.error('Edit group permission error:', e);
+        showToast('Hata: ' + e.message);
+      }
+    }
+
+    function toggleGpModeHelp() {
+      const modeSelect = document.getElementById('gp-mode-select');
+      const silentCheck = document.getElementById('gp-silent-check');
+      const modeHelpText = document.getElementById('gp-mode-help-text');
+    
+      if (!modeSelect || !silentCheck) return;
+    
+      const mode = modeSelect.value;
+    
+      // Update help text based on selected mode
+      if (modeHelpText) {
+        if (mode === 'whitelist') {
+          modeHelpText.innerHTML = 'Beyaz Liste Modu: SADECE seçilen kategorilere izin verilir, tüm diğer komutlar engellenir.';
+        } else {
+          modeHelpText.innerHTML = 'Kara Liste Modu: Seçilen kategoriler engellenir, tüm diğer komutlara izin verilir.';
+        }
+      }
+    
+      // Update silent checkbox label based on mode
+      if (mode === 'whitelist') {
+        silentCheck.nextSibling.textContent = 'Engellenen komutlarda \'Bu komut kapalıdır\' uyarısı atma (Sessiz Mod)';
+      } else {
+        silentCheck.nextSibling.textContent = 'İzin verilen komutlarda \'Bu komut kapalıdır\' uyarısı atma (Sessiz Mod)';
+      }
+    }
+
+    /* =========================================================================
+       VIEW-ONCE VAULT (TEK GÖNDERİMLİK MEDYA KASASI) & DEPOT GROUP SELECTOR
+       ========================================================================= */
   let viewOnceItems = [];
   let viewOnceCurrentFilter = 'all';
   let loadedWhatsAppGroups = [];

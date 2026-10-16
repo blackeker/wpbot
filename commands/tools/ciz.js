@@ -191,6 +191,7 @@ export async function executeAiDraw(prompt, styleInput, shape = 'square') {
   ].filter(Boolean);
 
   const endpoints = [...new Set(candidateEndpoints)];
+  const endpointErrors = [];
 
   for (const baseUrl of endpoints) {
     try {
@@ -210,34 +211,129 @@ export async function executeAiDraw(prompt, styleInput, shape = 'square') {
         timeout: 90000
       });
 
-      if (res.data && res.data.data && res.data.data[0]) {
-        const item = res.data.data[0];
-        let buffer = null;
-
-        if (item.b64_json) {
-          buffer = Buffer.from(item.b64_json, 'base64');
-        } else if (item.url) {
-          const imgUrl = item.url.startsWith('http') ? item.url : `${cleanBaseUrl}${item.url}`;
-          const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 35000 });
-          buffer = Buffer.from(imgRes.data);
-        }
-
-        if (buffer && buffer.length > 0) {
-          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          return { 
-            buffer, 
-            engine: `Perchance AI (${styleObj.perchanceStyle || 'anime'})`, 
-            elapsed, 
-            shapeLabel
-          };
-        }
+      const item = res.data?.data?.[0];
+      if (!item) {
+        throw new Error('API yanıtında görsel verisi bulunamadı.');
       }
+
+      let buffer = null;
+      if (item.b64_json) {
+        const base64 = item.b64_json.replace(/^data:image\/\w+;base64,/, '');
+        buffer = Buffer.from(base64, 'base64');
+      } else if (item.url) {
+        const imgUrl = item.url.startsWith('http') ? item.url : `${cleanBaseUrl}${item.url}`;
+        const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 35000 });
+        buffer = Buffer.from(imgRes.data);
+      }
+
+      if (!buffer?.length) {
+        throw new Error("API yanıtında kullanılabilir görsel URL'si veya base64 verisi bulunamadı.");
+      }
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      return {
+        buffer,
+        engine: `Perchance AI (${styleObj.perchanceStyle || 'anime'})`,
+        elapsed,
+        shapeLabel
+      };
     } catch (err) {
-      console.error(`[Perchance AI] Error calling ${baseUrl}:`, err.message);
+      const responseMessage = err.response?.data?.detail || err.response?.data?.error?.message || err.response?.data?.message;
+      const errorMessage = responseMessage ? `${err.message}: ${responseMessage}` : err.message;
+      endpointErrors.push(`${baseUrl}: ${errorMessage}`);
+      console.error(`[Perchance AI] Error calling ${baseUrl}:`, errorMessage);
     }
   }
 
-  return null;
+  throw new Error(`Görsel üretim API'lerinden yanıt alınamadı. ${endpointErrors.join(' | ')}`);
+}
+
+export async function executeAiVariations(imageBuffer, styleInput, shape = 'square', variationCount = 1) {
+  const styleObj = (typeof styleInput === 'object' && styleInput !== null && styleInput.name)
+    ? styleInput
+    : resolveStyle(styleInput);
+
+  let shapeLabel = '1:1 Kare';
+  if (shape === 'portrait') {
+    shapeLabel = '9:16 Dikey';
+  } else if (shape === 'landscape') {
+    shapeLabel = '16:9 Yatay';
+  }
+
+  // Convert image to base64 for API
+  const base64Image = imageBuffer.toString('base64');
+
+  const config = readConfig();
+
+  // Candidate Perchance endpoints
+  const candidateEndpoints = [
+    config?.perchanceAiApi,
+    process.env.PERCHANCE_AI_API,
+    'http://127.0.0.1:8000',
+    'http://localhost:8000'
+  ].filter(Boolean);
+
+  const endpoints = [...new Set(candidateEndpoints)];
+  const endpointErrors = [];
+
+  for (const baseUrl of endpoints) {
+    try {
+      const startTime = Date.now();
+      const payload = {
+        image: base64Image,
+        variation_count: variationCount,
+        // We might need to adjust these based on what the API actually supports
+        // For now, we'll use the same style and shape parameters
+        style: styleObj.perchanceStyle || 'anime',
+        shape: shape
+      };
+
+      const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+      const res = await axios.post(`${cleanBaseUrl}/variations`, payload, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 90000
+      });
+
+      // Assuming the API returns similar structure to generate endpoint
+      if (res.data && res.data.data && res.data.length > 0) {
+        const buffers = [];
+        for (const item of res.data.data) {
+          let buffer = null;
+          if (item.b64_json) {
+            const base64 = item.b64_json.replace(/^data:image\/\w+;base64,/, '');
+            buffer = Buffer.from(base64, 'base64');
+          } else if (item.url) {
+            const imgUrl = item.url.startsWith('http') ? item.url : `${cleanBaseUrl}${item.url}`;
+            const imgRes = await axios.get(imgUrl, { responseType: 'arraybuffer', timeout: 35000 });
+            buffer = Buffer.from(imgRes.data);
+          }
+
+          if (buffer?.length) {
+            buffers.push(buffer);
+          }
+        }
+
+        if (buffers.length > 0) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          return { 
+            buffers, 
+            engine: `Perchance AI (${styleObj.perchanceStyle || 'anime'}) Variations`,
+            elapsed,
+            shapeLabel,
+            count: buffers.length
+          };
+        }
+      }
+      throw new Error('API yanıtında görsel verisi bulunamadı.');
+    } catch (err) {
+      const responseMessage = err.response?.data?.detail || err.response?.data?.error?.message || err.response?.data?.message;
+      const errorMessage = responseMessage ? `${err.message}: ${responseMessage}` : err.message;
+      endpointErrors.push(`${baseUrl}: ${errorMessage}`);
+      console.error(`[Perchance AI Variations] Error calling ${baseUrl}:`, errorMessage);
+    }
+  }
+
+  throw new Error(`Görsel varyasyon API'lerinden yanıt alınamadı. ${endpointErrors.join(' | ')}`);
 }
 
 export default {
