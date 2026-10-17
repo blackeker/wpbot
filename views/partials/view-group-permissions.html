@@ -61,4 +61,33 @@
             </table>
           </div>
         </div>
+
+        <div class="card category-manager-card">
+          <div class="card-header">
+            <div>
+              <span class="card-title">Komut Kategorileri</span>
+              <p class="category-manager-hint">Gruplarda yönetilecek komutları düzenleyin; değişiklikler otomatik kaydedilir.</p>
+            </div>
+            <span class="badge">KALICI AYAR</span>
+          </div>
+          <div class="category-manager-tools">
+            <div class="category-tool">
+              <label class="form-label" for="category-new-name">Yeni kategori</label>
+              <div class="category-inline-form">
+                <input id="category-new-icon" class="input-text category-icon-input" type="text" maxlength="8" aria-label="Kategori simgesi" placeholder="📁">
+                <input id="category-new-name" class="input-text" type="text" maxlength="40" placeholder="Örn: Medya Araçları">
+                <button class="btn btn-primary" type="button" onclick="saveCategoryAction()">Kategori ekle</button>
+              </div>
+            </div>
+            <div class="category-tool">
+              <label class="form-label" for="category-command-select">Komutu başka kategoriye taşı</label>
+              <div class="category-inline-form">
+                <select id="category-command-select" class="input-select"></select>
+                <select id="category-target-select" class="input-select"></select>
+                <button class="btn btn-secondary" type="button" onclick="moveCategoryCommandAction()">Taşı</button>
+              </div>
+            </div>
+          </div>
+          <div id="category-manager-list" class="category-manager-list" aria-live="polite"></div>
+        </div>
       </section>

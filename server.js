@@ -7,7 +7,7 @@ import axios from 'axios';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { gotScraping } from 'got-scraping';
-import { exec, execSync } from 'child_process';
+import { exec, execFile, execSync } from 'child_process';
 import { startCronScheduler } from './server/cronScheduler.js';
 
 import { getModuleLogger } from './utils/logger.js';
@@ -57,6 +57,11 @@ import { executeDownloadPipeline, queueMediaSend } from './pipelines.js';
 import { getAnimecixSeasonEpisodes, getHdfilmcehennemiSeasonEpisodes, getHdkoreSeasonEpisodes, extractVideoUrl } from './extractor.js';
 import { 
   CATEGORIES, 
+  COMMAND_CATEGORY_MAP,
+  addCategory,
+  moveCommandToCategory,
+  renameCategory,
+  savePermissionsToFile,
   getGroupConfig, 
   updateGroupConfig, 
   resetGroupConfig 
@@ -160,6 +165,8 @@ app.use((req, res, next) => {
   }
   basicAuth(req, res, next);
 });
+
+app.use('/api/files', basicAuth);
 
 // Serve static assets from public/ directory
 app.use(express.static(path.join(path.resolve(), 'public')));
@@ -518,54 +525,212 @@ function getFileCategory(ext) {
   if (['.mp3', '.m4a', '.wav', '.ogg', '.flac', '.aac', '.opus'].includes(ext)) return 'audio';
   if (['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz'].includes(ext)) return 'archive';
   if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg', '.bmp'].includes(ext)) return 'image';
+  if (['.txt', '.log', '.json', '.md', '.csv', '.xml', '.yaml', '.yml', '.js', '.cjs', '.mjs', '.css', '.html', '.htm', '.py', '.sh', '.ps1', '.bat', '.ini', '.conf', '.toml', '.sql'].includes(ext)) return 'text';
   return 'other';
 }
 
-// File Explorer: List All Files
+function getExplorerRoots() {
+  if (process.platform !== 'win32') return [path.parse(process.cwd()).root];
+
+  const roots = [];
+  for (let code = 65; code <= 90; code++) {
+    const root = `${String.fromCharCode(code)}:\\`;
+    try {
+      if (fs.statSync(root).isDirectory()) roots.push(root);
+    } catch {}
+  }
+  return roots;
+}
+
+function resolveExplorerPath(requestedPath = downloadsDir) {
+  if (typeof requestedPath !== 'string' || requestedPath.length > 4096) {
+    const error = new Error('Geçersiz dosya yolu.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const resolvedPath = path.resolve(requestedPath);
+  const root = path.parse(resolvedPath).root;
+  if (!root || !getExplorerRoots().some(allowedRoot =>
+    process.platform === 'win32'
+      ? allowedRoot.toLowerCase() === root.toLowerCase()
+      : allowedRoot === root
+  )) {
+    const error = new Error('Bu dosya sistemi köküne erişilemiyor.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  let currentPath = root;
+  const segments = path.relative(root, resolvedPath).split(path.sep).filter(Boolean);
+  try {
+    for (const segment of segments) {
+      currentPath = path.join(currentPath, segment);
+      if (fs.lstatSync(currentPath).isSymbolicLink()) {
+        const error = new Error('Sembolik bağlantılar üzerinden gezinmeye izin verilmiyor.');
+        error.statusCode = 403;
+        throw error;
+      }
+    }
+    fs.lstatSync(resolvedPath);
+  } catch (error) {
+    if (error.statusCode) throw error;
+    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') {
+      const missing = new Error('Yol bulunamadı.');
+      missing.statusCode = 404;
+      throw missing;
+    }
+    throw error;
+  }
+
+  return resolvedPath;
+}
+
+function resolveExplorerFile(requestedPath) {
+  const filePath = resolveExplorerPath(requestedPath);
+  const stats = fs.lstatSync(filePath);
+  if (!stats.isFile()) {
+    const error = new Error('Seçilen yol bir dosya değil.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return { filePath, stats };
+}
+
+function reportExplorerError(res, error) {
+  const status = error.statusCode || (error.code === 'EACCES' || error.code === 'EPERM' ? 403 : 500);
+  logger.error({ err: error.message, code: error.code, status }, 'File explorer request failed');
+  res.status(status).json({ success: false, error: status === 500 ? 'Dosya işlemi başarısız oldu.' : error.message });
+}
+
+// File Explorer: list one directory at a time and never follow symlinks.
+app.get('/api/files/roots', (req, res) => {
+  res.json({
+    success: true,
+    roots: getExplorerRoots(),
+    defaultPath: fs.existsSync(downloadsDir) ? downloadsDir : getExplorerRoots()[0]
+  });
+});
+
 app.get('/api/files', (req, res) => {
   try {
     if (!fs.existsSync(downloadsDir)) {
       fs.mkdirSync(downloadsDir, { recursive: true });
     }
-    const allEntries = fs.readdirSync(downloadsDir);
+    const currentPath = resolveExplorerPath(req.query.path || downloadsDir);
+    const directoryStats = fs.lstatSync(currentPath);
+    if (!directoryStats.isDirectory()) {
+      return res.status(400).json({ success: false, error: 'Seçilen yol bir klasör değil.' });
+    }
+
+    const allEntries = fs.readdirSync(currentPath, { withFileTypes: true });
     let totalBytes = 0;
-    const fileList = [];
-
-    for (const name of allEntries) {
-      if (name.startsWith('.') || name.endsWith('.tmp') || name.endsWith('.part')) continue;
+    const entries = [];
+    for (const entry of allEntries) {
       try {
-        const filePath = path.join(downloadsDir, name);
-        const stats = fs.statSync(filePath);
-        if (!stats.isFile()) continue;
+        const entryPath = path.join(currentPath, entry.name);
+        const stats = fs.lstatSync(entryPath);
+        const isSymlink = stats.isSymbolicLink();
+        const kind = isSymlink ? 'symlink' : stats.isDirectory() ? 'directory' : stats.isFile() ? 'file' : 'other';
+        if (kind === 'file') totalBytes += stats.size;
 
-        totalBytes += stats.size;
-        const ext = path.extname(name).toLowerCase();
-        fileList.push({
-          name,
+        const ext = kind === 'file' ? path.extname(entry.name).toLowerCase() : '';
+        entries.push({
+          name: entry.name,
+          path: entryPath,
+          kind,
+          isDirectory: kind === 'directory',
           ext,
-          category: getFileCategory(ext),
+          category: kind === 'file' ? getFileCategory(ext) : kind,
           size: stats.size,
           sizeBytes: stats.size,
           sizeFormatted: formatBytes(stats.size),
           mtime: stats.mtime.toISOString(),
           dateFormatted: stats.mtime.toLocaleString('tr-TR'),
-          downloadUrl: `/downloads/${encodeURIComponent(name)}`
+          downloadUrl: kind === 'file' ? `/api/files/download?path=${encodeURIComponent(entryPath)}` : null
         });
-      } catch (e) {}
+      } catch (error) {
+        if (error.code !== 'EACCES' && error.code !== 'EPERM') throw error;
+      }
     }
 
-    // Sort by mtime descending (newest first)
-    fileList.sort((a, b) => new Date(b.mtime) - new Date(a.mtime));
+    entries.sort((a, b) => {
+      if (a.kind === 'directory' && b.kind !== 'directory') return -1;
+      if (b.kind === 'directory' && a.kind !== 'directory') return 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+    const maxEntries = 2000;
+    const visibleEntries = entries.slice(0, maxEntries);
+    const fileCount = entries.filter(entry => entry.kind === 'file').length;
+    const parentPath = path.dirname(currentPath) === currentPath ? null : path.dirname(currentPath);
+    const root = path.parse(currentPath).root;
+    const breadcrumbs = [{ name: root, path: root }];
+    let breadcrumbPath = root;
+    for (const segment of path.relative(root, currentPath).split(path.sep).filter(Boolean)) {
+      breadcrumbPath = path.join(breadcrumbPath, segment);
+      breadcrumbs.push({ name: segment, path: breadcrumbPath });
+    }
 
     res.json({
       success: true,
-      files: fileList,
-      totalCount: fileList.length,
+      path: currentPath,
+      parentPath,
+      breadcrumbs,
+      roots: getExplorerRoots(),
+      entries: visibleEntries,
+      truncated: entries.length > maxEntries,
+      totalCount: fileCount,
       totalBytes,
       totalBytesFormatted: formatBytes(totalBytes)
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    reportExplorerError(res, err);
+  }
+});
+
+app.get('/api/files/download', (req, res) => {
+  try {
+    const { filePath } = resolveExplorerFile(req.query.path);
+    res.download(filePath, path.basename(filePath), error => {
+      if (error && !res.headersSent) reportExplorerError(res, error);
+    });
+  } catch (error) {
+    reportExplorerError(res, error);
+  }
+});
+
+app.get('/api/files/content', (req, res) => {
+  try {
+    const { filePath } = resolveExplorerFile(req.query.path);
+    const ext = path.extname(filePath).toLowerCase();
+    const contentTypes = {
+      '.pdf': 'application/pdf',
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp',
+      '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.txt': 'text/plain; charset=utf-8', '.log': 'text/plain; charset=utf-8',
+      '.json': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8',
+      '.xml': 'text/plain; charset=utf-8', '.yaml': 'text/plain; charset=utf-8', '.yml': 'text/plain; charset=utf-8',
+      '.js': 'text/plain; charset=utf-8', '.cjs': 'text/plain; charset=utf-8', '.mjs': 'text/plain; charset=utf-8',
+      '.css': 'text/plain; charset=utf-8', '.html': 'text/plain; charset=utf-8', '.htm': 'text/plain; charset=utf-8',
+      '.py': 'text/plain; charset=utf-8', '.sh': 'text/plain; charset=utf-8', '.ps1': 'text/plain; charset=utf-8',
+      '.bat': 'text/plain; charset=utf-8', '.ini': 'text/plain; charset=utf-8', '.conf': 'text/plain; charset=utf-8',
+      '.toml': 'text/plain; charset=utf-8', '.sql': 'text/plain; charset=utf-8'
+    };
+    const contentType = contentTypes[ext];
+    if (!contentType) {
+      return res.status(415).json({ success: false, error: 'Bu dosya türü için güvenli önizleme desteklenmiyor; dosyayı indirebilirsiniz.' });
+    }
+    res.sendFile(filePath, {
+      headers: {
+        'Content-Type': contentType,
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(path.basename(filePath))}`
+      }
+    }, error => {
+      if (error && !res.headersSent) reportExplorerError(res, error);
+    });
+  } catch (error) {
+    reportExplorerError(res, error);
   }
 });
 
@@ -729,24 +894,29 @@ app.post('/api/view-once/clear', (req, res) => {
 
 // File Explorer: Rename File
 app.post('/api/files/rename', (req, res) => {
-  const { oldName, newName } = req.body;
+  const { oldName, newName, path: requestedPath } = req.body || {};
   if (!oldName || !newName) {
     return res.status(400).json({ success: false, error: 'Eski ve yeni dosya adı gereklidir.' });
   }
   try {
-    const safeOld = path.basename(oldName);
-    let safeNew = path.basename(newName);
+    const oldPath = resolveExplorerFile(requestedPath || path.join(downloadsDir, path.basename(oldName))).filePath;
+    const safeOld = path.basename(oldPath);
+    const safeNew = String(newName).trim();
+    if (!safeNew || safeNew === '.' || safeNew === '..' || safeNew.includes('/') || safeNew.includes('\\') || safeNew.includes('\0')) {
+      return res.status(400).json({ success: false, error: 'Yeni ad yalnızca geçerli bir dosya adı olmalıdır.' });
+    }
 
     if (!path.extname(safeNew) && path.extname(safeOld)) {
-      safeNew += path.extname(safeOld);
+      const targetName = `${safeNew}${path.extname(safeOld)}`;
+      const newPath = path.join(path.dirname(oldPath), targetName);
+      if (fs.existsSync(newPath)) {
+        return res.status(400).json({ success: false, error: 'Bu isimde bir dosya zaten mevcut.' });
+      }
+      fs.renameSync(oldPath, newPath);
+      return res.json({ success: true, message: 'Dosya başarıyla yeniden adlandırıldı.', newName: targetName, path: newPath });
     }
 
-    const oldPath = path.join(downloadsDir, safeOld);
-    const newPath = path.join(downloadsDir, safeNew);
-
-    if (!fs.existsSync(oldPath)) {
-      return res.status(404).json({ success: false, error: 'Dosya bulunamadı.' });
-    }
+    const newPath = path.join(path.dirname(oldPath), safeNew);
     if (fs.existsSync(newPath) && safeOld !== safeNew) {
       return res.status(400).json({ success: false, error: 'Bu isimde bir dosya zaten mevcut.' });
     }
@@ -755,54 +925,53 @@ app.post('/api/files/rename', (req, res) => {
     res.json({
       success: true,
       message: 'Dosya başarıyla yeniden adlandırıldı.',
-      newName: safeNew
+      newName: safeNew,
+      path: newPath
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    reportExplorerError(res, err);
   }
 });
 
 // File Explorer: Delete File(s)
 app.post('/api/files/delete', (req, res) => {
-  const { filename, filenames } = req.body;
+  const { filename, filenames, paths: requestedPaths } = req.body || {};
   const filesToDelete = [];
-  if (filename) filesToDelete.push(filename);
-  if (Array.isArray(filenames)) filesToDelete.push(...filenames);
+  if (filename) filesToDelete.push(path.join(downloadsDir, path.basename(filename)));
+  if (Array.isArray(filenames)) filesToDelete.push(...filenames.map(name => path.join(downloadsDir, path.basename(name))));
+  if (Array.isArray(requestedPaths)) filesToDelete.push(...requestedPaths);
 
   if (filesToDelete.length === 0) {
     return res.status(400).json({ success: false, error: 'Silinecek dosya belirtilmedi.' });
   }
+  if (filesToDelete.length > 100) {
+    return res.status(400).json({ success: false, error: 'Tek seferde en fazla 100 dosya silinebilir.' });
+  }
 
   let deletedCount = 0;
   try {
-    for (const f of filesToDelete) {
-      const safeFile = path.basename(f);
-      const filePath = path.join(downloadsDir, safeFile);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        deletedCount++;
-      }
+    for (const requestedPath of filesToDelete) {
+      const { filePath } = resolveExplorerFile(requestedPath);
+      fs.unlinkSync(filePath);
+      deletedCount++;
     }
     res.json({ success: true, message: `${deletedCount} dosya silindi.`, deletedCount });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    reportExplorerError(res, err);
   }
 });
 
 // File Explorer: Send File directly to WhatsApp
 app.post('/api/files/send-wa', async (req, res) => {
-  const { filename, phone, caption } = req.body;
+  const { filename, path: requestedPath, phone, caption } = req.body || {};
   if (!filename) return res.status(400).json({ success: false, error: 'filename parametresi gereklidir.' });
   if (!botSocketRef.current) {
     return res.status(400).json({ success: false, error: 'WhatsApp bot bağlantısı aktif değil.' });
   }
 
   try {
-    const safeFile = path.basename(filename);
-    const filePath = path.join(downloadsDir, safeFile);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: 'Dosya bulunamadı.' });
-    }
+    const { filePath } = resolveExplorerFile(requestedPath || path.join(downloadsDir, path.basename(filename)));
+    const safeFile = path.basename(filePath);
 
     const config = readConfig();
     let num = (phone || config.adminNumber || '05332624732').replace(/[^0-9]/g, '');
@@ -833,7 +1002,7 @@ app.post('/api/files/send-wa', async (req, res) => {
       message: `"${safeFile}" WhatsApp üzerinden ${num} numarasına gönderim kuyruğuna alındı.`
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    reportExplorerError(res, err);
   }
 });
 
@@ -987,27 +1156,33 @@ app.post('/api/session/reset', (req, res) => {
 // Media Vault: Zip Selected Files
 app.post('/api/files/zip', (req, res) => {
   try {
-    const { filenames } = req.body;
-    if (!filenames || !Array.isArray(filenames) || filenames.length === 0) {
+    const { filenames, paths: requestedPaths } = req.body || {};
+    if ((!Array.isArray(filenames) || filenames.length === 0) && (!Array.isArray(requestedPaths) || requestedPaths.length === 0)) {
       return res.status(400).json({ error: 'Dosya adları listesi gereklidir.' });
     }
-    const safeFiles = filenames.map(f => path.basename(f));
+    const inputPaths = Array.isArray(requestedPaths) && requestedPaths.length
+      ? requestedPaths
+      : filenames.map(name => path.join(downloadsDir, path.basename(name)));
+    if (inputPaths.length > 100) {
+      return res.status(400).json({ error: 'Tek seferde en fazla 100 dosya arşivlenebilir.' });
+    }
+    const safeFiles = inputPaths.map(requestedPath => resolveExplorerFile(requestedPath).filePath);
     const zipName = `hdwp_archive_${Date.now()}.zip`;
     const zipPath = path.join(downloadsDir, zipName);
 
-    // Native tar command for multi-platform compatibility (runs natively on Win10+/Linux)
-    const fileArgs = safeFiles.map(f => `"${f}"`).join(' ');
-    const cmd = `tar -ca -f "${zipPath}" -C "${downloadsDir}" ${fileArgs}`;
-
-    exec(cmd, (err) => {
+    execFile('tar', ['-ca', '-f', zipPath, '--', ...safeFiles], (err) => {
       if (err) {
         console.error('[ZIP] Hata:', err.message);
         return res.status(500).json({ error: 'Sıkıştırma işlemi başarısız oldu: ' + err.message });
       }
-      res.json({ success: true, zipUrl: `/downloads/${zipName}`, filename: zipName });
+      res.json({
+        success: true,
+        zipUrl: `/api/files/download?path=${encodeURIComponent(zipPath)}`,
+        filename: zipName
+      });
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    reportExplorerError(res, e);
   }
 });
 
@@ -1534,7 +1709,74 @@ app.get('/api/permissions/whatsapp-groups', async (req, res) => {
 });
 
 app.get('/api/permissions/categories', (req, res) => {
-  res.json({ success: true, categories: CATEGORIES });
+  res.json({ success: true, categories: CATEGORIES, commandCategoryMap: COMMAND_CATEGORY_MAP });
+});
+
+app.post('/api/permissions/categories', (req, res) => {
+  const body = req.body || {};
+  const { action } = body;
+  const categoriesBefore = Object.fromEntries(Object.entries(CATEGORIES).map(([key, category]) => [
+    key,
+    { ...category, commands: [...category.commands] }
+  ]));
+  const commandMapBefore = { ...COMMAND_CATEGORY_MAP };
+  let changed = false;
+
+  if (action === 'add') {
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > 40) {
+      return res.status(400).json({ success: false, error: 'Kategori adı 1-40 karakter olmalıdır.' });
+    }
+    const key = name
+      .replace(/[ıİ]/g, 'i')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32);
+    const icon = typeof body.icon === 'string' ? [...body.icon.trim()].slice(0, 4).join('') : '📁';
+    changed = addCategory(key, name, icon || '📁');
+    if (!changed) {
+      return res.status(400).json({ success: false, error: 'Bu kategori adı kullanılamıyor veya kategori zaten mevcut.' });
+    }
+  } else if (action === 'move') {
+    const { command, category } = body;
+    changed = moveCommandToCategory(command, category);
+    if (!changed) {
+      return res.status(400).json({ success: false, error: 'Komut veya hedef kategori geçersiz.' });
+    }
+  } else if (action === 'rename') {
+    const { oldKey } = body;
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > 40) {
+      return res.status(400).json({ success: false, error: 'Kategori adı 1-40 karakter olmalıdır.' });
+    }
+    const newKey = name
+      .replace(/[ıİ]/g, 'i')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32);
+    changed = renameCategory(oldKey, newKey, name);
+    if (!changed) {
+      return res.status(400).json({ success: false, error: 'Kategori bulunamadı veya yeni ad kullanılamıyor.' });
+    }
+  } else {
+    return res.status(400).json({ success: false, error: 'Geçersiz kategori işlemi.' });
+  }
+
+  if (!savePermissionsToFile()) {
+    for (const key of Object.keys(CATEGORIES)) delete CATEGORIES[key];
+    Object.assign(CATEGORIES, categoriesBefore);
+    for (const key of Object.keys(COMMAND_CATEGORY_MAP)) delete COMMAND_CATEGORY_MAP[key];
+    Object.assign(COMMAND_CATEGORY_MAP, commandMapBefore);
+    return res.status(500).json({ success: false, error: 'Kategori değişikliği diske kaydedilemedi.' });
+  }
+
+  res.json({ success: true, categories: CATEGORIES, commandCategoryMap: COMMAND_CATEGORY_MAP });
 });
 
 app.get('/api/permissions/groups', (req, res) => {

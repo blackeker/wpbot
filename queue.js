@@ -55,8 +55,16 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE active_tasks ADD COLUMN episodeBatch TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN seriesPack TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE active_tasks ADD COLUMN seriesPack TEXT"); } catch (e) {}
-try { db.exec("ALTER TABLE tasks ADD COLUMN audioTrack TEXT"); } catch (e) {}
-try { db.exec("ALTER TABLE active_tasks ADD COLUMN audioTrack TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN fileSize INTEGER"); } catch (e) {}
+try { db.exec("ALTER TABLE active_tasks ADD COLUMN fileSize INTEGER"); } catch (e) {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN downloadUrl TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE active_tasks ADD COLUMN downloadUrl TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN fileName TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE active_tasks ADD COLUMN fileName TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN extractorName TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE active_tasks ADD COLUMN extractorName TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN progress REAL"); } catch (e) {}
+try { db.exec("ALTER TABLE active_tasks ADD COLUMN progress REAL"); } catch (e) {}
 
 export let downloadQueue = [];
 export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...], timer } }
@@ -137,13 +145,13 @@ export function saveQueueToFile() {
     const deleteActive = db.prepare('DELETE FROM active_tasks');
     
     const insertTask = db.prepare(`
-      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack, audioTrack)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack, audioTrack, fileSize, downloadUrl, fileName, extractorName, progress)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertActive = db.prepare(`
-      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack, audioTrack)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO active_tasks (id, url, recipientJid, title, status, format, priority, addedTime, episodeBatch, seriesPack, audioTrack, fileSize, downloadUrl, fileName, extractorName, progress)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = db.transaction(() => {
@@ -162,24 +170,34 @@ export function saveQueueToFile() {
           new Date(t.addedTime).toISOString(),
           t.episodeBatch ? JSON.stringify(t.episodeBatch) : null,
           t.seriesPack ? JSON.stringify(t.seriesPack) : null,
-          t.audioTrack || null
-        );
-      }
+       t.audioTrack || null,
+           t.fileSize || null,
+           t.downloadUrl || null,
+           t.fileName || null,
+           t.extractorName || null,
+           t.progress || 0
+         );
+       }
 
-      for (const t of activeTasksList) {
-        insertActive.run(
-          t.id,
-          t.url,
-          t.recipientJid,
-          t.title,
-          'queued', // restore active tasks as queued on next boot
-          t.format || null,
-          t.priority ? 1 : 0,
-          new Date(t.addedTime).toISOString(),
-          t.episodeBatch ? JSON.stringify(t.episodeBatch) : null,
-          t.seriesPack ? JSON.stringify(t.seriesPack) : null,
-          t.audioTrack || null
-        );
+       for (const t of activeTasksList) {
+         insertActive.run(
+           t.id,
+           t.url,
+           t.recipientJid,
+           t.title,
+           'queued', // restore active tasks as queued on next boot
+           t.format || null,
+           t.priority ? 1 : 0,
+           new Date(t.addedTime).toISOString(),
+           t.episodeBatch ? JSON.stringify(t.episodeBatch) : null,
+           t.seriesPack ? JSON.stringify(t.seriesPack) : null,
+           t.audioTrack || null,
+           t.fileSize || null,
+           t.downloadUrl || null,
+           t.fileName || null,
+           t.extractorName || null,
+           t.progress || 0
+         );
       }
     });
 
@@ -217,6 +235,11 @@ function loadQueueFromFile() {
         episodeBatch: epBatch,
         seriesPack: sPack,
         audioTrack: r.audioTrack || null,
+        fileSize: r.fileSize || null,
+        downloadUrl: r.downloadUrl || null,
+        fileName: r.fileName || null,
+        extractorName: r.extractorName || null,
+        progress: r.progress || 0,
         isCancelled: false,
         startTime: null,
         endTime: null,
@@ -248,6 +271,11 @@ function loadQueueFromFile() {
         episodeBatch: epBatch,
         seriesPack: sPack,
         audioTrack: r.audioTrack || null,
+        fileSize: r.fileSize || null,
+        downloadUrl: r.downloadUrl || null,
+        fileName: r.fileName || null,
+        extractorName: r.extractorName || null,
+        progress: r.progress || 0,
         isCancelled: false,
         startTime: null,
         endTime: null,
@@ -293,7 +321,7 @@ export const activeTask = {
   }
 };
 
-export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null, episodeBatch = null, seriesPack = null, audioTrack = null, burnSubtitles = false) {
+export function addDownloadTask(url, recipientJid, title, format = null, priority = false, caption = null, episodeBatch = null, seriesPack = null, audioTrack = null, burnSubtitles = false, metadata = {}) {
   const isDuplicate = downloadQueue.some(t => t.url === url) || activeTasksList.some(t => t.url === url);
   if (isDuplicate) {
     throw new Error("Bu link zaten indirme kuyrugunda veya su an indiriliyor.");
@@ -324,7 +352,12 @@ export function addDownloadTask(url, recipientJid, title, format = null, priorit
     startTime: null,
     endTime: null,
     speed: null,        // MB/s (anlık hız)
-    sizeMB: null        // indirilen boyut
+    sizeMB: null,       // indirilen boyut
+    fileSize: metadata.fileSize || null,
+    downloadUrl: metadata.downloadUrl || null,
+    fileName: metadata.fileName || null,
+    extractorName: metadata.extractorName || null,
+    progress: 0
   };
 
   // Öncelikli görevler kuyruğun başına geçer

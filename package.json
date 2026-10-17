@@ -1,19 +1,17 @@
 {
   "name": "hdwpindirici",
   "version": "3.0.17",
-  "description": "WhatsApp Film/Dizi Indirme Botu",
+  "description": "Kekenin botu",
   "main": "bot.js",
   "type": "module",
   "scripts": {
     "build": "node -e 'console.log(\"Build ready\")'",
     "start": "node bot.js",
-    "dev": "node bot.js",
+    "dev": "nodemon bot.js",
     "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop wpbot",
     "pm2:restart": "pm2 restart wpbot",
-    "pm2:logs": "pm2 logs wpbot",
-    "menu": "node bin/menu-cli.js",
-    "test:memory": "node tests/test_cross_session_memory.js"
+    "pm2:logs": "pm2 logs wpbot"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.9",

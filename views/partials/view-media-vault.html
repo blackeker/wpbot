@@ -1,12 +1,13 @@
 <section class="view-panel" id="view-media-vault">
         <div class="card">
-          <!-- Top Header & Breadcrumb -->
+          <!-- Explorer header and location bar -->
           <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <div style="display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 13px; color: #fff; background: var(--bg-2); padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-1);">
-                <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                <span>/downloads</span>
-              </div>
+            <div class="fe-location-group">
+              <label class="sr-only" for="fe-root-select">Sürücü veya dosya sistemi kökü</label>
+              <select id="fe-root-select" class="input-select fe-root-select" onchange="navigateExplorerRoot(this.value)" aria-label="Sürücü veya dosya sistemi kökü">
+                <option value="">Kökler yükleniyor...</option>
+              </select>
+              <button class="btn btn-secondary btn-sm" id="fe-up-button" onclick="navigateExplorerUp()" title="Üst klasör" aria-label="Üst klasör">↑ Üst</button>
               <span class="badge" id="fe-stats-badge">Yükleniyor...</span>
             </div>
             
@@ -26,6 +27,8 @@
               </button>
             </div>
           </div>
+
+          <nav class="fe-breadcrumbs" id="fe-breadcrumbs" aria-label="Dosya yolu"></nav>
 
           <!-- Explorer Filter & Search Toolbar -->
           <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px;">
@@ -64,7 +67,7 @@
             <table class="mono-table">
               <thead>
                 <tr>
-                  <th width="40"><input type="checkbox" id="vault-select-all" onchange="toggleSelectAllVault(this.checked)"></th>
+                  <th width="40"><input type="checkbox" id="vault-select-all" onchange="toggleSelectAllVault(this.checked)" aria-label="Dosyaların tümünü seç"></th>
                   <th>Dosya Adı</th>
                   <th width="110">Kategori</th>
                   <th width="110">Boyut</th>

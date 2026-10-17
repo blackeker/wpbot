@@ -12,6 +12,10 @@
 
   // File Explorer State
   let feFiles = [];
+  let feCurrentPath = '';
+  let feParentPath = null;
+  let feBreadcrumbs = [];
+  let feRoots = [];
   let feCategoryFilter = 'all';
   let feSearchQuery = '';
   let feSortMode = 'date-desc';
@@ -853,13 +857,39 @@
      ========================================================================= */
   async function loadMediaVault() {
     try {
-      const res = await fetch('/api/files');
+      if (!feRoots.length) {
+        const rootsRes = await fetch('/api/files/roots');
+        const rootsData = await rootsRes.json();
+        if (!rootsRes.ok || !rootsData.success) throw new Error(rootsData.error || 'Dosya sistemi kökleri alınamadı.');
+        feRoots = rootsData.roots || [];
+        const rootSelect = document.getElementById('fe-root-select');
+        rootSelect.innerHTML = feRoots.map(root => `<option value="${escapeHtml(root)}">${escapeHtml(root)}</option>`).join('');
+        if (!feCurrentPath) feCurrentPath = rootsData.defaultPath || feRoots[0] || '';
+      }
+
+      const params = new URLSearchParams();
+      if (feCurrentPath) params.set('path', feCurrentPath);
+      const res = await fetch(`/api/files?${params.toString()}`);
       const data = await res.json();
-      feFiles = data.files || [];
+      if (!res.ok || !data.success) throw new Error(data.error || 'Klasör içeriği alınamadı.');
+      feFiles = data.entries || [];
+      feCurrentPath = data.path || feCurrentPath;
+      feParentPath = data.parentPath || null;
+      feBreadcrumbs = data.breadcrumbs || [];
+
+      const rootSelect = document.getElementById('fe-root-select');
+      if (rootSelect) {
+        const rootForPath = feRoots.find(root => feCurrentPath.toLowerCase().startsWith(root.toLowerCase()));
+        if (rootForPath) rootSelect.value = rootForPath;
+      }
+      const upButton = document.getElementById('fe-up-button');
+      if (upButton) upButton.disabled = !feParentPath;
+      renderExplorerBreadcrumbs();
 
       // Update counters
-      const counts = { all: feFiles.length, pdf: 0, video: 0, audio: 0, archive: 0, other: 0 };
-      feFiles.forEach(f => {
+      const files = feFiles.filter(entry => entry.kind === 'file');
+      const counts = { all: files.length, pdf: 0, video: 0, audio: 0, archive: 0, other: 0 };
+      files.forEach(f => {
         if (counts[f.category] !== undefined) counts[f.category]++;
         else counts.other++;
       });
@@ -879,13 +909,52 @@
 
       const statsEl = document.getElementById('fe-stats-badge');
       if (statsEl) {
-        statsEl.innerText = `${counts.all} Dosya • ${data.totalBytesFormatted || '0 B'}`;
+        const folderCount = feFiles.filter(entry => entry.kind === 'directory').length;
+        statsEl.innerText = `${folderCount} klasör · ${counts.all} dosya · ${data.totalBytesFormatted || '0 B'}`;
       }
 
+      if (data.truncated) showToast('Klasörde çok fazla öğe var; ilk 2.000 öğe gösteriliyor.');
       renderFileExplorer();
     } catch (e) {
       showToast('Dosyalar yüklenirken hata oluştu: ' + e.message);
     }
+  }
+
+  function renderExplorerBreadcrumbs() {
+    const container = document.getElementById('fe-breadcrumbs');
+    if (!container) return;
+    container.innerHTML = feBreadcrumbs.map((crumb, index) => `
+      <button class="fe-breadcrumb ${index === feBreadcrumbs.length - 1 ? 'active' : ''}" type="button" onclick="navigateExplorerBreadcrumb(${index})" ${index === feBreadcrumbs.length - 1 ? 'aria-current="page"' : ''}>
+        ${index === 0 ? '⌂' : '›'} ${escapeHtml(crumb.name)}
+      </button>
+    `).join('');
+  }
+
+  function navigateExplorerBreadcrumb(index) {
+    const crumb = feBreadcrumbs[index];
+    if (crumb) {
+      feCurrentPath = crumb.path;
+      loadMediaVault();
+    }
+  }
+
+  function navigateExplorerRoot(root) {
+    if (!root || !feRoots.includes(root)) return;
+    feCurrentPath = root;
+    loadMediaVault();
+  }
+
+  function navigateExplorerUp() {
+    if (!feParentPath) return;
+    feCurrentPath = feParentPath;
+    loadMediaVault();
+  }
+
+  function openExplorerEntry(index) {
+    const entry = feFiles[index];
+    if (!entry || entry.kind !== 'directory') return;
+    feCurrentPath = entry.path;
+    loadMediaVault();
   }
 
   function setFileCategoryFilter(cat) {
@@ -918,37 +987,38 @@
   }
 
   function getFileIcon(cat, ext) {
+    if (cat === 'directory') return '📁';
+    if (cat === 'symlink') return '↗️';
     if (cat === 'pdf') return '📖';
     if (cat === 'video') return '🎬';
     if (cat === 'audio') return '🎵';
     if (cat === 'archive') return '📦';
     if (cat === 'image') return '🖼️';
+    if (cat === 'text') return '📄';
     return '📁';
   }
 
   function renderFileExplorer() {
-    let files = [...feFiles];
-
-    // Filter by Category
-    if (feCategoryFilter !== 'all') {
-      files = files.filter(f => f.category === feCategoryFilter);
-    }
-
-    // Filter by Search Query
-    if (feSearchQuery) {
-      files = files.filter(f => f.name.toLowerCase().includes(feSearchQuery));
-    }
-
-    // Sort
+    const directories = feFiles.filter(entry =>
+      entry.kind === 'directory' &&
+      feCategoryFilter === 'all' &&
+      (!feSearchQuery || entry.name.toLowerCase().includes(feSearchQuery))
+    ).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const files = feFiles.filter(entry =>
+      entry.kind === 'file' &&
+      (feCategoryFilter === 'all' || entry.category === feCategoryFilter || (feCategoryFilter === 'other' && entry.category === 'text')) &&
+      (!feSearchQuery || entry.name.toLowerCase().includes(feSearchQuery))
+    );
     files.sort((a, b) => {
       if (feSortMode === 'date-desc') return new Date(b.mtime) - new Date(a.mtime);
       if (feSortMode === 'date-asc') return new Date(a.mtime) - new Date(b.mtime);
-      if (feSortMode === 'name-asc') return a.name.localeCompare(b.name);
-      if (feSortMode === 'name-desc') return b.name.localeCompare(a.name);
+      if (feSortMode === 'name-asc') return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      if (feSortMode === 'name-desc') return b.name.localeCompare(a.name, undefined, { sensitivity: 'base' });
       if (feSortMode === 'size-desc') return (b.sizeBytes || 0) - (a.sizeBytes || 0);
       if (feSortMode === 'size-asc') return (a.sizeBytes || 0) - (b.sizeBytes || 0);
       return 0;
     });
+    const entries = [...directories, ...files];
 
     const tableContainer = document.getElementById('fe-container-table');
     const gridContainer = document.getElementById('fe-container-grid');
@@ -960,34 +1030,63 @@
       tableContainer.style.display = 'block';
       gridContainer.style.display = 'none';
 
-      if (files.length === 0) {
+      if (entries.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-5); padding: 32px;">Bu filtrede dosya bulunmuyor.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = files.map(f => {
+      tbody.innerHTML = entries.map(f => {
+        const entryIndex = feFiles.indexOf(f);
         const icon = getFileIcon(f.category, f.ext);
+        if (f.kind === 'directory') {
+          return `
+            <tr class="fe-directory-row" ondblclick="openExplorerEntry(${entryIndex})">
+              <td></td>
+              <td>
+                <button class="fe-entry-name fe-directory-name" type="button" ondblclick="openExplorerEntry(${entryIndex})" onclick="openExplorerEntry(${entryIndex})">
+                  <span class="fe-entry-icon">${icon}</span>${escapeHtml(f.name)}
+                </button>
+              </td>
+              <td><span class="badge">KLASÖR</span></td>
+              <td>—</td>
+              <td>${escapeHtml(f.dateFormatted)}</td>
+              <td><button class="btn btn-secondary btn-sm" type="button" onclick="openExplorerEntry(${entryIndex})">Aç →</button></td>
+            </tr>
+          `;
+        }
+        if (f.kind !== 'file') {
+          return `
+            <tr>
+              <td></td>
+              <td><span class="fe-entry-icon">${icon}</span>${escapeHtml(f.name)}</td>
+              <td><span class="badge">BAĞLANTI</span></td>
+              <td>—</td>
+              <td>${escapeHtml(f.dateFormatted)}</td>
+              <td><span class="fe-unavailable">Güvenlik için takip edilmiyor</span></td>
+            </tr>
+          `;
+        }
         return `
           <tr>
-            <td><input type="checkbox" class="vault-item-check" data-name="${escapeHtml(f.name)}"></td>
+            <td><input type="checkbox" class="vault-item-check" data-path="${escapeHtml(f.path)}" aria-label="${escapeHtml(f.name)} dosyasını seç"></td>
             <td>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 16px;">${icon}</span>
-                <a href="javascript:void(0)" onclick="previewFile('${encodeURIComponent(f.name)}', '${f.category}', '${f.downloadUrl}')" style="font-weight: 600; color: #fff; text-decoration: none; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(f.name)}">
+                <button type="button" onclick="previewExplorerFile(${entryIndex})" class="fe-entry-name" title="${escapeHtml(f.name)}">
                   ${escapeHtml(f.name)}
-                </a>
+                </button>
               </div>
             </td>
-            <td><span class="badge" style="font-size: 10px;">${f.category.toUpperCase()} (${escapeHtml(f.ext)})</span></td>
+            <td><span class="badge" style="font-size: 10px;">${escapeHtml(f.category.toUpperCase())} (${escapeHtml(f.ext)})</span></td>
             <td style="font-family: var(--font-mono); font-size: 12px; color: #fff;">${f.sizeFormatted}</td>
             <td style="color: var(--text-4); font-size: 11px;">${f.dateFormatted}</td>
             <td>
               <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                <button class="btn btn-primary btn-sm" onclick="previewFile('${encodeURIComponent(f.name)}', '${f.category}', '${f.downloadUrl}')" style="padding: 4px 7px;">👁️ Aç</button>
-                <button class="btn btn-secondary btn-sm" onclick="openSendWaModal('${encodeURIComponent(f.name)}')" title="WhatsApp'a Gönder" style="padding: 4px 7px;">📲 WA</button>
+                <button class="btn btn-primary btn-sm" onclick="previewExplorerFile(${entryIndex})" style="padding: 4px 7px;">👁️ Aç</button>
+                <button class="btn btn-secondary btn-sm" onclick="openSendWaExplorerEntry(${entryIndex})" title="WhatsApp'a Gönder" style="padding: 4px 7px;">📲 WA</button>
                 <a href="${f.downloadUrl}" download class="btn btn-secondary btn-sm" style="padding: 4px 7px;" title="İndir">⬇️</a>
-                <button class="btn btn-secondary btn-sm" onclick="renameFilePrompt('${encodeURIComponent(f.name)}')" title="Yeniden Adlandır" style="padding: 4px 7px;">✏️</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteMediaFile('${encodeURIComponent(f.name)}')" title="Sil" style="padding: 4px 7px;">🗑️</button>
+                <button class="btn btn-secondary btn-sm" onclick="renameExplorerEntry(${entryIndex})" title="Yeniden Adlandır" style="padding: 4px 7px;">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteExplorerEntry(${entryIndex})" title="Sil" style="padding: 4px 7px;">🗑️</button>
               </div>
             </td>
           </tr>
@@ -997,32 +1096,50 @@
       tableContainer.style.display = 'none';
       gridContainer.style.display = 'grid';
 
-      if (files.length === 0) {
+      if (entries.length === 0) {
         gridContainer.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: var(--text-5); padding: 32px;">Bu filtrede dosya bulunmuyor.</div>';
         return;
       }
 
-      gridContainer.innerHTML = files.map(f => {
+      gridContainer.innerHTML = entries.map(f => {
+        const entryIndex = feFiles.indexOf(f);
         const icon = getFileIcon(f.category, f.ext);
+        if (f.kind === 'directory') {
+          return `
+            <button class="fe-card fe-directory-card" type="button" onclick="openExplorerEntry(${entryIndex})">
+              <div class="fe-top"><div class="fe-icon-box">${icon}</div><div class="fe-name">${escapeHtml(f.name)}</div></div>
+              <div class="fe-meta"><span>Klasör</span><span>${escapeHtml(f.dateFormatted.split(' ')[0])}</span></div>
+              <span class="fe-open-folder">Klasörü aç →</span>
+            </button>
+          `;
+        }
+        if (f.kind !== 'file') {
+          return `
+            <div class="fe-card">
+              <div class="fe-top"><div class="fe-icon-box">${icon}</div><div class="fe-name">${escapeHtml(f.name)}</div></div>
+              <div class="fe-meta"><span>Sembolik bağlantı</span><span>Takip edilmiyor</span></div>
+            </div>
+          `;
+        }
         return `
           <div class="fe-card">
             <div class="fe-top">
-              <input type="checkbox" class="vault-item-check" data-name="${escapeHtml(f.name)}" style="margin-top: 3px;">
+              <input type="checkbox" class="vault-item-check" data-path="${escapeHtml(f.path)}" aria-label="${escapeHtml(f.name)} dosyasını seç" style="margin-top: 3px;">
               <div class="fe-icon-box">${icon}</div>
-              <div class="fe-name" title="${escapeHtml(f.name)}" onclick="previewFile('${encodeURIComponent(f.name)}', '${f.category}', '${f.downloadUrl}')" style="cursor: pointer;">
+              <button type="button" class="fe-name" title="${escapeHtml(f.name)}" onclick="previewExplorerFile(${entryIndex})">
                 ${escapeHtml(f.name)}
-              </div>
+              </button>
             </div>
             <div class="fe-meta">
               <span>${f.sizeFormatted}</span>
               <span>${f.dateFormatted.split(' ')[0]}</span>
             </div>
             <div class="fe-actions">
-              <button class="btn btn-primary btn-sm" onclick="previewFile('${encodeURIComponent(f.name)}', '${f.category}', '${f.downloadUrl}')" style="flex: 1; padding: 4px 6px;">Aç</button>
-              <button class="btn btn-secondary btn-sm" onclick="openSendWaModal('${encodeURIComponent(f.name)}')" title="WhatsApp" style="padding: 4px 6px;">📲</button>
+              <button class="btn btn-primary btn-sm" onclick="previewExplorerFile(${entryIndex})" style="flex: 1; padding: 4px 6px;">Aç</button>
+              <button class="btn btn-secondary btn-sm" onclick="openSendWaExplorerEntry(${entryIndex})" title="WhatsApp" style="padding: 4px 6px;">📲</button>
               <a href="${f.downloadUrl}" download class="btn btn-secondary btn-sm" style="padding: 4px 6px;" title="İndir">⬇️</a>
-              <button class="btn btn-secondary btn-sm" onclick="renameFilePrompt('${encodeURIComponent(f.name)}')" title="Adlandır" style="padding: 4px 6px;">✏️</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteMediaFile('${encodeURIComponent(f.name)}')" title="Sil" style="padding: 4px 6px;">🗑️</button>
+              <button class="btn btn-secondary btn-sm" onclick="renameExplorerEntry(${entryIndex})" title="Adlandır" style="padding: 4px 6px;">✏️</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteExplorerEntry(${entryIndex})" title="Sil" style="padding: 4px 6px;">🗑️</button>
             </div>
           </div>
         `;
@@ -1031,10 +1148,22 @@
   }
 
   function toggleSelectAllVault(state) {
-    document.querySelectorAll('.vault-item-check').forEach(cb => cb.checked = state);
+    document.querySelectorAll('.vault-item-check').forEach(cb => {
+      cb.checked = state;
+    });
   }
 
-  function previewFile(encodedName, category, downloadUrl) {
+  function previewExplorerFile(index) {
+    const entry = feFiles[index];
+    if (!entry || entry.kind !== 'file') return;
+    const query = new URLSearchParams({ path: entry.path });
+    const previewUrl = entry.category === 'other'
+      ? entry.downloadUrl
+      : `/api/files/content?${query.toString()}`;
+    previewFile(encodeURIComponent(entry.name), entry.category, previewUrl, entry.downloadUrl);
+  }
+
+  function previewFile(encodedName, category, downloadUrl, fileDownloadUrl = downloadUrl) {
     const rawName = decodeURIComponent(encodedName);
     const modal = document.getElementById('file-preview-modal');
     const titleEl = document.getElementById('preview-modal-title');
@@ -1044,10 +1173,12 @@
 
     titleEl.innerText = rawName;
     badgeEl.innerText = (category || 'DOSYA').toUpperCase();
-    dlLink.href = downloadUrl;
+    dlLink.href = fileDownloadUrl;
 
     if (category === 'pdf') {
       bodyEl.innerHTML = `<iframe src="${downloadUrl}#toolbar=1" style="width: 100%; height: 75vh; border: none; background: #27272a;"></iframe>`;
+    } else if (category === 'text') {
+      bodyEl.innerHTML = `<iframe title="${escapeHtml(rawName)}" src="${downloadUrl}" sandbox style="width: 100%; height: 75vh; border: none; background: #0c1219;"></iframe>`;
     } else if (category === 'video') {
       bodyEl.innerHTML = `<video id="modal-preview-video" playsinline controls style="width: 100%; max-height: 520px;" src="${downloadUrl}"></video>`;
       setTimeout(() => {
@@ -1069,7 +1200,7 @@
         <div style="padding: 40px; text-align: center; color: var(--text-3);">
           <div style="font-size: 44px; margin-bottom: 12px;">📁</div>
           <p style="margin-bottom: 16px; color: #fff;">Bu dosya türü için tarayıcı içi önizleme desteklenmiyor.</p>
-          <a href="${downloadUrl}" download class="btn btn-primary">Dosyayı İndir</a>
+          <a href="${fileDownloadUrl}" download class="btn btn-primary">Dosyayı İndir</a>
         </div>
       `;
     }
@@ -1084,9 +1215,9 @@
     modal.classList.remove('active');
   }
 
-  function openSendWaModal(encodedName) {
-    const rawName = decodeURIComponent(encodedName);
-    currentSendWaFile = rawName;
+  function openSendWaModal(filePath) {
+    currentSendWaFile = filePath;
+    const rawName = filePath.split(/[\\/]/).pop();
     document.getElementById('wa-send-file-name').value = rawName;
     
     const savedPhone = localStorage.getItem('last_wa_recipient') || '05332624732';
@@ -1094,6 +1225,12 @@
     document.getElementById('wa-send-caption-input').value = '';
 
     document.getElementById('file-send-wa-modal').classList.add('active');
+  }
+
+  function openSendWaExplorerEntry(index) {
+    const entry = feFiles[index];
+    if (!entry || entry.kind !== 'file') return;
+    openSendWaModal(entry.path);
   }
 
   function closeSendWaModal() {
@@ -1117,7 +1254,12 @@
       const res = await fetch('/api/files/send-wa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: currentSendWaFile, phone, caption })
+        body: JSON.stringify({
+          filename: currentSendWaFile.split(/[\\/]/).pop(),
+          path: currentSendWaFile,
+          phone,
+          caption
+        })
       });
       const data = await res.json();
       if (data.success) {
@@ -1137,12 +1279,12 @@
   async function sendSelectedFilesPrompt() {
     const selected = [];
     document.querySelectorAll('.vault-item-check:checked').forEach(cb => {
-      selected.push(cb.getAttribute('data-name'));
+      selected.push(cb.getAttribute('data-path'));
     });
     if (selected.length === 0) return showToast('Lütfen gönderilecek en az bir dosya seçin.');
 
     if (selected.length === 1) {
-      return openSendWaModal(encodeURIComponent(selected[0]));
+      return openSendWaModal(selected[0]);
     }
 
     const defaultNum = localStorage.getItem('last_wa_recipient') || '05332624732';
@@ -1155,30 +1297,34 @@
     let sent = 0;
     for (const f of selected) {
       try {
-        await fetch('/api/files/send-wa', {
+        const res = await fetch('/api/files/send-wa', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: f, phone })
+          body: JSON.stringify({ filename: f.split(/[\\/]/).pop(), path: f, phone })
         });
-        sent++;
-      } catch (e) {}
+        const data = await res.json();
+        if (res.ok && data.success) sent++;
+      } catch (e) {
+        console.error('WhatsApp dosya gönderme hatası:', e);
+      }
     }
     showToast(`${sent} dosya WhatsApp gönderimine alındı!`);
   }
 
-  async function renameFilePrompt(encodedName) {
-    const rawName = decodeURIComponent(encodedName);
-    const newName = prompt('Yeni dosya adını girin:', rawName);
-    if (!newName || newName.trim() === '' || newName === rawName) return;
+  async function renameExplorerEntry(index) {
+    const entry = feFiles[index];
+    if (!entry || entry.kind !== 'file') return;
+    const newName = prompt('Yeni dosya adını girin:', entry.name);
+    if (!newName || newName.trim() === '' || newName === entry.name) return;
 
     try {
       const res = await fetch('/api/files/rename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oldName: rawName, newName: newName.trim() })
+        body: JSON.stringify({ oldName: entry.name, path: entry.path, newName: newName.trim() })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         showToast('Dosya yeniden adlandırıldı: ' + data.newName);
         loadMediaVault();
       } else {
@@ -1189,18 +1335,19 @@
     }
   }
 
-  async function deleteMediaFile(encodedName) {
-    const rawName = decodeURIComponent(encodedName);
-    if (!confirm(`"${rawName}" dosyasını sunucudan silmek istediğinize emin misiniz?`)) return;
+  async function deleteExplorerEntry(index) {
+    const entry = feFiles[index];
+    if (!entry || entry.kind !== 'file') return;
+    if (!confirm(`"${entry.name}" dosyasını sunucudan kalıcı olarak silmek istediğinize emin misiniz?`)) return;
 
     try {
       const res = await fetch('/api/files/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: rawName })
+        body: JSON.stringify({ paths: [entry.path] })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         showToast('Dosya silindi.');
         loadMediaVault();
       } else {
@@ -1214,22 +1361,24 @@
   async function deleteSelectedFilesAction() {
     const selected = [];
     document.querySelectorAll('.vault-item-check:checked').forEach(cb => {
-      selected.push(cb.getAttribute('data-name'));
+      selected.push(cb.getAttribute('data-path'));
     });
     if (selected.length === 0) return showToast('Lütfen silmek için dosya seçin.');
 
-    if (!confirm(`Seçilen ${selected.length} dosyayı kalıcı olarak silmek istiyor musunuz?`)) return;
+    if (!confirm(`Seçilen ${selected.length} dosya kalıcı olarak silinecek. Bu işlem geri alınamaz. Devam edilsin mi?`)) return;
 
     try {
       const res = await fetch('/api/files/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filenames: selected })
+        body: JSON.stringify({ paths: selected })
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         showToast(`${data.deletedCount || selected.length} dosya silindi.`);
         loadMediaVault();
+      } else {
+        showToast('Silme hatası: ' + (data.error || 'Dosyalar silinemedi.'));
       }
     } catch (e) {
       showToast('Silme hatası: ' + e.message);
@@ -1239,7 +1388,7 @@
   async function zipSelectedFiles() {
     const selected = [];
     document.querySelectorAll('.vault-item-check:checked').forEach(cb => {
-      selected.push(cb.getAttribute('data-name'));
+      selected.push(cb.getAttribute('data-path'));
     });
 
     if (selected.length === 0) return showToast('Lütfen sıkıştırmak için dosya seçin.');
@@ -1249,7 +1398,7 @@
       const res = await fetch('/api/files/zip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filenames: selected })
+        body: JSON.stringify({ paths: selected })
       });
       const data = await res.json();
       if (data.success && data.zipUrl) {
@@ -1262,10 +1411,6 @@
     } catch (e) {
       showToast('ZIP oluşturulamadı: ' + e.message);
     }
-  }
-
-  function openVideoModal(encodedName) {
-    previewFile(encodedName, 'video', `/downloads/${encodedName}`);
   }
 
   function closeVideoModal() {
@@ -1390,10 +1535,11 @@
         const cont = document.getElementById('gp-category-checkboxes');
         cont.innerHTML = Object.entries(catData.categories).map(([k, v]) => `
           <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #fff; cursor: pointer;">
-            <input type="checkbox" class="gp-cat-check" value="${k}">
-            <span>${v.name || k}</span>
+            <input type="checkbox" class="gp-cat-check" value="${escapeHtml(k)}">
+            <span>${escapeHtml(v.name || k)}</span>
           </label>
         `).join('');
+        renderCategoryManager(catData.categories, catData.commandCategoryMap || {});
       }
 
       // Load active group rules
@@ -1422,7 +1568,90 @@
     }
   }
 
+  function renderCategoryManager(categories, commandCategoryMap) {
+    const commandSelect = document.getElementById('category-command-select');
+    const targetSelect = document.getElementById('category-target-select');
+    const list = document.getElementById('category-manager-list');
+    if (!commandSelect || !targetSelect || !list) return;
+
+    const categoryEntries = Object.entries(categories);
+    const commandEntries = Object.entries(commandCategoryMap)
+      .sort(([left], [right]) => left.localeCompare(right, 'tr'));
+
+    targetSelect.innerHTML = categoryEntries.map(([key, category]) =>
+      `<option value="${escapeHtml(key)}">${escapeHtml(category.icon || '📁')} ${escapeHtml(category.name || key)}</option>`
+    ).join('');
+    commandSelect.innerHTML = commandEntries.map(([command, categoryKey]) => {
+      const category = categories[categoryKey];
+      const label = category?.name || categoryKey;
+      return `<option value="${escapeHtml(command)}">${escapeHtml(command)} · ${escapeHtml(label)}</option>`;
+    }).join('');
+
+    list.innerHTML = categoryEntries.map(([key, category]) => {
+      const commands = Array.isArray(category.commands) ? category.commands : [];
+      const commandTags = commands.length
+        ? commands.map(command => `<span class="category-command-tag">${escapeHtml(command)}</span>`).join('')
+        : '<span class="category-empty">Henüz komut eklenmedi</span>';
+      return `
+        <article class="category-manager-item">
+          <div class="category-manager-item-heading">
+            <span class="category-manager-icon">${escapeHtml(category.icon || '📁')}</span>
+            <div class="category-manager-name">
+              <strong>${escapeHtml(category.name || key)}</strong>
+              <span>${commands.length} komut · ${escapeHtml(key)}</span>
+            </div>
+          </div>
+          <div class="category-command-tags">${commandTags}</div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  async function saveCategoryAction() {
+    const nameInput = document.getElementById('category-new-name');
+    const iconInput = document.getElementById('category-new-icon');
+    const name = nameInput.value.trim();
+    if (!name) return showToast('Kategori adı girin.');
+
+    try {
+      const res = await fetch('/api/permissions/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add', name, icon: iconInput.value.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Kategori kaydedilemedi.');
+      nameInput.value = '';
+      iconInput.value = '';
+      await loadGroupPermissionsAction();
+      showToast('Kategori kaydedildi.');
+    } catch (e) {
+      showToast('Kategori eklenemedi: ' + e.message);
+    }
+  }
+
+  async function moveCategoryCommandAction() {
+    const command = document.getElementById('category-command-select').value;
+    const category = document.getElementById('category-target-select').value;
+    if (!command || !category) return showToast('Komut ve hedef kategori seçin.');
+
+    try {
+      const res = await fetch('/api/permissions/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'move', command, category })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Komut taşınamadı.');
+      await loadGroupPermissionsAction();
+      showToast(`"${command}" komutu kategoriye taşındı.`);
+    } catch (e) {
+      showToast('Komut taşınamadı: ' + e.message);
+    }
+  }
+
   async function fetchWhatsAppGroupsAction() {
+    console.log('fetchWhatsAppGroupsAction called');
     try {
       showToast('WhatsApp grupları taranıyor...');
       const res = await fetch('/api/permissions/whatsapp-groups');
@@ -1434,15 +1663,16 @@
         showToast(`${data.groups.length} WhatsApp grubu bulundu.`);
       }
     } catch (e) {
+      console.error('Error in fetchWhatsAppGroupsAction:', e);
       showToast('Gruplar alınamadı: ' + e.message);
+      // Fallback alert
+      alert('Error: ' + e.message);
     }
   }
 
   function onSelectWhatsAppGroup(jid) {
     if (jid) document.getElementById('gp-group-jid').value = jid;
   }
-
-  function toggleGpModeHelp() {}
 
   async function saveGroupPermissionAction() {
     const jid = document.getElementById('gp-group-jid').value.trim();

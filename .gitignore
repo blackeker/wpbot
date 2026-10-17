@@ -15,3 +15,6 @@ yt-dlp
 *.log
 *.db
 scratch/
+data/
+data/ai_memory.json
+data/user_profiles.json

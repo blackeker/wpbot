@@ -342,7 +342,6 @@ async function processSingleMessage(sock, msg) {
     ? msg.messageTimestamp
     : (msg.messageTimestamp?.low || Number(msg.messageTimestamp) || 0);
   if (msgTimestamp > 0 && (nowSec - msgTimestamp) > 180) {
-    console.log(`[IGNORE OLD MSG] Dropped message from ${msg.key?.remoteJid} (${nowSec - msgTimestamp}s old)`);
     return;
   }
 

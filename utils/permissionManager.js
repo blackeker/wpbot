@@ -1,4 +1,6 @@
-import { readConfig, writeConfig } from '../config.js';
+import { dataPath, readConfig, writeConfig } from '../config.js';
+import fs from 'fs';
+import path from 'path';
 
 // All supported adult / NSFW domains for automatic group restriction
 export const ADULT_DOMAINS = [
@@ -163,10 +165,122 @@ export function getCanonicalCommandName(nameOrAlias) {
 }
 
 /**
+ * Mutable command -> category map (single source of truth for command placement).
+ * Initialized from CATEGORIES; can be edited at runtime and persisted to permissions.json.
+ */
+export const COMMAND_CATEGORY_MAP = {};
+for (const [categoryKey, catData] of Object.entries(CATEGORIES)) {
+  for (const cmd of (catData.commands || [])) {
+    COMMAND_CATEGORY_MAP[cmd] = categoryKey;
+  }
+}
+
+export function rebuildCategoriesFromMap() {
+  for (const cat of Object.values(CATEGORIES)) {
+    cat.commands = [];
+  }
+  for (const [cmd, catKey] of Object.entries(COMMAND_CATEGORY_MAP)) {
+    if (!CATEGORIES[catKey]) CATEGORIES[catKey] = { name: catKey, icon: '📁', description: '', commands: [] };
+    if (!CATEGORIES[catKey].commands.includes(cmd)) CATEGORIES[catKey].commands.push(cmd);
+  }
+}
+
+export function moveCommandToCategory(command, newCategory) {
+  if (typeof command !== 'string' || typeof newCategory !== 'string') return false;
+  const canonical = getCanonicalCommandName(command);
+  if (!canonical || !Object.hasOwn(COMMAND_CATEGORY_MAP, canonical) || !Object.hasOwn(CATEGORIES, newCategory)) {
+    return false;
+  }
+  for (const cat of Object.values(CATEGORIES)) {
+    const idx = cat.commands.indexOf(canonical);
+    if (idx !== -1) cat.commands.splice(idx, 1);
+  }
+  if (!CATEGORIES[newCategory].commands.includes(canonical)) CATEGORIES[newCategory].commands.push(canonical);
+  COMMAND_CATEGORY_MAP[canonical] = newCategory;
+  return true;
+}
+
+export function addCategory(key, name, icon = '📁', description = '') {
+  if (!key || !/^[a-z0-9_-]+$/.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key) || Object.hasOwn(CATEGORIES, key) || typeof name !== 'string' || !name.trim()) return false;
+  CATEGORIES[key] = { name, icon, description, commands: [] };
+  return true;
+}
+
+export function renameCategory(oldKey, newKey, newName) {
+  if (!Object.hasOwn(CATEGORIES, oldKey) || !newKey || !/^[a-z0-9_-]+$/.test(newKey) || ['__proto__', 'constructor', 'prototype'].includes(newKey)) return false;
+  if (oldKey !== newKey && Object.hasOwn(CATEGORIES, newKey)) return false;
+  if (oldKey === newKey) {
+    if (newName) CATEGORIES[oldKey].name = newName;
+    return true;
+  }
+  CATEGORIES[newKey] = { ...CATEGORIES[oldKey], name: newName || CATEGORIES[oldKey].name };
+  delete CATEGORIES[oldKey];
+  for (const [cmd, cat] of Object.entries(COMMAND_CATEGORY_MAP)) {
+    if (cat === oldKey) COMMAND_CATEGORY_MAP[cmd] = newKey;
+  }
+  return true;
+}
+
+const PERMISSIONS_FILE = path.join(dataPath, 'permissions.json');
+
+export function savePermissionsToFile() {
+  try {
+    const payload = {
+      categories: CATEGORIES,
+      commandCategoryMap: COMMAND_CATEGORY_MAP,
+      savedAt: new Date().toISOString()
+    };
+    fs.mkdirSync(path.dirname(PERMISSIONS_FILE), { recursive: true });
+    const temporaryPath = `${PERMISSIONS_FILE}.${process.pid}.tmp`;
+    fs.writeFileSync(temporaryPath, JSON.stringify(payload, null, 2), 'utf8');
+    fs.renameSync(temporaryPath, PERMISSIONS_FILE);
+    return true;
+  } catch (e) {
+    console.error('[PERMISSION] save failed:', e.message);
+    return false;
+  }
+}
+
+export function loadPermissionsFromFile() {
+  try {
+    if (!fs.existsSync(PERMISSIONS_FILE)) return false;
+    const raw = JSON.parse(fs.readFileSync(PERMISSIONS_FILE, 'utf8'));
+    if (raw.categories && typeof raw.categories === 'object' && !Array.isArray(raw.categories)) {
+      for (const k of Object.keys(CATEGORIES)) delete CATEGORIES[k];
+      for (const [key, category] of Object.entries(raw.categories)) {
+        if (!/^[a-z0-9_-]+$/.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key) || !category || typeof category !== 'object' || Array.isArray(category)) continue;
+        CATEGORIES[key] = {
+          name: typeof category.name === 'string' ? category.name : key,
+          icon: typeof category.icon === 'string' ? category.icon : '📁',
+          description: typeof category.description === 'string' ? category.description : '',
+          commands: Array.isArray(category.commands) ? category.commands.filter(command => typeof command === 'string') : []
+        };
+      }
+    }
+    if (raw.commandCategoryMap && typeof raw.commandCategoryMap === 'object' && !Array.isArray(raw.commandCategoryMap)) {
+      for (const k of Object.keys(COMMAND_CATEGORY_MAP)) delete COMMAND_CATEGORY_MAP[k];
+      for (const [command, categoryKey] of Object.entries(raw.commandCategoryMap)) {
+        if (typeof categoryKey === 'string' && Object.hasOwn(CATEGORIES, categoryKey)) {
+          COMMAND_CATEGORY_MAP[command] = categoryKey;
+        }
+      }
+      rebuildCategoriesFromMap();
+    }
+    return true;
+  } catch (e) {
+    console.error('[PERMISSION] load failed:', e.message);
+    return false;
+  }
+}
+
+loadPermissionsFromFile();
+
+/**
  * Gets the category key for a given command name or alias.
  */
 export function getCommandCategory(nameOrAlias) {
   const canonical = getCanonicalCommandName(nameOrAlias);
+  if (COMMAND_CATEGORY_MAP[canonical]) return COMMAND_CATEGORY_MAP[canonical];
   for (const [categoryKey, catData] of Object.entries(CATEGORIES)) {
     if (catData.commands.includes(canonical)) {
       return categoryKey;
