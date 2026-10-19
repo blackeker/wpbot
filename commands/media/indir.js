@@ -66,31 +66,39 @@ function buildAnimecixEpisodeUrl(origUrl, titleId, season, slug, ep) {
 
 export default {
   name: 'indir',
-  aliases: ['download'],
-  async execute(sock, msg, from, args, ctx) {
-    const isMp3Cmd = ctx.text.startsWith('!mp3');
-    const isIndir = ctx.text.startsWith('!indir') || ctx.text.startsWith('!download') || isMp3Cmd;
+  aliases: ['download', 'dl', 'indirme'],
+  async execute(sock, msg, from, args = [], ctx = {}) {
+    const rawText = ctx?.text || args.join(' ') || '';
+    const isMp3Cmd = rawText.startsWith('!mp3') || /\bmp3\b/i.test(rawText);
+    const isIndir = rawText.startsWith('!indir') || rawText.startsWith('!download') || isMp3Cmd;
 
-    const parts = ctx.text.trim().split(/\s+/);
-    if (isIndir && parts.length < 2) {
+    const combinedInput = [rawText, ...(Array.isArray(args) ? args : [])].join(' ').trim();
+    const parts = combinedInput.split(/\s+/).filter(Boolean);
+    if (isIndir && parts.length < 2 && (!args || args.length === 0)) {
       await sock.sendMessage(from, { text: '📢 Link gönder, hemen indir! Sıramı görmek için *kuyruk* yaz.' });
       return;
     }
 
-    const priority = parts.includes('--oncelikli') || parts.includes('--öncelikli');
-    const burnSubtitles = parts.includes('--hardsub') || parts.includes('--gomulu') || parts.includes('--gömülü');
-    let urls = parts.filter(p => p.startsWith('http://') || p.startsWith('https://') || p.startsWith('magnet:'));
+    const priority = parts.includes('--oncelikli') || parts.includes('--öncelikli') || /\b(acil|öncelikli|oncelikli)\b/i.test(combinedInput);
+    const burnSubtitles = parts.includes('--hardsub') || parts.includes('--gomulu') || parts.includes('--gömülü') || /\b(gömülü|gomulu|hardsub)\b/i.test(combinedInput);
+    const matchedUrls = combinedInput.match(/(?:https?:\/\/|magnet:\?)[^\s"',<>]+/gi) || [];
+    let urls = [...new Set(matchedUrls)];
     if (urls.length === 0) {
       await sock.sendMessage(from, { text: 'Lütfen geçerli bir link belirtin. Örnek: `!indir https://animecix.net/...`' });
       return;
     }
 
-    // Check if arguments specify an episode range (e.g. `!indir <url> 10 15`, `!indir <url> 10-15`, `!indir <url> 50+`, `!indir <url> 50 son`, `!indir <url_230> 244`)
+    // Check if arguments specify an episode range (e.g. `!indir <url> 10 15`, `!indir <url> 10-15`, `1 ile 12 arası`, `50+`, `!indir <url> 50 son`)
     let numRange = null;
     const nonUrlParts = parts.filter(p => !p.startsWith('http://') && !p.startsWith('https://') && !p.startsWith('magnet:') && !p.startsWith('!') && !p.startsWith('--'));
     const joinedNonUrls = nonUrlParts.join(' ').trim();
-    const rangeMatch = joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s*[-to–—]\s*(\d+(?:\.\d+)?)$/i) || joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
-    const plusMatch = joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s*(?:\+|son|sonrasi|sonrası|-)$/i);
+    const rangeMatch =
+      joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s*[-to–—]\s*(\d+(?:\.\d+)?)$/i) ||
+      joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/) ||
+      joinedNonUrls.match(/\b(\d+(?:\.\d+)?)\s*(?:[-–—]|ile|den|dan|'den|'dan|to)\s*(\d+(?:\.\d+)?)(?:\.\s*bölüm|\s*bölüm|\s*bolum|\s*arası|\s*arasi)?/i);
+    const plusMatch =
+      joinedNonUrls.match(/^(\d+(?:\.\d+)?)\s*(?:\+|son|sonrasi|sonrası|-)$/i) ||
+      joinedNonUrls.match(/\b(\d+(?:\.\d+)?)\s*(?:\+|ve\s*sonras[ıi]|bölümden\s*sonras[ıi])/i);
     const singleNumMatch = joinedNonUrls.match(/^(\d+(?:\.\d+)?)$/);
 
     if (rangeMatch) {

@@ -420,10 +420,14 @@ export class UserProfileManager {
       cleanText = cleanText.replace(directive.regex, '');
     }
 
-    // Boşlukları ve gereksiz satır başlarını düzelt
-    cleanText = cleanText.replace(/^\s+/, '').replace(/\s{2,}/g, ' ').trim();
+    // Yarım kalmış / kesilmiş [MEMORY_... veya [M... etiketlerini temizle (kullanıcıya sızmasını önle)
+    cleanText = cleanText.replace(/\[MEMORY_[A-Z_]*:?[^\]]*$/gi, '');
+    cleanText = cleanText.replace(/(?:\r?\n|\s)*\[M(?:EMORY)?[A-Z_]*:?[^\]]*$/g, '');
 
-     console.log('[USER PROFILE] Memory directives applied: %d actions', actionsApplied.length);
+    // Boşlukları ve gereksiz satır başlarını düzelt
+    cleanText = cleanText.replace(/^\s+/, '').replace(/[ \t]{2,}/g, ' ').trim();
+
+    console.log('[USER PROFILE] Memory directives applied: %d actions', actionsApplied.length);
     return { cleanText, actionsApplied };
   }
 
@@ -446,24 +450,32 @@ export class UserProfileManager {
       }
     }
 
-    // Şehir yakalama: "Ankara'da yaşıyorum", "Eskişehir'de mimarlık", "İzmir'deyim", "İstanbul'da oturuyorum"
-    // Soru cümlelerinde (örn: "hangi şehirdeyim?", "neredeyim?") veya genel kelimelerde atama yapılmaz
+    // Şehir yakalama: Sadece gerçek Türkiye illeri eşleştiğinde kaydet ("promptparda", "evde" gibi kelimeleri şehir sanma)
     const isQuestionAboutCity = lower.includes('hangi') || lower.includes('nerede') || lower.includes('?') || lower.includes('miyim') || lower.includes('muyum');
     if (!isQuestionAboutCity) {
-      const nonCities = ['şehir', 'sehir', 'nerede', 'neresi', 'burası', 'orası', 'hangi', 'ev', 'iş', 'ofis', 'yol', 'otobüs', 'araba', 'tren', 'uçak', 'tatil', 'otel', 'köy', 'oda', 'hakkım', 'veri', 'şey', 'bu', 'şu', 'o', 'ben', 'sen', 'biz', 'onlar', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on', 'var', 'yok'];
-        const cityMatches = [...text.matchAll(/([A-ZÇĞİÖŞÜa-zçğıöşü]{3,20})(?:['’]?(?:da|de|ta|te|a|e))\s*(?:yaşıyorum|ikamet\s+ediyorum|oturuyorum|bulunuyorum|çalışıyorum|okuyorum|taşındım|yerleştim)/gi)];
-        const cityMatch = cityMatches.at(-1);
-        if (cityMatch && cityMatch[1]) {
-          const c = cityMatch[1].trim();
-          if (!nonCities.includes(c.toLowerCase())) {
-            this.setNote(rawJid, 'sehir', c);
-          }
-        } else {
-          const cityShortMatch = text.match(/([A-ZÇĞİÖŞÜa-zçğıöşü]{3,20})(?:['’]?(?:da|de|ta|te|dayım|deyim|tayım|teyim))/i);
+      const VALID_CITIES = new Set([
+        'adana', 'adiyaman', 'afyon', 'afyonkarahisar', 'agri', 'aksaray', 'amasya', 'ankara', 'antalya', 'ardahan', 'artvin', 'aydin',
+        'balikesir', 'bartin', 'batman', 'bayburt', 'bilecik', 'bingol', 'bitlis', 'bolu', 'burdur', 'bursa', 'canakkale', 'cankiri',
+        'corum', 'denizli', 'diyarbakir', 'duzce', 'edirne', 'elazig', 'erzincan', 'erzurum', 'eskisehir', 'gaziantep', 'antep',
+        'giresun', 'gumushane', 'hakkari', 'hatay', 'antakya', 'igdir', 'isparta', 'istanbul', 'izmir', 'kahramanmaras', 'maras',
+        'karabuk', 'karaman', 'kars', 'kastamonu', 'kayseri', 'kilis', 'kirikkale', 'kirklareli', 'kirsehir', 'kocaeli', 'izmit',
+        'konya', 'kutahya', 'malatya', 'manisa', 'mardin', 'mersin', 'mugla', 'mus', 'nevsehir', 'nigde', 'ordu', 'osmaniye',
+        'rize', 'sakarya', 'adapazari', 'samsun', 'sanliurfa', 'urfa', 'siirt', 'sinop', 'sirnak', 'sivas', 'tekirdag', 'tokat',
+        'trabzon', 'tunceli', 'usak', 'van', 'yalova', 'yozgat', 'zonguldak', 'lefkosa', 'girne', 'gazimagusa'
+      ]);
+      const cityMatches = [...text.matchAll(/\b([A-ZÇĞİÖŞÜa-zçğıöşü]{3,20})(?:['’]?(?:da|de|ta|te|a|e))\s*(?:yaşıyorum|ikamet\s+ediyorum|oturuyorum|bulunuyorum|çalışıyorum|okuyorum|taşındım|yerleştim)\b/gi)];
+      const cityMatch = cityMatches.at(-1);
+      if (cityMatch && cityMatch[1]) {
+        const c = cityMatch[1].trim();
+        if (VALID_CITIES.has(normalizeMemoryValue(c))) {
+          this.setNote(rawJid, 'sehir', c.charAt(0).toUpperCase() + c.slice(1));
+        }
+      } else {
+        const cityShortMatch = text.match(/\b([A-ZÇĞİÖŞÜa-zçğıöşü]{3,20})(?:['’](?:da|de|ta|te)|['’]?(?:dayım|deyim|tayım|teyim))\b/i);
         if (cityShortMatch && cityShortMatch[1]) {
           const c = cityShortMatch[1].trim();
-          if (!nonCities.includes(c.toLowerCase())) {
-            this.setNote(rawJid, 'sehir', c);
+          if (VALID_CITIES.has(normalizeMemoryValue(c))) {
+            this.setNote(rawJid, 'sehir', c.charAt(0).toUpperCase() + c.slice(1));
           }
         }
       }

@@ -96,31 +96,31 @@ export async function execute(sock, msg, from, args, context = {}) {
       groupAiStatusLine = `👥 *Grup Yapay Zeka:* ${gCfg.allowAi !== false ? '🟢 Açık' : '🔴 Kapalı'}\n\n`;
     }
 
-    const statusText = `🤖 *YAPAY ZEKA SAĞLAYICI DURUMU*
+    const statusText = `🤖 *YAPAY ZEKA SAĞLAYICI DURUMU (Otomatik Seçim)*
 
-${groupAiStatusLine}1️⃣ *Groq (Birincil):*
-• Yapılandırıldı: ${groqSt.configured ? '✅ Evet' : '❌ Hayır'}
-• Model: \`${groqSt.model}\`
-• Durum: ${groqSt.coolingDown ? '⏳ Cooldown' : '🟢 Aktif'}
-• Başarılı / Hata: ${groqSt.stats.success} / ${groqSt.stats.errors}
+${groupAiStatusLine}1️⃣ *Ollama Cloud (Birincil - Otomatik Rotasyon):*
+• Yapılandırıldı: ${ollamaSt.configured ? '✅ Evet' : '❌ Hayır'} (${ollamaSt.keyCount} Aktif Key)
+• Model Havuzu: \`${ollamaSt.model}\` / \`gpt-oss:120b\`
+• Durum: ${ollamaSt.coolingDown ? '⏳ Cooldown' : '🟢 Aktif'}
+• Başarılı / Hata: ${ollamaSt.stats.success} / ${ollamaSt.stats.errors}
 
-2️⃣ *OpenRouter (İkincil Fallback):*
-• Yapılandırıldı: ${openrouterSt.configured ? '✅ Evet' : '❌ Hayır'}
-• Model: \`${openrouterSt.model}\`
-• Durum: ${openrouterSt.coolingDown ? '⏳ Cooldown' : '🟢 Aktif'}
-• Başarılı / Hata: ${openrouterSt.stats.success} / ${openrouterSt.stats.errors}
-
-3️⃣ *Google Gemini (Üçüncül Fallback):*
+2️⃣ *Google Gemini (İkincil Fallback):*
 • Yapılandırıldı: ${geminiSt.configured ? '✅ Evet' : '❌ Hayır'}
 • Model: \`${geminiSt.model}\`
 • Durum: ${geminiSt.coolingDown ? '⏳ Cooldown' : '🟢 Aktif'}
 • Başarılı / Hata: ${geminiSt.stats.success} / ${geminiSt.stats.errors}
 
-4️⃣ *Ollama (4x Multi-Key Fallback):*
-• Yapılandırıldı: ${ollamaSt.configured ? '✅ Evet' : '❌ Hayır'} (${ollamaSt.keyCount} Aktif Key)
-• Model: \`${ollamaSt.model}\`
-• Durum: ${ollamaSt.coolingDown ? '⏳ Cooldown' : '🟢 Aktif'}
-• Başarılı / Hata: ${ollamaSt.stats.success} / ${ollamaSt.stats.errors}
+3️⃣ *Groq (Üçüncül Ultra-Fast Fallback):*
+• Yapılandırıldı: ${groqSt.configured ? '✅ Evet' : '❌ Hayır'}
+• Model: \`${groqSt.model}\`
+• Durum: ${groqSt.coolingDown ? '⏳ Cooldown' : '🟢 Aktif'}
+• Başarılı / Hata: ${groqSt.stats.success} / ${groqSt.stats.errors}
+
+4️⃣ *OpenRouter (Yedek Fallback):*
+• Yapılandırıldı: ${openrouterSt.configured ? '✅ Evet' : '❌ Hayır'}
+• Model: \`${openrouterSt.model}\`
+• Durum: ${openrouterSt.coolingDown ? '⏳ Cooldown' : '🟢 Aktif'}
+• Başarılı / Hata: ${openrouterSt.stats.success} / ${openrouterSt.stats.errors}
 
 🧠 *Hafıza (Bellek):*
 • Aktif Sohbet Sayısı: ${memStats.activeSessions}

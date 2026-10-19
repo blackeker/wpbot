@@ -1,5 +1,59 @@
 [
   {
+    "title": "https://video.sibnet.ru/shell.php?videoid=6281353",
+    "url": "https://video.sibnet.ru/shell.php?videoid=6281353",
+    "error": "Extraction failed: No alternative video sources found on this page.",
+    "timestamp": "2026-10-18T22:21:12.911Z"
+  },
+  {
+    "title": "https://video.sibnet.ru/shell.php?videoid=6281270",
+    "url": "https://video.sibnet.ru/shell.php?videoid=6281270",
+    "error": "Extraction failed: No alternative video sources found on this page.",
+    "timestamp": "2026-10-18T22:21:06.466Z"
+  },
+  {
+    "title": "https://video.sibnet.ru/shell.php?videoid=6281247",
+    "url": "https://video.sibnet.ru/shell.php?videoid=6281247",
+    "error": "Extraction failed: No alternative video sources found on this page.",
+    "timestamp": "2026-10-18T22:21:06.195Z"
+  },
+  {
+    "title": "https://instagram.com/goldmakarnaelazig?utm_source=qr&dlrf=emJyN2h6aGxwc29m",
+    "url": "https://instagram.com/goldmakarnaelazig?utm_source=qr&dlrf=emJyN2h6aGxwc29m",
+    "error": "İndirme bağlantısı alınamadı. Tüm Instagram indirme servisleri yanıt vermiyor.",
+    "timestamp": "2026-10-18T19:29:45.123Z"
+  },
+  {
+    "title": "https://instagram.com/goldmakarnaelazig?utm_source=qr&dlrf=emJyN2h6aGxwc29m",
+    "url": "https://instagram.com/goldmakarnaelazig?utm_source=qr&dlrf=emJyN2h6aGxwc29m",
+    "error": "İndirme bağlantısı alınamadı. Tüm Instagram indirme servisleri yanıt vermiyor.",
+    "timestamp": "2026-10-18T11:00:59.124Z"
+  },
+  {
+    "title": "https://instagram.com/goldmakarnaelazig?utm_source=qr&dlrf=emJyN2h6aGxwc29m",
+    "url": "https://instagram.com/goldmakarnaelazig?utm_source=qr&dlrf=emJyN2h6aGxwc29m",
+    "error": "İndirme bağlantısı alınamadı. Tüm Instagram indirme servisleri yanıt vermiyor.",
+    "timestamp": "2026-10-17T21:06:55.979Z"
+  },
+  {
+    "title": "instagram_DemnnN4olNR.mp4",
+    "url": "https://www.instagram.com/reel/DemnnN4olNR/?dlrf=MXA1cXQxaDY4eWQybA==",
+    "error": "M3U8 download failed: ",
+    "timestamp": "2026-10-17T18:57:50.792Z"
+  },
+  {
+    "title": "https://www.instagram.com/p/DbQrHy2jWUQ/?vrfl=MWlyNnNtYW55cnUweA==",
+    "url": "https://www.instagram.com/p/DbQrHy2jWUQ/?vrfl=MWlyNnNtYW55cnUweA==",
+    "error": "İndirme bağlantısı alınamadı. Tüm Instagram indirme servisleri yanıt vermiyor.",
+    "timestamp": "2026-10-17T16:43:11.748Z"
+  },
+  {
+    "title": "https://www.instagram.com/p/DbQrHy2jWUQ/?xtok=MWlyNnNtYW55cnUweA==",
+    "url": "https://www.instagram.com/p/DbQrHy2jWUQ/?xtok=MWlyNnNtYW55cnUweA==",
+    "error": "İndirme bağlantısı alınamadı. Tüm Instagram indirme servisleri yanıt vermiyor.",
+    "timestamp": "2026-10-17T16:42:35.502Z"
+  },
+  {
     "title": "https://instagram.com/goldmakarnaelazig?utm_source=qr&dlrf=emJyN2h6aGxwc29m",
     "url": "https://instagram.com/goldmakarnaelazig?utm_source=qr&dlrf=emJyN2h6aGxwc29m",
     "error": "İndirme bağlantısı alınamadı. Tüm Instagram indirme servisleri yanıt vermiyor.",

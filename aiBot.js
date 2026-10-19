@@ -107,10 +107,11 @@ async function startAiBot() {
 
       // Print status of providers
       const status = aiEngine.getStatus();
-      console.log(`🔧 Sağlayıcı Durumu:`);
-      console.log(`   - Groq (Primary): ${status.providers.groq.configured ? '🟢 Aktif' : '🔴 API Key Eksik'}`);
-      console.log(`   - OpenRouter (Secondary): ${status.providers.openrouter.configured ? '🟢 Aktif' : '🔴 API Key Eksik'}`);
-      console.log(`   - Google Gemini (Tertiary): ${status.providers.gemini.configured ? '🟢 Aktif' : '🔴 API Key Eksik'}\n`);
+      console.log(`🔧 Sağlayıcı Durumu (Otomatik Seçim):`);
+      console.log(`   - Ollama Cloud (Primary): ${status.providers.ollama.configured ? '🟢 Aktif' : '🔴 API Key Eksik'}`);
+      console.log(`   - Google Gemini (Secondary): ${status.providers.gemini.configured ? '🟢 Aktif' : '🔴 API Key Eksik'}`);
+      console.log(`   - Groq (Tertiary): ${status.providers.groq.configured ? '🟢 Aktif' : '🔴 API Key Eksik'}`);
+      console.log(`   - OpenRouter (Backup): ${status.providers.openrouter.configured ? '🟢 Aktif' : '🔴 API Key Eksik'}\n`);
     }
   });
 
@@ -173,7 +174,7 @@ async function processIncomingMessage(sock, msg) {
   }
 
   // ── 1. Komut Kontrolleri (Reset / Durum) ─────────────────────
-  if (ltext === '!reset' || ltext === '!temizle' || ltext === '!hafiza' || ltext === '!unutmabeni') {
+  if (ltext === '!reset' || ltext === '!temizle' || ltext === '!unutmabeni') {
     memoryManager.clearHistory(from);
     await sock.sendMessage(from, { text: '🧠 *Konuşma hafızası sıfırlandı!* Yeni bir konudan konuşabiliriz.' }, { quoted: msg });
     return;
@@ -184,10 +185,11 @@ async function processIncomingMessage(sock, msg) {
     const engineStatus = aiEngine.getStatus();
     const reply = `🤖 *${BOT_NAME} Durum Raporu*
 
-⚡ *Yapay Zeka Fallback Havuzu:*
-1. Groq: ${engineStatus.providers.groq.configured ? '🟢 Aktif' : '🔴 Yapılandırılmadı'} (${engineStatus.providers.groq.stats.success} başarılı)
-2. OpenRouter: ${engineStatus.providers.openrouter.configured ? '🟢 Aktif' : '🔴 Yapılandırılmadı'} (${engineStatus.providers.openrouter.stats.success} başarılı)
-3. Google Gemini: ${engineStatus.providers.gemini.configured ? '🟢 Aktif' : '🔴 Yapılandırılmadı'} (${engineStatus.providers.gemini.stats.success} başarılı)
+⚡ *Yapay Zeka Havuzu (Otomatik Model Seçimi):*
+1. Ollama Cloud: ${engineStatus.providers.ollama.configured ? '🟢 Aktif' : '🔴 Yapılandırılmadı'} (${engineStatus.providers.ollama.stats.success} başarılı)
+2. Google Gemini: ${engineStatus.providers.gemini.configured ? '🟢 Aktif' : '🔴 Yapılandırılmadı'} (${engineStatus.providers.gemini.stats.success} başarılı)
+3. Groq: ${engineStatus.providers.groq.configured ? '🟢 Aktif' : '🔴 Yapılandırılmadı'} (${engineStatus.providers.groq.stats.success} başarılı)
+4. OpenRouter: ${engineStatus.providers.openrouter.configured ? '🟢 Aktif' : '🔴 Yapılandırılmadı'} (${engineStatus.providers.openrouter.stats.success} başarılı)
 
 🧠 *Hafıza:*
 • Aktif Sohbet: ${memStats.activeSessions}
@@ -333,11 +335,12 @@ async function processIncomingMessage(sock, msg) {
         }
         
         // Log success to memory
-        memoryManager.addMessage(from, {
-          role: 'assistant',
-          content: `[Varyasyon Üretildi: ${variations.length} adet varyasyon oluşturuldu]`,
-          senderName: BOT_NAME
-        });
+        memoryManager.addMessage(
+          from,
+          'assistant',
+          `[Varyasyon Üretildi: ${variations.length} adet varyasyon oluşturuldu]`,
+          { senderName: BOT_NAME }
+        );
         
         return; // Skip normal AI processing since we handled the variation request
       } catch (error) {

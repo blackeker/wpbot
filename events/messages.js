@@ -37,6 +37,7 @@ import {
   getGroupConfig
 } from '../utils/permissionManager.js';
 import { simulateIncomingRead, isSenderThrottled } from '../utils/antiBan.js';
+import { handleDownloadCommands } from '../ai/downloadCommands.js';
 
 export function isViewOnceMessage(rawMsg) {
   if (!rawMsg || typeof rawMsg !== 'object') return false;
@@ -485,10 +486,12 @@ async function processSingleMessage(sock, msg) {
     'empflix', 'sxyprn', 'sunporno', 'fuq', 'javforme', 'javhd', 'jav789', 'yerliifsa',
     'sikis', 'pornovakti', 'turkcealtyaziliporno', 'pornoizle', 'ifsadunyasi', 'guncelporno', 'yerliporno'
   ];
-  const isLink = text.startsWith('http://') || text.startsWith('https://');
-  const isDirectFileLink = isLink && /\.(mp4|mkv|avi|webm|apk|zip|rar|7z|pdf|exe)(\?.*)?$/i.test(text.split(' ')[0]);
-  const isSupportedLink = (isLink && (SUPPORTED_DOMAINS.some(d => text.includes(d)) || text.includes('itch.io') || text.includes('9mod.com'))) || isDirectFileLink;
-  const isTorrentUrl = text.startsWith('magnet:') || (isLink && /\.torrent(\?.*)?$/i.test(text.split(/\s+/)[0]));
+  const embeddedUrlMatch = text.match(/https?:\/\/[^\s"',<>]+/i);
+  const firstUrl = embeddedUrlMatch ? embeddedUrlMatch[0] : '';
+  const isLink = Boolean(firstUrl);
+  const isDirectFileLink = isLink && /\.(mp4|mkv|avi|webm|apk|zip|rar|7z|pdf|exe)(\?.*)?$/i.test(firstUrl);
+  const isSupportedLink = (isLink && (SUPPORTED_DOMAINS.some(d => firstUrl.toLowerCase().includes(d)) || firstUrl.includes('itch.io') || firstUrl.includes('9mod.com'))) || isDirectFileLink;
+  const isTorrentUrl = text.includes('magnet:?') || (isLink && /\.torrent(\?.*)?$/i.test(firstUrl));
 
   // 0. Pending Quality Selection / Interactive Flow Handler
   if (pendingSelections[from]) {
@@ -1245,6 +1248,10 @@ async function processSingleMessage(sock, msg) {
         return;
       }
     }
+
+    // İndirme komutlarını her zaman işle (AI'dan bağımsız - doğal dil ile)
+    const dlResult = await handleDownloadCommands(sock, msg, from, text, { quoted: msg, skipAntiBan: true });
+    if (dlResult.handled) return;
 
     // Auto reply in DMs, or in groups when mentioned / replied to
     if (!isGroupChat || isBotMentioned || isReplyToBot) {

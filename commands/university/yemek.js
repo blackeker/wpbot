@@ -1,4 +1,4 @@
-import { getYemekMessage, sendMenuResponse, loadMenuData, findMenuByQuery } from '../../utils/menuData.js';
+import { getYemekMessage, getKahvaltiMessage, getAksamMessage, sendMenuResponse, loadMenuData, findMenuByQuery } from '../../utils/menuData.js';
 import { checkCooldown, updateCooldown } from '../../utils/cooldownManager.js';
 import { aiEngine } from '../../ai/aiEngine.js';
 import { getAiConfig } from '../../config.js';
