@@ -279,6 +279,43 @@ function formatDateHeader(tarih, gun, tag) {
   return pickRandom(formats);
 }
 
+/* İl Müdürlüğü notu: bazı yurt gruplarına belirli tarihlerde özel akşam menüsü verilir.
+   Menü listesi DEĞİŞMEZ; yalnızca ilgili yurdun ilgili günlerinde kısa bir not gösterilir. */
+export const kykOzelAralik = {
+  "ahmet-kabakli": ["2026-11-08", "2026-11-20"],
+  "sare-ana": ["2026-11-02", "2026-11-17"],
+  "harput": ["2026-11-02", "2026-11-17"],
+  "izzetpasa": ["2026-11-02", "2026-11-17"],
+  "omer-bilginoglu": ["2026-11-11", "2026-11-27"],
+  "fethi-sekin": ["2026-11-11", "2026-11-27"],
+  "firat": ["2026-11-11", "2026-11-27"]
+};
+
+export const kykOzelNot = (bas, bit) => {
+  const g = t => t.slice(8, 10) + "." + t.slice(5, 7);
+  return `📢 *Özel Menü Notu:*\n${g(bas)}–${g(bit)} tarihleri arasında ilgili yurtlarda (Mercimek çorba, Lahmacun, Mevsim Salata, Ayran) menüsü verilecektir.`;
+};
+
+export const KAHVALTI_GENEL_NOTU = "ℹ️ _Al götür kahvaltı her gün 10.30'a kadar verilir._";
+
+function getOzelYurtNotu(tarihStr, query = '') {
+  if (!tarihStr) return '';
+  // DD.MM.YYYY -> YYYY-MM-DD
+  const parts = tarihStr.split('.');
+  if (parts.length !== 3) return '';
+  const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+
+  const cleanQuery = normalizeTr(query);
+  for (const [yurtKey, [bas, bit]] of Object.entries(kykOzelAralik)) {
+    if (isoDate >= bas && isoDate <= bit) {
+      if (cleanQuery && (cleanQuery.includes(normalizeTr(yurtKey)) || normalizeTr(yurtKey).includes(cleanQuery))) {
+        return `\n\n${kykOzelNot(bas, bit)}`;
+      }
+    }
+  }
+  return '';
+}
+
 export function getKahvaltiMessage(query = '') {
   const data = loadMenuData();
   if (!data || data.length === 0) return '❌ *Hata:* Menü verisi bulunamadı.';
@@ -294,8 +331,9 @@ export function getKahvaltiMessage(query = '') {
   const divider = pickRandom(DIVIDERS);
   const footer = pickRandom(KAHVALTI_FOOTERS);
   const dateLine = formatDateHeader(entry.tarih, entry.gun, tag);
+  const kahvaltiNotu = entry.kahvalti_notu ? `\n\nℹ️ _${entry.kahvalti_notu}_` : `\n\n${KAHVALTI_GENEL_NOTU}`;
 
-  return `${header}\n${dateLine}\n${divider}\n${formattedItems}\n${divider}\n${footer}`;
+  return `${header}\n${dateLine}\n${divider}\n${formattedItems}${kahvaltiNotu}\n${divider}\n${footer}`;
 }
 
 export function getAksamMessage(query = '') {
@@ -304,7 +342,7 @@ export function getAksamMessage(query = '') {
   const result = findMenuByQuery(query, data);
   if (!result || !result.entry) return getNotFoundMessage(query, data, 'aksam');
   const entry = result.entry;
-  const items = entry.aksam_yemegi || [];
+  const items = entry.aksam_yemegi || entry.aksam || [];
   if (items.length === 0) return `ℹ️ *${entry.tarih} (${entry.gun})* tarihi için akşam yemeği menüsü bulunmuyor.`;
   const bulletFn = pickRandom(BULLET_FORMATS);
   const formattedItems = items.map(item => bulletFn(getItemEmoji(item, 'aksam'), item)).join('\n');
@@ -313,8 +351,9 @@ export function getAksamMessage(query = '') {
   const divider = pickRandom(DIVIDERS);
   const footer = pickRandom(AKSAM_FOOTERS);
   const dateLine = formatDateHeader(entry.tarih, entry.gun, tag);
+  const ozelNot = getOzelYurtNotu(entry.tarih, query);
 
-  return `${header}\n${dateLine}\n${divider}\n${formattedItems}\n${divider}\n${footer}`;
+  return `${header}\n${dateLine}\n${divider}\n${formattedItems}${ozelNot}\n${divider}\n${footer}`;
 }
 
 export function getYemekMessage(query = '') {
@@ -325,7 +364,7 @@ export function getYemekMessage(query = '') {
   const entry = result.entry;
   const bulletFn = pickRandom(BULLET_FORMATS);
   const kahvaltiItems = (entry.kahvalti || []).map(item => bulletFn(getItemEmoji(item, 'kahvalti'), item)).join('\n');
-  const aksamItems = (entry.aksam_yemegi || []).map(item => bulletFn(getItemEmoji(item, 'aksam'), item)).join('\n');
+  const aksamItems = (entry.aksam_yemegi || entry.aksam || []).map(item => bulletFn(getItemEmoji(item, 'aksam'), item)).join('\n');
   const tag = result.label && result.label !== entry.gun ? ` _(${result.label})_` : '';
   const header = pickRandom(YEMEK_HEADERS);
   const divider = pickRandom(DIVIDERS);
@@ -333,10 +372,12 @@ export function getYemekMessage(query = '') {
   const dateLine = formatDateHeader(entry.tarih, entry.gun, tag);
   const intro = pickRandom(HUMAN_INTROS);
   const outro = pickRandom(HUMAN_OUTROS);
+  const kahvaltiNotu = entry.kahvalti_notu ? `\n_${entry.kahvalti_notu}_\n` : `\n_${KAHVALTI_GENEL_NOTU}_\n`;
+  const ozelNot = getOzelYurtNotu(entry.tarih, query);
 
   let text = `${intro}${header}\n${dateLine}\n${divider}\n`;
-  text += `🍳 *KAHVALTI:*\n${kahvaltiItems || '— Menü belirtilmemiş —'}\n\n`;
-  text += `🍲 *AKŞAM YEMEĞİ:*\n${aksamItems || '— Menü belirtilmemiş —'}\n`;
+  text += `🍳 *KAHVALTI:*\n${kahvaltiItems || '— Menü belirtilmemiş —'}\n${kahvaltiNotu}\n`;
+  text += `🍲 *AKŞAM YEMEĞİ:*\n${aksamItems || '— Menü belirtilmemiş —'}${ozelNot}\n`;
   text += `${divider}\n${footer}${outro}`;
 
   return text;

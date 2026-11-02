@@ -1,751 +1,806 @@
 [
   {
-    "tarih": "01.10.2026",
-    "gun": "Perşembe",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Kavurması",
-      "Karışık Pizza",
-      "Kaşar Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Mercimek Çorbası / Şehriye Çorbası",
-      "Tavuk Döner  / Karışık Sebze Graten",
-      "Pirinç Pilavı",
-      "Mevsim Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "02.10.2026",
-    "gun": "Cuma",
-    "kahvalti": [
-      "Menemen",
-      "Patates Kızartması",
-      "Çikolatalı Kek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Domates Çorbası / Yayla Çorbası",
-      "Etsiz Kuru Fasulye / Kabak Kalye (Sulu) / Tavuk Fajita",
-      "Şehriyeli Bulgur Pilavı",
-      "Haydari",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Puding"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "03.10.2026",
-    "gun": "Cumartesi",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Karışık Kızartma",
-      "Simit",
-      "Labne Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Tarhana Çorbası / Düğün Çorbası",
-      "Tas kebabı / Şinitzel / İmam Bayıldı",
-      "Pirinç Pilavı",
-      "Mevsim Salata",
-      "Çey",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "04.10.2026",
-    "gun": "Pazar",
-    "kahvalti": [
-      "Sade Omlet",
-      "Salçalı Sosis",
-      "Peynirli Börek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Ezogelin Çorbası / Tutmaç Çorbası",
-      "Fırında Tavuk Biftek / Mücver / Etli Dolma",
-      "Salçalı Makarna",
-      "Tarator",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "05.10.2026",
-    "gun": "Pazartesi",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Kızartması",
-      "Zeytinli/Peynirli Açma",
-      "Kaşar Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Terbiyeli Sebze Çorbası / Domates",
-      "Çiftlik Köfte / Nugget / Taze Fasulye",
-      "Yeşil Mercimekli Bulgur Pilavı",
-      "Şekerpare",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "06.10.2026",
-    "gun": "Salı",
-    "kahvalti": [
-      "Kaşarlı Omlet",
-      "Patates Salatası",
-      "Dere Otlu Poğaça",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Mercimek Çorbası / Ayran Aşı",
-      "Tavuk Kavurma / Mantı / Arap Tava",
-      "Nohutlu Pirinç Pilavı",
-      "Mevsim Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "07.10.2026",
-    "gun": "Çarşamba",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Sosis Kızartma",
-      "Ispanaklı Börek",
-      "Labne Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Şehriye Çorbası / Yayla Çorbası",
-      "Karnıyarık / Tavuk Tantuni / Karışık Kızartma",
-      "Fırın Makarna",
-      "Cacık",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "08.10.2026",
-    "gun": "Perşembe",
-    "kahvalti": [
-      "Sucuklu Omlet",
-      "Karışık Kızartma",
-      "Kakaolu Kek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Düğün Çorbası / Şehriye Çorbası",
-      "Fırın Tavuk Baget / Kabak Kalye / Etli Taze Fasülye",
-      "Sebzeli Bulgur Pilavı",
-      "Sütlaç",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "09.10.2026",
-    "gun": "Cuma",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Kızartması",
-      "Kek + Bal + Tereyağı",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Tarhana Çorbası / Mısır Çorbası",
-      "Orman Kebabı / Tavuk Şiş / Yoğurtlu Mantı",
-      "Pirinç Pilavı",
-      "Pembe Sultan",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "10.10.2026",
-    "gun": "Cumartesi",
-    "kahvalti": [
-      "Peynirli Omlet",
-      "Patates Kavurması",
-      "Peynirli Börek",
-      "Labne Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Süzme Mercimek Çorbası / Yayla Çorbası",
-      "Çıtır Tavuk+Patates Kızartması / Mücver / Fırında Dizme Köfte",
-      "Domates Soslu Makarna",
-      "Mevsim Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "11.10.2026",
-    "gun": "Pazar",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Kızartması",
-      "Karışık Pizza",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Terbiyeli Sebze Çorbası / Şehriye Çorbası",
-      "Etsiz Kuru Fasülye / Karışık Dolma / Tavuk Baget Kızartma",
-      "Erişte Pilavı",
-      "Cevizli Baklava",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "12.10.2026",
-    "gun": "Pazartesi",
-    "kahvalti": [
-      "Sade Omlet",
-      "Patates Kızartması",
-      "Çikolatalı Kek",
-      "Kaşar Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Mercimek Çorbası / Ayran Aşı",
-      "Kavurma / Sulu Nohut / Tavuk Çöp Şiş",
-      "Pirinç Pilavı",
-      "Karışık Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "13.10.2026",
-    "gun": "Salı",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Salçalı Sosis",
-      "Sade Poğaça",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Tarhana Çorbası / Domates Çorbası",
-      "Fırında Tavuk Baget / Karışık Sebze Graten / Patlıcan Musakka",
-      "Nohutlu Pirinç Pilavı",
-      "Mevsim Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "14.10.2026",
-    "gun": "Çarşamba",
-    "kahvalti": [
-      "Kaşarlı Omlet",
-      "Karışık Kızartma",
-      "Zeytinli/Peynirli Açma",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Ezogelin Çorbası / Tutmaç Çorbası",
-      "Hamburger Köfte + Patates / Tavuk Burger / Bezelye Yemeği",
-      "Soslu Makarna",
-      "Ayran",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "15.10.2026",
-    "gun": "Perşembe",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Salatası",
-      "Sürülebilir Çikolata + Kek",
-      "Labne Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Mercimek Çorba / Mısır Çorba",
-      "Tavuk Fajita / Yoğurtlu Mantı / Kilis Tava",
-      "Yeşil Mercimekli Bulgur Pilavı",
-      "Çoban Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "16.10.2026",
-    "gun": "Cuma",
-    "kahvalti": [
-      "Menemen",
-      "Patates Kızartması",
-      "Simit",
-      "Krem Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Ayran Aşı Çorba / Ezogelin Çorbası",
-      "Etsiz Kuru Fasülye / Mevsim Soslu Karışık Kızartma / Tavuk Külbastı",
-      "Mısırlı Pirinç Pilavı",
-      "Rus Salatası",
-      "Revani",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "17.10.2026",
-    "gun": "Cumartesi",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Karışık Kızartma",
-      "Peynirli Börek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Sebze Çorbası / Tarhana Çorbası",
-      "Tavuk Tantuni / Bezelye Yemeği / Patlıcan Musakka",
-      "Salçalı Makarna",
-      "Ayran",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "18.10.2026",
-    "gun": "Pazar",
-    "kahvalti": [
-      "Sucuklu Omlet",
-      "Patates Kavurması",
-      "Dere Otlu Poğaça",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Ayran Aşı Çorbası / Mercimek Çorbası",
-      "Güveç / Ispanak Kavurma",
-      "Şehriyeli Bulgur Pilavı",
-      "Cacık",
-      "Çeyrek Ekmek",
-      "500 ml Su"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
-    "tarih": "19.10.2026",
-    "gun": "Pazartesi",
-    "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Sosis Kızartma",
-      "Reçel",
-      "Kaşar Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
-    ],
-    "kahvalti_kaynak": "[cite: 2]",
-    "aksam_yemegi": [
-      "Tarhana Çorbası / Mercimek Çorbası",
-      "Tavuk Kavurma / Karışık Sebze Kızartma / Çiftlik Köfte",
-      "Fırın Makarna",
-      "Mevsim Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Cevizli Baklava"
-    ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
-  },
-  {
     "tarih": "20.10.2026",
     "gun": "Salı",
     "kahvalti": [
-      "Peynirli Omlet",
-      "Patates Kızartması",
-      "Karışık Pizza",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Peynirli omlet",
+      "Patates kızartma",
+      "Karışık pizza",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ezogelin Çorbası / Sebze Çorbasu",
-      "Hamburger Köfte + Patates / Tavuk Burger / Taze Fasulye",
-      "Pirinç Pilavı",
-      "Ayran",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Ezogelin çorbası / Sebze çorbası",
+      "Hamburger köfte + patates / Tavuk burger / Taze fasulye",
+      "Pirinç pilavı",
+      "Ayran"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "21.10.2026",
     "gun": "Çarşamba",
     "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Karışık Kızartma",
-      "Sade Poğaça",
-      "Labne Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Haşlanmış yumurta",
+      "Karışık kızartma",
+      "Sade poğaça",
+      "Labne peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Sebze Çorbası / Mercimek Çorbası",
-      "Fırında Sebzeli Tavuk Izgara / Mevsim Türlü / Etli Dolma",
-      "Soslu Makarna",
-      "Karışık Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Sebze çorbası / Mercimek çorbası",
+      "Fırında sebzeli tavuk ızgara / Mevsim türlü / Etli dolma",
+      "Soslu makarna",
+      "Karışık salata"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "22.10.2026",
     "gun": "Perşembe",
     "kahvalti": [
-      "Sade Omlet",
-      "Patates Salatası",
-      "Çikolatalı Kek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Sade omlet",
+      "Patates salatası",
+      "Çikolatalı kek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Yayla Çorbası / Şehriye Çorbası",
-      "Etli Kuru Fasulye / Mevsim Soslu Karışık Kızartma / Tavuk Çöp Şiş",
-      "Bulgur Pilavı",
+      "Yayla çorbası / Şehriye çorbası",
+      "Etsiz kuru fasulye / Mevsim soslu karışık kızartma / Tavuk çöp şiş",
+      "Bulgur pilavı",
       "Haydari",
-      "Tahin Helva",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Tulumba"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "23.10.2026",
     "gun": "Cuma",
     "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Kızartması",
-      "Peynirli Börek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Haşlanmış yumurta",
+      "Patates kızartma",
+      "Peynirli börek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ezogelin / Domates Çorbası",
-      "Patlıcan Musakka / Nugget / Yoğurtlu Kabak",
-      "Soslu Makarna",
-      "Karışık Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Ezogelin çorbası / Domates çorbası",
+      "Patlıcan musakka / Nugget / Yoğurtlu kabak",
+      "Soslu makarna",
+      "Karışık salata"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "24.10.2026",
     "gun": "Cumartesi",
     "kahvalti": [
-      "Kaşarlı Omlet",
-      "Karışık Kızartma",
-      "Sucuklu Yumurta",
-      "Krem Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Kaşarlı omlet",
+      "Karışık kızartma",
+      "Sucuklu yumurta",
+      "Krem peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ayran Aşı Çorbası / Tarhana Çorbası",
-      "Şinitzel / Rosto Köfte / Sulu Patates",
-      "Erişte Pilavı",
-      "Şekerpare",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Ayran aşı çorbası / Tarhana çorbası",
+      "Şinitzel / Rosto köfte / Sulu patates",
+      "Erişte pilavı",
+      "Şekerpare"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "25.10.2026",
     "gun": "Pazar",
     "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Sosis Kızartma",
+      "Haşlanmış yumurta",
+      "Sosis kızartma",
       "Simit",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Mahluta Çorbası / Sebze Çorbası",
-      "Patlıcan Parmak Kebabı / Fırında Tavuk / Tavuk Baget Kızartma",
-      "Bulgur Pilavı",
-      "eZME",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Yayla çorbası / Ezogelin çorbası",
+      "Patlıcan parmak kebabı / Salçalı mantı / Tavuk baget kızartma",
+      "Bulgur pilavı",
+      "Ezme"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "26.10.2026",
     "gun": "Pazartesi",
     "kahvalti": [
-      "Sucuklu Omlet",
-      "Patates Salatası",
-      "Dere Otlu Poğaça",
-      "Krem Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Sucuklu omlet",
+      "Patates salatası",
+      "Dere otlu poğaça",
+      "Krem peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Şehriye Çorbası / Mercimek Çorbası",
-      "Tavuk Döner  / Karışık Sebze Graten",
-      "Pirinç Pilavı",
-      "Karışık Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Şehriye çorbası / Mercimek çorbası",
+      "Tavuk döner / Karışık sebze graten",
+      "Pirinç pilavı",
+      "Karışık salata"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "27.10.2026",
     "gun": "Salı",
     "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Patates Kızartması",
-      "Kek + Bal + Tereyağı",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Haşlanmış yumurta",
+      "Patates kızartma",
+      "Kek",
+      "Bal",
+      "Tereyağı",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Sebze Çorbası / Tarhana Çorbası",
-      "Etsiz Kuru Fasulye / Mevsim Soslu Karışık Kızartma / Nugget",
-      "Erişte Pilavı",
+      "Sebze çorbası / Tarhana çorbası",
+      "Etsiz kuru fasulye / Mevsim soslu karışık kızartma / Nugget",
+      "Erişte pilavı",
       "Yoğurt",
-      "Browni",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Brownie"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "28.10.2026",
     "gun": "Çarşamba",
     "kahvalti": [
-      "Sucuklu Omlet",
-      "Patates Kavurması",
-      "Zeytinli/Peynirli Açma",
-      "Kaşar Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Sucuklu omlet",
+      "Patates kavurma",
+      "Zeytinli / peynirli açma",
+      "Kaşar peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Mercimek Çorbası / Domates Çorbası",
-      "Kuşbaşı Tavuklu Kebap / Tavuk Kavurma / Bezelye Yemeği",
-      "Şehriyeli Bulgur Pilavı",
-      "Çoban Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Mercimek çorbası / Domates çorbası",
+      "Kuşbaşılı patlıcan kebap / Tavuk kavurma / Bezelye yemeği",
+      "Sebzeli bulgur pilavı",
+      "Çoban salata"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "29.10.2026",
     "gun": "Perşembe",
     "kahvalti": [
       "Menemen",
-      "Karışık Kızartma",
-      "Mozaik Kek",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Karışık kızartma",
+      "Mozaik kek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Ezogelin Çorba / Tarhana Çorbası",
-      "Tavuk Tantuni / Mücver / Kıymalı Ispanak",
-      "Makarna Salatası",
-      "Ayran",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Ezogelin çorbası / Tarhana çorbası",
+      "Tavuk tantuni / Mücver / Kıymalı ıspanak",
+      "Makarna salatası",
+      "Ayran"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "30.10.2026",
     "gun": "Cuma",
     "kahvalti": [
-      "Sade Omlet",
-      "Patates Kızartması",
+      "Sade omlet",
+      "Patates kızartma",
       "Simit",
-      "Beyaz Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Mercimek Çorbası / Yayla Çorbası",
-      "Ekmek Arası Köfte / Tavuk Sote / Yoğurtlu Mantı",
-      "Nohutlu Pirinç Pilavı Pirinç Pilavı",
-      "Mevsim Salata",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Mercimek çorbası / Yayla çorbası",
+      "Ekmek arası köfte / Tavuk sote / Yoğurtlu mantı",
+      "Nohutlu pirinç pilavı",
+      "Mevsim salata"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   },
   {
     "tarih": "31.10.2026",
     "gun": "Cumartesi",
     "kahvalti": [
-      "Haşlanmış Yumurta",
-      "Salçalı Sosis",
-      "Ispanaklı Börek",
-      "Labne Peynir",
-      "Siyah/Yeşil Zeytin",
-      "Çeyrek Ekmek",
-      "500 ml Su",
-      "Çay/Bitki Çayı"
+      "Haşlanmış yumurta",
+      "Salçalı sosis",
+      "Ispanaklı börek",
+      "Labne peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
     ],
-    "kahvalti_kaynak": "[cite: 2]",
     "aksam_yemegi": [
-      "Dövme Çorba / Domates Çorbası",
-      "Orman Kebabı/ Ispanaklı Yemeği / Tavuk Şiş",
-      "Bulgur Pilavı",
-      "Sütlaç",
-      "Çeyrek Ekmek",
-      "500 ml Su"
+      "Dövme çorbası / Domates çorbası",
+      "Orman kebabı / Ispanak yemeği / Tavuk çöp şiş",
+      "Bulgur pilavı",
+      "Sütlaç"
     ],
-    "aksam_yemegi_kaynak": "[cite: 1]"
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "01.11.2026",
+    "gun": "Pazar",
+    "kahvalti": [
+      "Peynirli omlet",
+      "Sosis kızartma",
+      "Sade poğaça",
+      "Labne",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Mercimek çorbası / Şehriye çorbası",
+      "Tavuk kavurma / İmam bayıldı / Çiftlik kebabı",
+      "Soslu makarna",
+      "Haydari"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "02.11.2026",
+    "gun": "Pazartesi",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Patates kızartma",
+      "Zeytinli / peynirli açma",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Tarhana çorbası / Düğün çorbası",
+      "Etli kuru fasulye / Mevsim soslu karışık kızartma / Tavuk çöp şiş",
+      "Şehriyeli bulgur pilavı",
+      "Cevizli baklava"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "03.11.2026",
+    "gun": "Salı",
+    "kahvalti": [
+      "Kaşarlı omlet",
+      "Patates kızartma",
+      "Dere otlu poğaça",
+      "Krem peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Domates çorbası / Yayla çorbası",
+      "Tavuk döner / Karışık sebze graten",
+      "Sade pirinç pilavı",
+      "Mevsim salata"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "04.11.2026",
+    "gun": "Çarşamba",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Sosis kızartma",
+      "Peynirli / ıspanaklı börek",
+      "Kaşar peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Ezogelin çorbası / Tutmaç çorbası",
+      "Hamburger köfte + patates / Tavuk burger / Yoğurtlu karnabahar",
+      "Makarna salatası",
+      "Sütlaç"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "05.11.2026",
+    "gun": "Perşembe",
+    "kahvalti": [
+      "Sucuklu omlet",
+      "Karışık kızartma",
+      "Simit",
+      "Krem peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Terbiyeli sebze çorbası / Domates çorbası",
+      "Fırında sebzeli tavuk ızgara / Mevsim türlü / Etli dolma",
+      "Sebzeli bulgur pilavı",
+      "Mevsim salata"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "06.11.2026",
+    "gun": "Cuma",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Haşlanmış patates + domates-salatalık",
+      "Karışık pizza",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Mercimek çorbası / Ayran aşı çorbası",
+      "Orman kebabı / Ispanak yemeği / Şinitzel",
+      "Nohutlu pirinç pilavı",
+      "Cacık"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "07.11.2026",
+    "gun": "Cumartesi",
+    "kahvalti": [
+      "Menemen",
+      "Salçalı sosis",
+      "Patatesli börek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Şehriye çorbası / Yayla çorbası",
+      "Tavuk fajita / Yoğurtlu mantı / Kilis tava",
+      "Fırın makarna",
+      "Brownie"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "08.11.2026",
+    "gun": "Pazar",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Patates kavurması",
+      "Kek + sürülebilir çikolata",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Tarhana çorbası / Mısır çorbası",
+      "Çiftlik köfte / Nugget / Taze fasulye",
+      "Şehriyeli bulgur pilavı",
+      "Havuç tarator"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "09.11.2026",
+    "gun": "Pazartesi",
+    "kahvalti": [
+      "Sade omlet",
+      "Patates kızartma",
+      "Sade poğaça",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Mercimek çorbası / Yayla çorbası",
+      "Kavurma / Bezelye yemeği / Tavuk çöp şiş",
+      "Sade pirinç pilavı",
+      "Mevsim salata"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "10.11.2026",
+    "gun": "Salı",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Salçalı sosis",
+      "Peynirli / ıspanaklı börek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Terbiyeli sebze çorbası / Şehriye çorbası",
+      "Tavuk tantuni / Taze fasulye / Karnıyarık",
+      "Soslu makarna",
+      "Haydari"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "11.11.2026",
+    "gun": "Çarşamba",
+    "kahvalti": [
+      "Peynirli omlet",
+      "Karışık kızartma",
+      "Zeytinli / peynirli açma",
+      "Kaşar peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Tarhana çorbası / Domates çorbası",
+      "Etli kuru fasulye / Mevsim türlü / Nugget",
+      "Şehriyeli bulgur pilavı",
+      "Yoğurt",
+      "Şekerpare"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "12.11.2026",
+    "gun": "Perşembe",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Patates kızartma",
+      "Domates-salatalık",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Mercimek çorbası / Şehriye çorbası",
+      "Fırında tavuk biftek / Mücver / Etli dolma",
+      "Gökkuşağı pirinç pilavı",
+      "Mevsim salata"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "13.11.2026",
+    "gun": "Cuma",
+    "kahvalti": [
+      "Menemen",
+      "Patates salatası",
+      "Simit",
+      "Labne peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Ezogelin çorbası / Sebze çorbası",
+      "Rosto köfte / Sulu patates / Şinitzel",
+      "Soslu makarna",
+      "Ayran veya meyve suyu"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "14.11.2026",
+    "gun": "Cumartesi",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Salçalı sosis",
+      "Ispanaklı börek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Düğün çorbası / Süzme çorbası",
+      "Çıtır tavuk / Ispanak kavurma / Güveç",
+      "Sebzeli bulgur pilavı",
+      "Sütlaç"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "15.11.2026",
+    "gun": "Pazar",
+    "kahvalti": [
+      "Sucuklu omlet",
+      "Patates kızartma",
+      "Dere otlu poğaça",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Yayla çorbası / Şehriye çorbası",
+      "Kuşbaşılı patlıcan kebabı / Tavuk kavurma / Bezelye yemeği",
+      "Şehriyeli pirinç pilavı",
+      "Havuç tarator"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "16.11.2026",
+    "gun": "Pazartesi",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Patates kızartma",
+      "Sade poğaça",
+      "Kaşar peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Tarhana çorbası / Düğün çorbası",
+      "Soslu fırında tavuk / Mevsim türlü / Etli nohutlu mantı",
+      "Soslu makarna",
+      "Mevsim salata"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "17.11.2026",
+    "gun": "Salı",
+    "kahvalti": [
+      "Peynirli omlet",
+      "Sosis kızartma",
+      "Simit",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Ezogelin çorbası / Tutmaç çorbası",
+      "Fırında Diana köfte / Çıtır tavuk + patates kızartması / Mücver",
+      "Sade bulgur pilavı",
+      "Revani"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "18.11.2026",
+    "gun": "Çarşamba",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Patates kavurması",
+      "Karışık pizza",
+      "Krem peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Mercimek çorbası",
+      "İstavrit (balık) / Soslu karışık kızartma",
+      "Mevsim salata",
+      "Helva"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "19.11.2026",
+    "gun": "Perşembe",
+    "kahvalti": [
+      "Sade omlet",
+      "Sosis kızartma + domates-salatalık",
+      "Kek + reçel",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Ezogelin çorbası / Mısır çorbası",
+      "Ekmek arası köfte / Tavuk sote / Yoğurtlu mantı",
+      "Şehriyeli pirinç pilavı",
+      "Ayran"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "20.11.2026",
+    "gun": "Cuma",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Karışık kızartma",
+      "Zeytinli / peynirli açma",
+      "Labne peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Süzme çorbası / Yayla çorbası",
+      "Etli kuru fasulye / Dolma / Tavuk çöp şiş",
+      "Erişte pilavı",
+      "Cevizli baklava"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "21.11.2026",
+    "gun": "Cumartesi",
+    "kahvalti": [
+      "Kaşarlı omlet",
+      "Patates salatası",
+      "Peynirli börek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Düğün çorbası / Ayran aşı çorbası",
+      "Karnıyarık / Tavuk tantuni / Pırasa",
+      "Sade pirinç pilavı",
+      "Cacık"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "22.11.2026",
+    "gun": "Pazar",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Sosis kızartma",
+      "Peynirli / ıspanaklı börek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Sebze çorbası / Mercimek çorbası",
+      "Patlıcan parmak kebabı / Yoğurtlu mantı / Tavuk baget kızartma",
+      "Sebzeli bulgur pilavı",
+      "Mevsim salata"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "23.11.2026",
+    "gun": "Pazartesi",
+    "kahvalti": [
+      "Peynirli omlet",
+      "Patates kızartma",
+      "Dere otlu poğaça",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Ezogelin çorbası / Tutmaç çorbası",
+      "Tavuk döner / Karışık sebze graten",
+      "Sade pirinç pilavı",
+      "Islak kek"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "24.11.2026",
+    "gun": "Salı",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Salçalı sosis",
+      "Simit",
+      "Kaşar peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Tarhana çorbası / Domates çorbası",
+      "Çiftlik köfte / Tavuk kavurma / Soslu karışık kızartma",
+      "Makarna salatası",
+      "Ayran veya meyve suyu"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "25.11.2026",
+    "gun": "Çarşamba",
+    "kahvalti": [
+      "Sucuklu omlet",
+      "Karışık kızartma",
+      "Mozaik kek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Mercimek çorbası / Ayran aşı çorbası",
+      "Tas kebabı / Şinitzel / İmam bayıldı",
+      "Şehriyeli bulgur pilavı",
+      "Haydari"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "26.11.2026",
+    "gun": "Perşembe",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Patates kavurması",
+      "Zeytinli / peynirli açma",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Terbiyeli sebze çorbası / Şehriye çorbası",
+      "Fırın tavuk baget / Sebze graten / Etli taze fasulye",
+      "Soslu makarna",
+      "Mevsim salata"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "27.11.2026",
+    "gun": "Cuma",
+    "kahvalti": [
+      "Sade omlet",
+      "Patates kızartma",
+      "Kek + bal",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Tarhana çorbası / Yayla çorbası",
+      "Etli nohut / Yoğurtlu mantı / Tavuk fajita",
+      "Şehriyeli pirinç pilavı",
+      "Mercimek köfte",
+      "Puding"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "28.11.2026",
+    "gun": "Cumartesi",
+    "kahvalti": [
+      "Haşlanmış yumurta + domates-salatalık",
+      "Salçalı sosis",
+      "Peynirli / ıspanaklı börek",
+      "Labne peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Düğün çorbası / Domates çorbası",
+      "Çiftlik kebabı / Nugget / Dolma",
+      "Sebzeli bulgur pilavı",
+      "Mevsim salata"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "29.11.2026",
+    "gun": "Pazar",
+    "kahvalti": [
+      "Menemen",
+      "Patates kızartma",
+      "Peynirli börek",
+      "Beyaz peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Mercimek çorbası",
+      "Somon (balık) / Soslu karışık kızartma",
+      "Mevsim salata",
+      "Helva"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
+  },
+  {
+    "tarih": "30.11.2026",
+    "gun": "Pazartesi",
+    "kahvalti": [
+      "Haşlanmış yumurta",
+      "Patates salatası",
+      "Sade poğaça",
+      "Kaşar peynir",
+      "Siyah / yeşil zeytin",
+      "Çay"
+    ],
+    "aksam_yemegi": [
+      "Tarhana çorbası / Mısır çorbası",
+      "Hamburger köfte + patates / Tavuk burger / Ispanak kavurma",
+      "Şehriyeli pirinç pilavı",
+      "Tulumba tatlısı"
+    ],
+    "kahvalti_notu": "Al götür kahvaltı her gün 10.30'a kadar verilir."
   }
 ]
