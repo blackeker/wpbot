@@ -420,6 +420,7 @@ async function processSingleMessage(sock, msg) {
   const sender = msg.key.participant || from;
   const senderNumber = sender.split('@')[0];
   const isOwner = isBotOwner(msg, senderNumber);
+  const isSelfOrOwner = Boolean(msg.key.fromMe || isOwner);
   let _isAdmin = null;
   const getIsAdmin = async () => {
     if (_isAdmin === null) {
@@ -976,6 +977,9 @@ async function processSingleMessage(sock, msg) {
   const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
   const hasQuoted = Boolean(contextInfo?.quotedMessage || contextInfo?.stanzaId);
   if (isReplyDownloadTrigger(text, hasQuoted)) {
+    // 🛑 Sadece botun kendisi / sahibi indirme tetikleyebilir
+    if (!isSelfOrOwner) return;
+
     const perm = checkCommandPermission('indir', from, { isOwner, isAdmin: await getIsAdmin() });
     if (!perm.allowed) {
       if (!perm.silent && perm.message) {
@@ -1073,6 +1077,19 @@ async function processSingleMessage(sock, msg) {
     const cmd = commands.get(canonicalName) || commands.get(commandName);
 
     if (cmd) {
+      // 🛑 İNDİRME VE MEDYA KISITLAMASI: Sadece botun kendisi / sahibi kullanabilir
+      const isDownloadCmd = cmd.category === 'media' || 
+                            cmd.category === 'hentai' || 
+                            ['indir', 'download', 'dl', 'devam', 'dur', 'iptal', 'kuyruk', 'tekrargonder', 'temizle', 'indirmedurum'].includes(cmd.name);
+      
+      if (isDownloadCmd && !isSelfOrOwner) {
+        // Anti-Spam: Grupta flood yapmamak için yetkisiz kullanıcıların indirme komutlarını sessizce yoksay
+        if (!isGroupChat) {
+          await sock.sendMessage(from, { text: '⛔ *Yetkisiz İşlem:* İndirme ve medya özellikleri yalnızca bot sahibi tarafından kullanılabilir.' }, { quoted: msg });
+        }
+        return;
+      }
+
       const perm = checkCommandPermission(canonicalName || cmd.name, from, { isOwner, isAdmin: await getIsAdmin() });
       if (!perm.allowed) {
         if (!perm.silent && perm.message) {
@@ -1105,6 +1122,11 @@ async function processSingleMessage(sock, msg) {
 
   // Treat as download if supported link
   if (isSupportedLink || isTorrentUrl) {
+    // 🛑 SADECE botun kendisi / sahibi link atarak indirme başlatabilir!
+    if (!isSelfOrOwner) {
+      return; // Diğer kullanıcıların attığı linkler otomatik indirilmez
+    }
+
     const perm = checkLinkPermission(text, from, { isOwner, isAdmin: await getIsAdmin() });
     if (!perm.allowed) {
       if (!perm.silent && perm.message) {
@@ -1113,29 +1135,6 @@ async function processSingleMessage(sock, msg) {
       return;
     }
 
-    // Önce kullanıcı "indir" demiş mi kontrol et (doğal dil komutu)
-    const dlResult = await handleDownloadCommands(sock, msg, from, text, { quoted: msg, skipAntiBan: true });
-    if (dlResult.handled) return;
-
-    // Sadece link atıldıysa (indir demeden) AI ile akıllı indirme teklifi et
-    const aiCfg = getAiConfig();
-    if (aiCfg.hasAnyKey && aiCfg.enabled && (!isGroupChat || isBotMentioned || isReplyToBot)) {
-      const pendingKey = `smart_dl_${from}`;
-      // Aynı link için zaten teklif verilmediyse sor
-      if (!global.smartDlPending) global.smartDlPending = new Map();
-      if (!global.smartDlPending.has(from) || global.smartDlPending.get(from) !== text) {
-        global.smartDlPending.set(from, text);
-        // 2 dakika sonra temizle
-        setTimeout(() => global.smartDlPending.delete(from), 120000);
-
-        await sock.sendMessage(from, {
-          text: `🔗 *Link Algılandı*\n━━━━━━━━━━━━━━━━━━━━\n${text.slice(0, 100)}${text.length > 100 ? '...' : ''}\n\n📥 Bu linki indirmek ister misiniz?\n\n✅ *Evet* → "linki indir" yazın\n❌ *Hayır* → İptal etmek için herhangi bir şey yazın`
-        }, { quoted: msg, skipAntiBan: true });
-        return;
-      }
-    }
-
-    // AI yoksa veya grup'ta etiketlenmediyse doğrudan indirme komutunu çalıştır
     const cmd = commands.get('indir');
     if (cmd) {
       try {
