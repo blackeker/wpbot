@@ -1,7 +1,5 @@
 import { getYemekMessage, getKahvaltiMessage, getAksamMessage, sendMenuResponse, loadMenuData, findMenuByQuery } from '../../utils/menuData.js';
 import { checkCooldown, updateCooldown } from '../../utils/cooldownManager.js';
-import { aiEngine } from '../../ai/aiEngine.js';
-import { getAiConfig } from '../../config.js';
 import { getUniversityMenu } from '../../utils/uniFetcher.js';
 
 export default {
@@ -64,23 +62,6 @@ export default {
           uniText += divider;
 
           menuText += `\n\n${uniText}`;
-        }
-      }
-
-      // AI GURME YORUMU (Sadece tam menüde çalışsın)
-      const aiCfg = getAiConfig();
-      if (aiCfg.hasAnyKey && aiCfg.enabled && !query.toLowerCase().includes('kahvalti') && !query.toLowerCase().includes('aksam')) {
-        const data = loadMenuData();
-        const match = findMenuByQuery(query, data);
-        if (match && match.entry) {
-          const e = match.entry;
-          const prompt = `Yemekhane menüsü:\nKahvaltı: ${e.kahvalti?.join(', ')}\nAkşam: ${e.aksam_yemegi?.join(', ')}\n\nKısa, esprili bir gurme yorumu yap.`;
-          try {
-            const aiComment = await aiEngine.generateReply(prompt, [], {
-              systemPrompt: 'Sen samimi ve esprili bir Türk gurmesin. En fazla 2 kısa cümle yaz.'
-            });
-            menuText += `\n\n🤖 *Kondi'nin Gurme Yorumu:* ${aiComment.text}`;
-          } catch (aiErr) {}
         }
       }
 

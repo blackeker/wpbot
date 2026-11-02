@@ -12,8 +12,7 @@ import {
   cleanOldDownloads, 
   pendingHentaizmLogins, 
   downloadsDir,
-  sentMessageIds,
-  getAiConfig
+  sentMessageIds
 } from '../config.js';
 import { 
   downloadQueue, 
@@ -37,7 +36,6 @@ import {
   getGroupConfig
 } from '../utils/permissionManager.js';
 import { simulateIncomingRead, isSenderThrottled } from '../utils/antiBan.js';
-import { handleDownloadCommands } from '../ai/downloadCommands.js';
 
 export function isViewOnceMessage(rawMsg) {
   if (!rawMsg || typeof rawMsg !== 'object') return false;
@@ -506,82 +504,7 @@ async function processSingleMessage(sock, msg) {
       const isAuthorizedSender = !isGroupChat || !selectionSender || selectionSender === sender || isOwner;
 
       if (isAuthorizedSender) {
-        // --- Yapay Zeka Görsel Üretimi Adım Adım Sihirbazı (Prompt -> Kategori -> Boyut) ---
-        if (selection.type === 'ciz_flow') {
-      const input = text.trim().toLowerCase();
-
-      if (input === 'iptal' || input === 'vazgeç' || input === 'cancel') {
-        delete pendingSelections[from];
-        await sock.sendMessage(from, { text: '❌ Görsel oluşturma işlemi iptal edildi.' });
-        return;
-      }
-
-      if (selection.step === 'prompt') {
-        if (!text.trim()) {
-          await sock.sendMessage(from, { text: '⚠️ Lütfen çizilmesini istediğiniz görselin açıklamasını yazın.' });
-          return;
-        }
-        selection.prompt = text.trim();
-        selection.step = 'style';
-        const { getStyleMenuText } = await import('../commands/tools/ciz.js');
-        await sock.sendMessage(from, { text: getStyleMenuText(selection.prompt) });
-        return;
-      }
-
-      if (selection.step === 'style') {
-        const { resolveStyle, getShapeMenuText } = await import('../commands/tools/ciz.js');
-        const chosenStyle = resolveStyle(input);
-        selection.selectedStyle = chosenStyle;
-        selection.step = 'shape';
-        await sock.sendMessage(from, { text: getShapeMenuText(chosenStyle) });
-        return;
-      }
-
-      if (selection.step === 'shape') {
-        let shape = 'square';
-        let shapeLabel = '1:1 Kare';
-        if (['2', 'dikey', 'portrait', '9:16', 'hikaye', 'story'].includes(input)) {
-          shape = 'portrait';
-          shapeLabel = '9:16 Dikey';
-        } else if (['3', 'yatay', 'landscape', '16:9', 'genis', 'geniş'].includes(input)) {
-          shape = 'landscape';
-          shapeLabel = '16:9 Yatay';
-        } else {
-          shape = 'square';
-          shapeLabel = '1:1 Kare';
-        }
-
-        const prompt = selection.prompt;
-        const styleObj = selection.selectedStyle;
-        delete pendingSelections[from];
-
-        await sock.sendMessage(from, {
-          text: `⏳ *Görseliniz üretiliyor...*\n\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${shapeLabel}\n\n_Lütfen bekleyin..._`
-        });
-
-        try {
-          const { executeAiDraw } = await import('../commands/tools/ciz.js');
-          const result = await executeAiDraw(prompt, styleObj, shape);
-
-          if (!result || !result.buffer) {
-            await sock.sendMessage(from, { text: '❌ Görsel üretilirken yanıt vermedi veya zaman aşımına uğradı. Lütfen birkaç saniye sonra tekrar deneyin.' });
-            return;
-          }
-
-          let caption = `✨ *Görseliniz Hazır!*\n━━━━━━━━━━━━━━━━━━━━\n📝 *İstem:* ${prompt}\n🎨 *Stil:* ${styleObj.icon} ${styleObj.name}\n📐 *Boyut:* ${result.shapeLabel || shapeLabel}\n (${result.elapsed}s)\n━━━━━━━━━━━━━━━━━━━━`;
-
-          await sock.sendMessage(from, {
-            image: result.buffer,
-            caption: caption.trim()
-          });
-        } catch (err) {
-          await sock.sendMessage(from, { text: `❌ Görsel oluşturulurken bir hata oluştu: ${err.message}` });
-        }
-        return;
-      }
-    }
-
-    if (selection.type === 'audio_selection') {
+        if (selection.type === 'audio_selection') {
       const input = text.trim().toLowerCase();
 
       if (input === 'iptal' || input === 'vazgeç' || input === 'cancel') {
@@ -1190,6 +1113,29 @@ async function processSingleMessage(sock, msg) {
       return;
     }
 
+    // Önce kullanıcı "indir" demiş mi kontrol et (doğal dil komutu)
+    const dlResult = await handleDownloadCommands(sock, msg, from, text, { quoted: msg, skipAntiBan: true });
+    if (dlResult.handled) return;
+
+    // Sadece link atıldıysa (indir demeden) AI ile akıllı indirme teklifi et
+    const aiCfg = getAiConfig();
+    if (aiCfg.hasAnyKey && aiCfg.enabled && (!isGroupChat || isBotMentioned || isReplyToBot)) {
+      const pendingKey = `smart_dl_${from}`;
+      // Aynı link için zaten teklif verilmediyse sor
+      if (!global.smartDlPending) global.smartDlPending = new Map();
+      if (!global.smartDlPending.has(from) || global.smartDlPending.get(from) !== text) {
+        global.smartDlPending.set(from, text);
+        // 2 dakika sonra temizle
+        setTimeout(() => global.smartDlPending.delete(from), 120000);
+
+        await sock.sendMessage(from, {
+          text: `🔗 *Link Algılandı*\n━━━━━━━━━━━━━━━━━━━━\n${text.slice(0, 100)}${text.length > 100 ? '...' : ''}\n\n📥 Bu linki indirmek ister misiniz?\n\n✅ *Evet* → "linki indir" yazın\n❌ *Hayır* → İptal etmek için herhangi bir şey yazın`
+        }, { quoted: msg, skipAntiBan: true });
+        return;
+      }
+    }
+
+    // AI yoksa veya grup'ta etiketlenmediyse doğrudan indirme komutunu çalıştır
     const cmd = commands.get('indir');
     if (cmd) {
       try {
@@ -1210,93 +1156,5 @@ async function processSingleMessage(sock, msg) {
       }
     }
     return;
-  }
-
-  // Fallback to AI conversational chat if not a command and not a media link
-  const aiCfg = getAiConfig();
-  if (aiCfg.hasAnyKey && aiCfg.enabled) {
-    const botNumber = sock.user?.id?.split(':')[0]?.replace(/[^0-9]/g, '') || '';
-    const botLid = sock.user?.lid ? sock.user.lid.split(':')[0] : '';
-    const msgContextInfo = content.extendedTextMessage?.contextInfo || 
-                           content.imageMessage?.contextInfo || 
-                           content.videoMessage?.contextInfo || 
-                           content.documentMessage?.contextInfo || 
-                           content.stickerMessage?.contextInfo ||
-                           directImage?.contextInfo;
-
-    const mentionedJids = msgContextInfo?.mentionedJid || [];
-    const isBotMentioned = Boolean(
-      (botNumber && mentionedJids.some(j => j.includes(botNumber))) ||
-      (botLid && mentionedJids.some(j => j.includes(botLid))) ||
-      (text && botNumber && text.includes(`@${botNumber}`))
-    );
-
-    const quotedParticipant = msgContextInfo?.participant || '';
-    const isReplyToBot = Boolean(
-      (botNumber && quotedParticipant.includes(botNumber)) ||
-      (botLid && quotedParticipant.includes(botLid))
-    );
-
-    // If in group, verify that AI is allowed in this group and bot is strictly tagged/replied
-    if (isGroupChat) {
-      const groupCfg = getGroupConfig(from);
-      if (groupCfg.allowAi === false) {
-        return; // AI is explicitly disabled in this group
-      }
-      // In groups, NEVER reply unless explicitly tagged or replied to
-      if (!isBotMentioned && !isReplyToBot) {
-        return;
-      }
-    }
-
-    // İndirme komutlarını her zaman işle (AI'dan bağımsız - doğal dil ile)
-    const dlResult = await handleDownloadCommands(sock, msg, from, text, { quoted: msg, skipAntiBan: true });
-    if (dlResult.handled) return;
-
-    // Auto reply in DMs, or in groups when mentioned / replied to
-    if (!isGroupChat || isBotMentioned || isReplyToBot) {
-      let prompt = text;
-      if (isBotMentioned && botNumber) {
-        prompt = text.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
-      }
-
-      // 👁️ Check for image in the message or quoted message to analyze with AI Vision
-      try {
-        const { extractImageBufferFromMessage, extractAudioBufferFromMessage, transcribeAudioBuffer, handleAiVision, handleAiChat } = await import('../ai/aiEngine.js');
-        const imgData = await extractImageBufferFromMessage(msg);
-        if (imgData && imgData.buffer) {
-          const visionPrompt = prompt || imgData.caption || 'Bu görseli incele, ne olduğunu, üzerindeki detayları veya soruları açıkla.';
-          await handleAiVision(sock, msg, from, imgData.buffer, imgData.mimeType, visionPrompt);
-          return;
-        }
-
-        // 🎙️ Check for voice note (PTT / Audio) to transcribe with Whisper and chat
-        if (!prompt) {
-          const audioData = await extractAudioBufferFromMessage(msg);
-          if (audioData && audioData.buffer) {
-            try { await sock.sendPresenceUpdate('recording', from); } catch (e) {}
-            const transcript = await transcribeAudioBuffer(audioData.buffer, audioData.mimeType);
-            if (transcript) {
-              console.log(`[AI VOICE TRANSCRIPTION] (${from}): "${transcript}"`);
-              await handleAiChat(sock, msg, from, transcript, {
-                senderName: msg.pushName || senderNumber,
-                isGroup: isGroupChat,
-                transcribedFromVoice: true
-              });
-              return;
-            }
-          }
-        }
-
-        if (prompt) {
-          await handleAiChat(sock, msg, from, prompt, {
-            senderName: msg.pushName || senderNumber,
-            isGroup: isGroupChat
-          });
-        }
-      } catch (aiErr) {
-        console.error('[AI AUTO CHAT ERROR]:', aiErr.message);
-      }
-    }
   }
 }

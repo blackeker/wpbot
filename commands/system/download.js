@@ -1,7 +1,6 @@
 import { addDownloadTask, cancelDownloadTask, downloadQueue, activeTasksList, clearPendingSelection, setPendingSelection } from '../../queue.js';
 import { executeDownloadPipeline } from '../../pipelines.js';
 import { botSocketRef } from '../../config.js';
-import { userProfileManager } from '../../ai/userProfileManager.js';
 
 import indirCmd from '../media/indir.js';
 

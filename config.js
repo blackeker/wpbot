@@ -107,20 +107,6 @@ const DEFAULT_CONFIG = {
   hentaiGroupJid: "",
   groupPermissions: {},
   
-  // Yapay Zeka (AI) Yapılandırması (config.json'dan okunur)
-  groqApiKey: process.env.GROQ_API_KEY || "",
-  openrouterApiKey: process.env.OPENROUTER_API_KEY || "",
-  geminiApiKey: process.env.GEMINI_API_KEY || "",
-  ollamaUrl: process.env.OLLAMA_URL || "https://ollama.com",
-  ollamaModel: process.env.OLLAMA_MODEL || "gemma4:31b",
-  ollamaApiKey: process.env.OLLAMA_API_KEY || "",
-  ollamaEnabled: process.env.OLLAMA_ENABLED === 'true' || false,
-  aiChatEnabled: true,
-  aiBotName: process.env.BOT_NAME || "Moi",
-  groqModel: process.env.GROQ_MODEL || "qwen/qwen3.8-27b",
-  openrouterModel: process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free",
-  geminiModel: process.env.GEMINI_MODEL || "gemini-3.8-flash",
-
   antiBan: {
     enabled: true,
     autoRead: true,
@@ -163,39 +149,6 @@ export function readConfig(forceReload = false) {
     }
   }
 
-  // AI keys normalization (support root keys, nested ai.* keys, uppercase env keys)
-  if (config.ai && typeof config.ai === 'object') {
-    config.groqApiKey = config.ai.groqApiKey || config.ai.GROQ_API_KEY || config.groqApiKey;
-    config.openrouterApiKey = config.ai.openrouterApiKey || config.ai.OPENROUTER_API_KEY || config.openrouterApiKey;
-    config.geminiApiKey = config.ai.geminiApiKey || config.ai.GEMINI_API_KEY || config.geminiApiKey;
-    if (config.ai.groqModel) config.groqModel = config.ai.groqModel;
-    if (config.ai.openrouterModel) config.openrouterModel = config.ai.openrouterModel;
-    if (config.ai.geminiModel) config.geminiModel = config.ai.geminiModel;
-    if (config.ai.ollamaUrl) config.ollamaUrl = config.ai.ollamaUrl;
-    if (config.ai.ollamaModel) config.ollamaModel = config.ai.ollamaModel;
-    if (config.ai.ollamaApiKey) config.ollamaApiKey = config.ai.ollamaApiKey;
-    if (Array.isArray(config.ai.ollamaApiKeys)) config.ollamaApiKeys = config.ai.ollamaApiKeys;
-    else if (typeof config.ai.ollamaApiKeys === 'string') config.ollamaApiKeys = config.ai.ollamaApiKeys;
-    if (config.ai.ollamaEnabled !== undefined) config.ollamaEnabled = config.ai.ollamaEnabled;
-    if (config.ai.botName) config.aiBotName = config.ai.botName;
-    if (config.ai.enabled !== undefined) config.aiChatEnabled = config.ai.enabled;
-  }
-  if (config.GROQ_API_KEY && !config.groqApiKey) config.groqApiKey = config.GROQ_API_KEY;
-  if (config.OPENROUTER_API_KEY && !config.openrouterApiKey) config.openrouterApiKey = config.OPENROUTER_API_KEY;
-  if (config.GEMINI_API_KEY && !config.geminiApiKey) config.geminiApiKey = config.GEMINI_API_KEY;
-  if (config.OLLAMA_URL && !config.ollamaUrl) config.ollamaUrl = config.OLLAMA_URL;
-  if (config.OLLAMA_MODEL && !config.ollamaModel) config.ollamaModel = config.OLLAMA_MODEL;
-  if (config.OLLAMA_API_KEY && !config.ollamaApiKey) config.ollamaApiKey = config.OLLAMA_API_KEY;
-  if (config.BOT_NAME && !config.aiBotName) config.aiBotName = config.BOT_NAME;
-
-  // Sync process.env for standard libraries
-  if (config.groqApiKey) process.env.GROQ_API_KEY = config.groqApiKey;
-  if (config.openrouterApiKey) process.env.OPENROUTER_API_KEY = config.openrouterApiKey;
-  if (config.geminiApiKey) process.env.GEMINI_API_KEY = config.geminiApiKey;
-  if (config.ollamaUrl) process.env.OLLAMA_URL = config.ollamaUrl;
-  if (config.ollamaModel) process.env.OLLAMA_MODEL = config.ollamaModel;
-  if (config.aiBotName) process.env.BOT_NAME = config.aiBotName;
-
   // Initialize env values from config for libraries checking process.env
   if (config.proxyUrl) {
     process.env.PROXY_URL = config.proxyUrl;
@@ -211,46 +164,12 @@ export function readConfig(forceReload = false) {
 }
 
 /**
- * Dinamik olarak güncel AI yapılandırmasını ve API keylerini döndürür
+ * AI Yapılandırması (Kaldırıldı - Standalone ai-bot projesine taşındı)
  */
 export function getAiConfig() {
-  const cfg = readConfig(true); // force fresh read from disk
-  const groqKey = cfg.groqApiKey || process.env.GROQ_API_KEY || '';
-  const openrouterKey = cfg.openrouterApiKey || process.env.OPENROUTER_API_KEY || '';
-  const geminiKey = cfg.geminiApiKey || process.env.GEMINI_API_KEY || '';
-  const ollamaUrl = (cfg.ollamaUrl || process.env.OLLAMA_URL || 'https://ollama.com').replace(/\/+$/, '');
-  const ollamaModel = cfg.ollamaModel || process.env.OLLAMA_MODEL || 'gemma4:31b';
-  
-  let ollamaKeys = [];
-  if (Array.isArray(cfg.ollamaApiKeys)) {
-    ollamaKeys = cfg.ollamaApiKeys.filter(Boolean);
-  } else if (typeof cfg.ollamaApiKeys === 'string') {
-    ollamaKeys = cfg.ollamaApiKeys.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-  } else if (process.env.OLLAMA_API_KEYS) {
-    ollamaKeys = process.env.OLLAMA_API_KEYS.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-  } else if (cfg.ollamaApiKey) {
-    ollamaKeys = [cfg.ollamaApiKey.trim()];
-  } else if (process.env.OLLAMA_API_KEY) {
-    ollamaKeys = [process.env.OLLAMA_API_KEY.trim()];
-  }
-
-  const ollamaEnabled = Boolean(cfg.ollamaEnabled !== undefined ? cfg.ollamaEnabled : (process.env.OLLAMA_ENABLED === 'true' || ollamaKeys.length > 0));
-
   return {
-    groqApiKey: groqKey,
-    openrouterApiKey: openrouterKey,
-    geminiApiKey: geminiKey,
-    ollamaUrl: ollamaUrl,
-    ollamaModel: ollamaModel,
-    ollamaApiKey: ollamaKeys[0] || '',
-    ollamaApiKeys: ollamaKeys,
-    ollamaEnabled: ollamaEnabled,
-    hasAnyKey: Boolean(groqKey || openrouterKey || geminiKey || (ollamaEnabled && ollamaKeys.length > 0) || ollamaEnabled),
-    enabled: cfg.aiChatEnabled !== false,
-    botName: cfg.aiBotName || cfg.botName || process.env.BOT_NAME || 'Moi',
-    groqModel: cfg.groqModel || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
-    openrouterModel: cfg.openrouterModel || process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free',
-    geminiModel: cfg.geminiModel || process.env.GEMINI_MODEL || 'gemini-3.8-flash'
+    enabled: false,
+    hasAnyKey: false
   };
 }
 

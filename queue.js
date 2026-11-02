@@ -69,6 +69,40 @@ try { db.exec("ALTER TABLE active_tasks ADD COLUMN progress REAL"); } catch (e) 
 export let downloadQueue = [];
 export const pendingSelections = {}; // { 'sender_jid': { url: '...', title: '...', formats: [...], timer } }
 
+// ── İlerleme Bildirim Sistemi ──
+// Her kullanıcı için son ilerleme bildirim zamanını tutar (spam önleme)
+export const lastProgressNotify = new Map(); // { 'recipientJid': timestamp }
+
+// İlerleme bildirimini WhatsApp'a gönder (en fazla her 30 saniyede bir)
+export async function notifyProgress(recipientJid, task, sock) {
+  if (!sock || !recipientJid) return;
+  const now = Date.now();
+  const lastNotify = lastProgressNotify.get(recipientJid) || 0;
+  if (now - lastNotify < 30000) return; // 30 saniyede en fazla bir bildirim
+
+  lastProgressNotify.set(recipientJid, now);
+
+  const percent = task.progress || 0;
+  const bar = getProgressBar(percent);
+  const speed = task.speed || '0';
+  const status = task.status || 'Bilinmiyor';
+
+  try {
+    await sock.sendMessage(recipientJid, {
+      text: `📥 *İNDİRME İLERLEMESİ*\n━━━━━━━━━━━━━━━━━━━━\n📁 ${task.title || task.url}\n📊 İlerleme: *%${percent}*\n\`[${bar}]\`\n⚡ Hız: ~${speed} MB/s\n🔄 Durum: ${status}\n━━━━━━━━━━━━━━━━━━━━\n💡 Durum sorgusu: "indirmeler ne durumda"\n🛑 İptal: "indirme iptal"`
+    }, { skipAntiBan: true });
+  } catch (e) {
+    console.error('[PROGRESS NOTIFY ERROR]:', e.message);
+  }
+}
+
+function getProgressBar(percent) {
+  const totalBlocks = 10;
+  const filledBlocks = Math.min(totalBlocks, Math.max(0, Math.round((percent / 100) * totalBlocks)));
+  const emptyBlocks = totalBlocks - filledBlocks;
+  return '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
+}
+
 export function updateUserProgress(userId, seriesId, episode, season) {
   try {
     const stmt = db.prepare(`
@@ -513,6 +547,8 @@ export async function processQueue() {
               task.statusText = statusText.replace(/[*_~`]/g, '').trim();
             }
             notifyQueueUpdate();
+            // WhatsApp'a gerçek zamanlı ilerleme bildirimi gönder (30sn'de bir)
+            await notifyProgress(from, task, sock);
           }, 
           task.abortController.signal,
           task
